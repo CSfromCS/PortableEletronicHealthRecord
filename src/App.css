@@ -115,6 +115,48 @@ button {
   gap: 0.5rem;
 }
 
+.vitals-section {
+  background: var(--pale-oak-2);
+  border: 1px solid var(--taupe);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem;
+}
+
+.vitals-section h3 {
+  margin: 0;
+}
+
+.vitals-form {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+
+.vitals-list {
+  display: grid;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vitals-item {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--taupe);
+  border-radius: 8px;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+}
+
+.inline-note {
+  margin: 0;
+}
+
 .settings-panel p {
   margin-bottom: 0.75rem;
 }

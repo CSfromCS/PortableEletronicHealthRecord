@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
-import type { DailyUpdate, Patient } from './types'
+import type { DailyUpdate, Patient, VitalEntry } from './types'
 import './App.css'
 
 type PatientFormState = {
@@ -44,9 +44,20 @@ const initialProfileForm: ProfileFormState = {
 
 type DailyUpdateFormState = Omit<DailyUpdate, 'id' | 'patientId' | 'date' | 'lastUpdated'>
 
+type VitalFormState = {
+  time: string
+  bp: string
+  hr: string
+  rr: string
+  temp: string
+  spo2: string
+  note: string
+}
+
 type BackupPayload = {
   patients: Patient[]
   dailyUpdates: DailyUpdate[]
+  vitals?: VitalEntry[]
 }
 
 const initialDailyUpdateForm: DailyUpdateFormState = {
@@ -70,13 +81,33 @@ const toLocalISODate = (date = new Date()) => {
   return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 10)
 }
 
+const toLocalTime = (date = new Date()) => {
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours}:${minutes}`
+}
+
+const initialVitalForm = (): VitalFormState => ({
+  time: toLocalTime(),
+  bp: '',
+  hr: '',
+  rr: '',
+  temp: '',
+  spo2: '',
+  note: '',
+})
+
 declare const __APP_VERSION__: string;
 declare const __GIT_SHA__: string;
 
 const isBackupPayload = (value: unknown): value is BackupPayload => {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
-  return Array.isArray(candidate.patients) && Array.isArray(candidate.dailyUpdates)
+  if (!Array.isArray(candidate.patients) || !Array.isArray(candidate.dailyUpdates)) {
+    return false
+  }
+
+  return candidate.vitals === undefined || Array.isArray(candidate.vitals)
 }
 
 function App() {
@@ -91,11 +122,16 @@ function App() {
   const [dailyDate, setDailyDate] = useState(() => toLocalISODate())
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
+  const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const patients = useLiveQuery(() => db.patients.toArray(), [])
+  const dailyVitals = useLiveQuery(async () => {
+    if (selectedPatientId === null) return [] as VitalEntry[]
+    return db.vitals.where('[patientId+date]').equals([selectedPatientId, dailyDate]).sortBy('time')
+  }, [selectedPatientId, dailyDate])
 
   useEffect(() => {
     if ('storage' in navigator && 'persist' in navigator.storage) {
@@ -284,8 +320,24 @@ function App() {
       `Pendings: ${patient.pendings || '-'}`,
     ].join('\n')
 
-  const toDailySummary = (patient: Patient, update: DailyUpdateFormState) => {
+  const formatVitalEntry = (entry: VitalEntry) => {
+    const values = [
+      entry.bp ? `BP ${entry.bp}` : '',
+      entry.hr ? `HR ${entry.hr}` : '',
+      entry.rr ? `RR ${entry.rr}` : '',
+      entry.temp ? `T ${entry.temp}` : '',
+      entry.spo2 ? `O2 ${entry.spo2}` : '',
+      entry.note,
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    return `${entry.time} ${values}`.trim()
+  }
+
+  const toDailySummary = (patient: Patient, update: DailyUpdateFormState, vitalsEntries: VitalEntry[]) => {
     const hasAnyUpdate =
+      vitalsEntries.length > 0 ||
       update.vitals ||
       update.fluid ||
       update.respiratory ||
@@ -299,10 +351,19 @@ function App() {
       update.other ||
       update.assessment ||
       update.plans
-    const vitalsLine = update.vitals ? `Vitals: ${update.vitals}` : hasAnyUpdate ? '' : 'No update yet.'
+
+    const vitalsLines: string[] = []
+    if (update.vitals) {
+      vitalsLines.push(`Vitals: ${update.vitals}`)
+    }
+    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals: ${formatVitalEntry(entry)}`))
+    if (vitalsLines.length === 0 && !hasAnyUpdate) {
+      vitalsLines.push('No update yet.')
+    }
+
     const lines = [
       `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
-      vitalsLine,
+      ...vitalsLines,
       update.fluid ? `F: ${update.fluid}` : '',
       update.respiratory ? `R: ${update.respiratory}` : '',
       update.infectious ? `I: ${update.infectious}` : '',
@@ -346,10 +407,37 @@ function App() {
     await copyText(text)
   }
 
+  const addStructuredVital = async () => {
+    if (selectedPatientId === null || !vitalForm.time) return
+
+    await db.vitals.add({
+      patientId: selectedPatientId,
+      date: dailyDate,
+      time: vitalForm.time,
+      bp: vitalForm.bp.trim(),
+      hr: vitalForm.hr.trim(),
+      rr: vitalForm.rr.trim(),
+      temp: vitalForm.temp.trim(),
+      spo2: vitalForm.spo2.trim(),
+      note: vitalForm.note.trim(),
+      createdAt: new Date().toISOString(),
+    })
+
+    setVitalForm(initialVitalForm())
+    setNotice('Vital added.')
+  }
+
+  const deleteStructuredVital = async (vitalId?: number) => {
+    if (vitalId === undefined) return
+    await db.vitals.delete(vitalId)
+    setNotice('Vital removed.')
+  }
+
   const exportBackup = async () => {
     const payload: BackupPayload = {
       patients: await db.patients.toArray(),
       dailyUpdates: await db.dailyUpdates.toArray(),
+      vitals: await db.vitals.toArray(),
     }
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -375,7 +463,8 @@ function App() {
         return
       }
 
-      await db.transaction('rw', db.patients, db.dailyUpdates, async () => {
+      await db.transaction('rw', db.patients, db.dailyUpdates, db.vitals, async () => {
+        await db.vitals.clear()
         await db.dailyUpdates.clear()
         await db.patients.clear()
         if (parsed.patients.length > 0) {
@@ -384,11 +473,15 @@ function App() {
         if (parsed.dailyUpdates.length > 0) {
           await db.dailyUpdates.bulkPut(parsed.dailyUpdates)
         }
+        if ((parsed.vitals ?? []).length > 0) {
+          await db.vitals.bulkPut(parsed.vitals ?? [])
+        }
       })
 
       setSelectedPatientId(null)
       setDailyUpdateId(undefined)
       setDailyUpdateForm(initialDailyUpdateForm)
+      setVitalForm(initialVitalForm())
       setProfileForm(initialProfileForm)
       setNotice('Backup imported.')
     } catch {
@@ -407,14 +500,16 @@ function App() {
       return
     }
 
-    await db.transaction('rw', db.patients, db.dailyUpdates, async () => {
+    await db.transaction('rw', db.patients, db.dailyUpdates, db.vitals, async () => {
       await db.patients.bulkDelete(dischargedIds)
       await db.dailyUpdates.where('patientId').anyOf(dischargedIds).delete()
+      await db.vitals.where('patientId').anyOf(dischargedIds).delete()
     })
 
     if (selectedPatientId !== null && dischargedIds.includes(selectedPatientId)) {
       setSelectedPatientId(null)
       setDailyUpdateForm(initialDailyUpdateForm)
+      setVitalForm(initialVitalForm())
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
     }
@@ -653,9 +748,77 @@ function App() {
                           if (selectedPatient?.id) {
                             void loadDailyUpdate(selectedPatient.id, nextDate)
                           }
+                          setVitalForm(initialVitalForm())
                         }}
                       />
                     </label>
+                    <section className='vitals-section'>
+                      <h3>Structured vitals</h3>
+                      <div className='vitals-form'>
+                        <input
+                          aria-label='Vital time'
+                          type='time'
+                          value={vitalForm.time}
+                          onChange={(event) => setVitalForm({ ...vitalForm, time: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital blood pressure'
+                          placeholder='BP'
+                          value={vitalForm.bp}
+                          onChange={(event) => setVitalForm({ ...vitalForm, bp: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital heart rate'
+                          placeholder='HR'
+                          value={vitalForm.hr}
+                          onChange={(event) => setVitalForm({ ...vitalForm, hr: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital respiratory rate'
+                          placeholder='RR'
+                          value={vitalForm.rr}
+                          onChange={(event) => setVitalForm({ ...vitalForm, rr: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital temperature'
+                          placeholder='Temp'
+                          value={vitalForm.temp}
+                          onChange={(event) => setVitalForm({ ...vitalForm, temp: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital oxygen saturation'
+                          placeholder='SpO2'
+                          value={vitalForm.spo2}
+                          onChange={(event) => setVitalForm({ ...vitalForm, spo2: event.target.value })}
+                        />
+                        <input
+                          aria-label='Vital note'
+                          placeholder='Note'
+                          value={vitalForm.note}
+                          onChange={(event) => setVitalForm({ ...vitalForm, note: event.target.value })}
+                        />
+                        <button type='button' onClick={() => void addStructuredVital()}>
+                          Add vital
+                        </button>
+                      </div>
+                      {dailyVitals && dailyVitals.length > 0 ? (
+                        <ul className='vitals-list'>
+                          {dailyVitals.map((entry) => (
+                            <li key={entry.id} className='vitals-item'>
+                              <span>
+                                {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
+                                {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
+                              </span>
+                              <button type='button' onClick={() => void deleteStructuredVital(entry.id)}>
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No structured vitals for this date yet.</p>
+                      )}
+                    </section>
                     <textarea
                       aria-label='Vitals'
                       placeholder='Vitals'
@@ -777,12 +940,17 @@ function App() {
                       <button type='button' onClick={() => void saveDailyUpdate()}>
                         Save daily update
                       </button>
-                      <button type='button' onClick={() => void copyText(toDailySummary(selectedPatient, dailyUpdateForm))}>
+                      <button
+                        type='button'
+                        onClick={() => void copyText(toDailySummary(selectedPatient, dailyUpdateForm, dailyVitals ?? []))}
+                      >
                         Copy daily summary
                       </button>
                       <button
                         type='button'
-                        onClick={() => void shareText(toDailySummary(selectedPatient, dailyUpdateForm), 'Daily summary')}
+                        onClick={() =>
+                          void shareText(toDailySummary(selectedPatient, dailyUpdateForm, dailyVitals ?? []), 'Daily summary')
+                        }
                       >
                         Share daily summary
                       </button>

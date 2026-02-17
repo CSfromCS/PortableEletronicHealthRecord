@@ -16,7 +16,8 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
 - ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas with manual save plus debounced auto-save, clipboard text generation for census entry, daily summary, and full census copy.
 - ✅ Phase 1 backlog completed in-app: list search/filter/sort controls, settings backup export/import UI, clear discharged patients action, and optional Web Share integration (clipboard fallback retained).
-- ⏳ Still pending (future phases): structured vitals/medications/labs/order stores and advanced derived generators.
+- ⏳ Still pending (future phases): structured medications/labs/order stores and advanced derived generators.
+- ✅ Phase 2 started: structured vitals store + quick-entry UI is implemented as an optional enhancement in Daily Update.
 
 ---
 
@@ -155,6 +156,7 @@ interface DailyUpdate {
 #### Tab: Daily Update
 - Date picker defaults to today and loads data via Dexie's `[patientId+date]` compound index so you can toggle between diary entries.
 - FRICHMOND text areas for each category, plus vitals, assessment, and plan fields; manual save remains available and debounced auto-save persists edits during typing.
+- Structured vitals quick-entry rows (time/BP/HR/RR/temp/SpO2/note) are stored separately per patient+date and listed in-app for fast bedside capture.
 - **"Copy Daily Summary"** and **"Share Daily Summary"** buttons render the formatted text block from current values.
 
 ### 3. Settings
@@ -248,7 +250,6 @@ Tasks:
 
 These are all the features from the original plan. Add them **one at a time** when freeform text stops being good enough:
 
-- **Structured vitals store** — if typing vitals as text feels too slow and you want a quick-entry row with timestamp
 - **Structured medications store** — if managing med lists as text is error-prone
 - **Structured labs with comparison** — if you want automatic delta calculations (↑↓→)
 - **Doctor's orders tracking** — if you need to track order status (active/carried out/discontinued)
@@ -333,7 +334,7 @@ rounding-app/
 |---|---|---|
 | PWA | Yes | Same URL works on phone + laptop, installable, offline-capable |
 | Data model | 2 stores, freeform text | Ship fast; add structure when freeform hurts |
-| Vitals | Freeform text in daily update | Faster to type than structured entry for MVP |
+| Vitals | Hybrid: freeform + structured quick entries | Preserve fast notes while enabling timestamped row capture |
 | Labs | Freeform text on patient record | Structured comparison is Phase 2 |
 | Medications | Freeform text on patient record | Structured tracking is Phase 2 |
 | Security | Deferred | Personal tool, phone/laptop already have lock screens |
@@ -348,7 +349,6 @@ The original plan had 7 Dexie stores, 13 agent sessions, and a 12-weekend timeli
 
 | Cut Feature | Add Back When... |
 |---|---|
-| `vitals` store (structured per-timestamp) | Typing vitals as text feels too slow |
 | `orders` store (status tracking) | You need to track which orders are done vs pending |
 | `medications` store (structured) | Managing med lists as text causes errors |
 | `medicationDoses` store (dose logging) | You need to know exactly when doses were given |

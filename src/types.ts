@@ -42,3 +42,17 @@ export interface DailyUpdate {
   plans: string
   lastUpdated: string
 }
+
+export interface VitalEntry {
+  id?: number
+  patientId: number
+  date: string
+  time: string
+  bp: string
+  hr: string
+  rr: string
+  temp: string
+  spo2: string
+  note: string
+  createdAt: string
+}
