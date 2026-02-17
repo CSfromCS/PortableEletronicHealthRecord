@@ -2,7 +2,11 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vite'
 
+const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
+const base = process.env.GITHUB_ACTIONS && repositoryName ? `/${repositoryName}/` : '/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -12,7 +16,7 @@ export default defineConfig({
         name: 'Portable Electronic Health Record',
         short_name: 'PEHR',
         description: 'Offline-first patient tracking for hospital rounds',
-        start_url: '/',
+        start_url: './',
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#ffffff',
