@@ -1,12 +1,25 @@
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vite'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { execSync } from "node:child_process";
 
 const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
 const base = process.env.GITHUB_ACTIONS && repositoryName ? `/${repositoryName}/` : '/'
 
-const gitSha = execSync("git rev-parse --short HEAD").toString().trim();
+const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8')) as {
+  version?: string
+}
+const appVersion = packageJson.version ?? '0.0.0'
+
+const gitSha = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'dev'
+  }
+})()
 
 export default defineConfig({
   base,
@@ -35,7 +48,7 @@ export default defineConfig({
     }),
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "0.0.0-dev"),
+    __APP_VERSION__: JSON.stringify(appVersion),
     __GIT_SHA__: JSON.stringify(gitSha),
   },
 })

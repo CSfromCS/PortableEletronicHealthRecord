@@ -68,3 +68,14 @@ export interface MedicationEntry {
   status: 'active' | 'discontinued'
   createdAt: string
 }
+
+export interface LabEntry {
+  id?: number
+  patientId: number
+  date: string
+  testName: string
+  value: string
+  unit: string
+  note: string
+  createdAt: string
+}

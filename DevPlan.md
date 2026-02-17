@@ -8,17 +8,26 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 
 **Design principle: better than Google Sheets on a phone, not a full EMR.** If a feature doesn't directly make note-taking or text generation faster, it waits.
 
+## Release Hygiene (Required Every Change)
+
+For any user-visible or behavior-changing update:
+- Bump `package.json` version in the same task.
+- Ensure footer version reflects the new version after build/run.
+- Include the new version in the task handoff summary.
+
 ---
 
 ## Current Progress (as of 2026-02-17)
 
+- ⚠️ Development note: backward compatibility is not required at this stage. No real patient records exist yet, so schema, UI flows, and generated text formats can be changed freely while iterating.
 - ✅ Keep this as `DevPlan.md` (no `agent.md` file is needed for this project plan).
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
 - ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas with manual save plus debounced auto-save, clipboard text generation for census entry, daily summary, and full census copy.
 - ✅ Phase 1 backlog completed in-app: list search/filter/sort controls, settings backup export/import UI, clear discharged patients action, and optional Web Share integration (clipboard fallback retained).
-- ⏳ Still pending (future phases): structured labs/order stores and advanced derived generators.
+- ⏳ Still pending (future phases): doctor's orders tracking and medication dose logging.
 - ✅ Phase 2 started: structured vitals store + quick-entry UI is implemented as an optional enhancement in Daily Update.
 - ✅ Phase 2 continued: structured medications store + quick-entry UI is implemented as an optional enhancement in Profile.
+- ✅ Phase 2 continued: structured labs store + quick-entry UI with per-test trend comparison is implemented in Profile and included in census output.
 
 ---
 
@@ -252,7 +261,7 @@ Tasks:
 
 These are all the features from the original plan. Add them **one at a time** when freeform text stops being good enough:
 
-- **Structured labs with comparison** — if you want automatic delta calculations (↑↓→)
+- ✅ **Structured labs with comparison** — implemented with per-test comparison indicators (↑↓→)
 - **Doctor's orders tracking** — if you need to track order status (active/carried out/discontinued)
 - **Medication dose logging** — if you need to track when doses were given
 
@@ -334,9 +343,9 @@ rounding-app/
 | Decision | Choice | Rationale |
 |---|---|---|
 | PWA | Yes | Same URL works on phone + laptop, installable, offline-capable |
-| Data model | 2 stores, freeform text | Ship fast; add structure when freeform hurts |
+| Data model | Hybrid: freeform + targeted structured stores | Keep fast note flow while adding structure where repetitive formatting hurts |
 | Vitals | Hybrid: freeform + structured quick entries | Preserve fast notes while enabling timestamped row capture |
-| Labs | Freeform text on patient record | Structured comparison is Phase 2 |
+| Labs | Hybrid: freeform + structured quick entries | Preserve quick notes while adding comparison-ready trends |
 | Medications | Hybrid: freeform + structured quick entries | Keep old note flow while enabling cleaner med list tracking |
 | Security | Deferred | Personal tool, phone/laptop already have lock screens |
 | Multi-user sync | Not planned | Personal tool |

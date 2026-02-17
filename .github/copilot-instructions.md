@@ -6,7 +6,14 @@ Before coding, read `DevPlan.md` and follow it as the source of truth for scope 
 1. Read `DevPlan.md` before making code changes.
 2. Implement only what matches the current phase and scope in `DevPlan.md`.
 3. If implementation changes roadmap status, completed work, or priorities, update `DevPlan.md` in the same task.
-4. For user-visible or behavior-changing updates, bump `package.json` version so app footer version changes and can be verified.
+4. For every user-visible or behavior-changing update, bump `package.json` version in the same task so app footer version changes and can be verified.
+5. Do not finalize implementation work until step 4 is done.
+
+## Definition of Done (Required)
+- [ ] Code change implemented and validated.
+- [ ] `DevPlan.md` status updated if scope/progress changed.
+- [ ] `package.json` version bumped for user-visible or behavior-changing work.
+- [ ] Final response explicitly mentions the new app version.
 
 ## Priorities
 1. Preserve MVP simplicity (personal offline clerk tool, no backend/auth).
@@ -22,5 +29,5 @@ Before coding, read `DevPlan.md` and follow it as the source of truth for scope 
 
 ## Maintenance
 - Keep `DevPlan.md` synchronized with implementation status.
-- Bump `package.json` version on meaningful user-visible changes.
+- Bump `package.json` version on every meaningful user-visible or behavior-changing change.
 - Keep README setup/run instructions accurate.

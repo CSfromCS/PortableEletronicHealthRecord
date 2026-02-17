@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
-import type { DailyUpdate, MedicationEntry, Patient, VitalEntry } from './types'
+import type { DailyUpdate, LabEntry, MedicationEntry, Patient, VitalEntry } from './types'
 import './App.css'
 
 type PatientFormState = {
@@ -68,6 +68,15 @@ type BackupPayload = {
   dailyUpdates: DailyUpdate[]
   vitals?: VitalEntry[]
   medications?: MedicationEntry[]
+  labs?: LabEntry[]
+}
+
+type LabFormState = {
+  date: string
+  testName: string
+  value: string
+  unit: string
+  note: string
 }
 
 const initialDailyUpdateForm: DailyUpdateFormState = {
@@ -116,6 +125,14 @@ const initialMedicationForm = (): MedicationFormState => ({
   status: 'active',
 })
 
+const initialLabForm = (): LabFormState => ({
+  date: toLocalISODate(),
+  testName: '',
+  value: '',
+  unit: '',
+  note: '',
+})
+
 declare const __APP_VERSION__: string;
 declare const __GIT_SHA__: string;
 
@@ -128,7 +145,8 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
 
   const validVitals = candidate.vitals === undefined || Array.isArray(candidate.vitals)
   const validMedications = candidate.medications === undefined || Array.isArray(candidate.medications)
-  return validVitals && validMedications
+  const validLabs = candidate.labs === undefined || Array.isArray(candidate.labs)
+  return validVitals && validMedications && validLabs
 }
 
 function App() {
@@ -145,12 +163,14 @@ function App() {
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [medicationForm, setMedicationForm] = useState<MedicationFormState>(() => initialMedicationForm())
+  const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
+  const labs = useLiveQuery(() => db.labs.toArray(), [])
   const dailyVitals = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as VitalEntry[]
     return db.vitals.where('[patientId+date]').equals([selectedPatientId, dailyDate]).sortBy('time')
@@ -193,6 +213,31 @@ function App() {
     if (selectedPatientId === null) return []
     return structuredMedsByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredMedsByPatient])
+
+  const structuredLabsByPatient = useMemo(() => {
+    const grouped = new Map<number, LabEntry[]>()
+    ;(labs ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.date !== b.date) {
+          return b.date.localeCompare(a.date)
+        }
+        return b.createdAt.localeCompare(a.createdAt)
+      })
+    })
+
+    return grouped
+  }, [labs])
+
+  const selectedPatientStructuredLabs = useMemo(() => {
+    if (selectedPatientId === null) return []
+    return structuredLabsByPatient.get(selectedPatientId) ?? []
+  }, [selectedPatientId, structuredLabsByPatient])
 
   const visiblePatients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -314,6 +359,7 @@ function App() {
     setView('patients')
     setSelectedPatientId(patient.id ?? null)
     setMedicationForm(initialMedicationForm())
+    setLabForm(initialLabForm())
     setSelectedTab('profile')
   }
 
@@ -332,23 +378,26 @@ function App() {
     setNotice('Profile saved.')
   }
 
-  const saveDailyUpdate = async (manual = true) => {
-    if (selectedPatientId === null) return
+  const saveDailyUpdate = useCallback(
+    async (manual = true) => {
+      if (selectedPatientId === null) return
 
-    const nextId = await db.dailyUpdates.put({
-      id: dailyUpdateId,
-      patientId: selectedPatientId,
-      date: dailyDate,
-      ...dailyUpdateForm,
-      lastUpdated: new Date().toISOString(),
-    })
+      const nextId = await db.dailyUpdates.put({
+        id: dailyUpdateId,
+        patientId: selectedPatientId,
+        date: dailyDate,
+        ...dailyUpdateForm,
+        lastUpdated: new Date().toISOString(),
+      })
 
-    setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
-    setDailyDirty(false)
-    if (manual) {
-      setNotice('Daily update saved.')
-    }
-  }
+      setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
+      setDailyDirty(false)
+      if (manual) {
+        setNotice('Daily update saved.')
+      }
+    },
+    [dailyDate, dailyUpdateForm, dailyUpdateId, selectedPatientId],
+  )
 
   useEffect(() => {
     if (selectedPatientId === null || !dailyDirty) return
@@ -358,7 +407,7 @@ function App() {
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
-  }, [dailyDate, dailyDirty, dailyUpdateForm, dailyUpdateId, selectedPatientId])
+  }, [dailyDirty, saveDailyUpdate, selectedPatientId])
 
   const formatStructuredMedication = (entry: MedicationEntry) => {
     const base = [entry.medication, entry.dose, entry.route, entry.frequency].filter(Boolean).join(' ')
@@ -369,7 +418,46 @@ function App() {
     return withNote
   }
 
-  const toCensusEntry = (patient: Patient, medicationEntries: MedicationEntry[]) => {
+  const compareLabValue = (currentValue: string, previousValue: string) => {
+    const current = Number.parseFloat(currentValue)
+    const previous = Number.parseFloat(previousValue)
+    if (!Number.isFinite(current) || !Number.isFinite(previous)) {
+      return ''
+    }
+
+    const delta = current - previous
+    if (Math.abs(delta) < 0.0001) {
+      return '→ vs prev'
+    }
+
+    const sign = delta > 0 ? '+' : ''
+    const arrow = delta > 0 ? '↑' : '↓'
+    return `${arrow} ${sign}${delta.toFixed(2)} vs prev`
+  }
+
+  const formatStructuredLab = (entry: LabEntry, previousByTest: Map<string, LabEntry>) => {
+    const valueWithUnit = [entry.value, entry.unit].filter(Boolean).join(' ')
+    const previous = previousByTest.get(entry.testName.trim().toLowerCase())
+    const comparison = previous ? compareLabValue(entry.value, previous.value) : ''
+    const note = entry.note ? ` — ${entry.note}` : ''
+    return `${entry.date} ${entry.testName}: ${valueWithUnit || '-'}${comparison ? ` (${comparison})` : ''}${note}`
+  }
+
+  const buildStructuredLabLines = (entries: LabEntry[]) => {
+    const previousByTest = new Map<string, LabEntry>()
+    const lines: string[] = []
+
+    entries.forEach((entry) => {
+      const testKey = entry.testName.trim().toLowerCase()
+      if (!testKey) return
+      lines.push(formatStructuredLab(entry, previousByTest))
+      previousByTest.set(testKey, entry)
+    })
+
+    return lines
+  }
+
+  const toCensusEntry = (patient: Patient, medicationEntries: MedicationEntry[], labEntries: LabEntry[]) => {
     const activeStructuredMeds = medicationEntries
       .filter((entry) => entry.status === 'active')
       .map(formatStructuredMedication)
@@ -377,11 +465,14 @@ function App() {
 
     const freeformMeds = patient.medications.trim()
     const medsCombined = [freeformMeds, ...activeStructuredMeds].filter(Boolean).join('\n')
+    const freeformLabs = patient.labs.trim()
+    const structuredLabLines = buildStructuredLabLines(labEntries)
+    const labsCombined = [freeformLabs, ...structuredLabLines].filter(Boolean).join('\n')
 
     return [
       `${patient.roomNumber} ${patient.lastName}, ${patient.firstName} ${patient.age}/${patient.sex}`,
       patient.diagnosis,
-      `Labs: ${patient.labs || '-'}`,
+      `Labs: ${labsCombined || '-'}`,
       `Meds: ${medsCombined || '-'}`,
       `Pendings: ${patient.pendings || '-'}`,
     ].join('\n')
@@ -532,12 +623,36 @@ function App() {
     setNotice('Medication removed.')
   }
 
+  const addStructuredLab = async () => {
+    if (selectedPatientId === null || !labForm.testName.trim()) return
+
+    await db.labs.add({
+      patientId: selectedPatientId,
+      date: labForm.date,
+      testName: labForm.testName.trim(),
+      value: labForm.value.trim(),
+      unit: labForm.unit.trim(),
+      note: labForm.note.trim(),
+      createdAt: new Date().toISOString(),
+    })
+
+    setLabForm((previous) => ({ ...initialLabForm(), date: previous.date }))
+    setNotice('Lab added.')
+  }
+
+  const deleteStructuredLab = async (labId?: number) => {
+    if (labId === undefined) return
+    await db.labs.delete(labId)
+    setNotice('Lab removed.')
+  }
+
   const exportBackup = async () => {
     const payload: BackupPayload = {
       patients: await db.patients.toArray(),
       dailyUpdates: await db.dailyUpdates.toArray(),
       vitals: await db.vitals.toArray(),
       medications: await db.medications.toArray(),
+      labs: await db.labs.toArray(),
     }
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -563,7 +678,8 @@ function App() {
         return
       }
 
-      await db.transaction('rw', db.patients, db.dailyUpdates, db.vitals, db.medications, async () => {
+      await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs], async () => {
+        await db.labs.clear()
         await db.medications.clear()
         await db.vitals.clear()
         await db.dailyUpdates.clear()
@@ -580,6 +696,9 @@ function App() {
         if ((parsed.medications ?? []).length > 0) {
           await db.medications.bulkPut(parsed.medications ?? [])
         }
+        if ((parsed.labs ?? []).length > 0) {
+          await db.labs.bulkPut(parsed.labs ?? [])
+        }
       })
 
       setSelectedPatientId(null)
@@ -587,6 +706,7 @@ function App() {
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setMedicationForm(initialMedicationForm())
+      setLabForm(initialLabForm())
       setProfileForm(initialProfileForm)
       setNotice('Backup imported.')
     } catch {
@@ -605,11 +725,12 @@ function App() {
       return
     }
 
-    await db.transaction('rw', db.patients, db.dailyUpdates, db.vitals, db.medications, async () => {
+    await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs], async () => {
       await db.patients.bulkDelete(dischargedIds)
       await db.dailyUpdates.where('patientId').anyOf(dischargedIds).delete()
       await db.vitals.where('patientId').anyOf(dischargedIds).delete()
       await db.medications.where('patientId').anyOf(dischargedIds).delete()
+      await db.labs.where('patientId').anyOf(dischargedIds).delete()
     })
 
     if (selectedPatientId !== null && dischargedIds.includes(selectedPatientId)) {
@@ -617,6 +738,7 @@ function App() {
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setMedicationForm(initialMedicationForm())
+      setLabForm(initialLabForm())
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
     }
@@ -760,7 +882,13 @@ function App() {
                 onClick={() =>
                   void copyText(
                     activePatients
-                      .map((patient) => toCensusEntry(patient, structuredMedsByPatient.get(patient.id ?? -1) ?? []))
+                      .map((patient) =>
+                        toCensusEntry(
+                          patient,
+                          structuredMedsByPatient.get(patient.id ?? -1) ?? [],
+                          structuredLabsByPatient.get(patient.id ?? -1) ?? [],
+                        ),
+                      )
                       .join('\n\n'),
                   )
                 }
@@ -773,7 +901,13 @@ function App() {
                 onClick={() =>
                   void shareText(
                     activePatients
-                      .map((patient) => toCensusEntry(patient, structuredMedsByPatient.get(patient.id ?? -1) ?? []))
+                      .map((patient) =>
+                        toCensusEntry(
+                          patient,
+                          structuredMedsByPatient.get(patient.id ?? -1) ?? [],
+                          structuredLabsByPatient.get(patient.id ?? -1) ?? [],
+                        ),
+                      )
                       .join('\n\n'),
                     'Full census',
                   )
@@ -898,6 +1032,61 @@ function App() {
                       value={profileForm.labs}
                       onChange={(event) => setProfileForm({ ...profileForm, labs: event.target.value })}
                     />
+                    <section className='labs-section'>
+                      <h3>Structured labs</h3>
+                      <div className='labs-form'>
+                        <input
+                          aria-label='Lab date'
+                          type='date'
+                          value={labForm.date}
+                          onChange={(event) => setLabForm({ ...labForm, date: event.target.value })}
+                        />
+                        <input
+                          aria-label='Lab test name'
+                          placeholder='Test name'
+                          value={labForm.testName}
+                          onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })}
+                        />
+                        <input
+                          aria-label='Lab value'
+                          placeholder='Value'
+                          value={labForm.value}
+                          onChange={(event) => setLabForm({ ...labForm, value: event.target.value })}
+                        />
+                        <input
+                          aria-label='Lab unit'
+                          placeholder='Unit'
+                          value={labForm.unit}
+                          onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })}
+                        />
+                        <input
+                          aria-label='Lab note'
+                          placeholder='Note'
+                          value={labForm.note}
+                          onChange={(event) => setLabForm({ ...labForm, note: event.target.value })}
+                        />
+                        <button type='button' onClick={() => void addStructuredLab()}>
+                          Add lab
+                        </button>
+                      </div>
+                      {selectedPatientStructuredLabs.length > 0 ? (
+                        <ul className='labs-list'>
+                          {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
+                            const entry = selectedPatientStructuredLabs[index]
+                            return (
+                              <li key={entry.id} className='labs-item'>
+                                <span>{line}</span>
+                                <button type='button' onClick={() => void deleteStructuredLab(entry.id)}>
+                                  Remove
+                                </button>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No structured labs yet.</p>
+                      )}
+                    </section>
                     <textarea
                       aria-label='Pendings'
                       placeholder='Pendings'
@@ -916,14 +1105,21 @@ function App() {
                       </button>
                       <button
                         type='button'
-                        onClick={() => void copyText(toCensusEntry(selectedPatient, selectedPatientStructuredMeds))}
+                        onClick={() =>
+                          void copyText(
+                            toCensusEntry(selectedPatient, selectedPatientStructuredMeds, selectedPatientStructuredLabs),
+                          )
+                        }
                       >
                         Copy census entry
                       </button>
                       <button
                         type='button'
                         onClick={() =>
-                          void shareText(toCensusEntry(selectedPatient, selectedPatientStructuredMeds), 'Census entry')
+                          void shareText(
+                            toCensusEntry(selectedPatient, selectedPatientStructuredMeds, selectedPatientStructuredLabs),
+                            'Census entry',
+                          )
                         }
                       >
                         Share census entry
