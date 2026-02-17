@@ -1538,7 +1538,7 @@ function App() {
     <div className='min-h-screen'>
       <main>
         <h1 className='text-2xl font-semibold text-mauve-shadow'>Portable Unofficial Health Record - Really (PUHRR)</h1>
-        <p>Simple notes for bedside rounds.</p>
+        <p>The puhrfect tool for clerk admin work.</p>
         {notice ? (
           <Alert className='border-action-primary/30 bg-cherry-blossom/50 mb-2'>
             <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
@@ -1658,7 +1658,7 @@ function App() {
               ))}
             </div>
 
-            <div className='flex justify-end mb-2'>
+            <div className='flex justify-end mt-2 mb-2'>
               <Button
                 variant='secondary'
                 onClick={() =>
