@@ -60,12 +60,17 @@ const initialDailyUpdateForm: DailyUpdateFormState = {
   plans: '',
 }
 
+const toLocalISODate = (date = new Date()) => {
+  const timezoneOffsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - timezoneOffsetMs).toISOString().slice(0, 10)
+}
+
 function App() {
   const [form, setForm] = useState<PatientFormState>(initialForm)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [profileForm, setProfileForm] = useState<ProfileFormState>(initialProfileForm)
-  const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dailyDate, setDailyDate] = useState(() => toLocalISODate())
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
@@ -105,7 +110,7 @@ function App() {
       sex: form.sex,
       service: form.service.trim(),
       diagnosis: form.diagnosis.trim(),
-      admitDate: new Date().toISOString().slice(0, 10),
+      admitDate: toLocalISODate(),
       attendingPhysician: '',
       chiefComplaint: '',
       hpiText: '',
@@ -189,7 +194,7 @@ function App() {
     const discharged = patient.status === 'active'
     await db.patients.update(patient.id, {
       status: discharged ? 'discharged' : 'active',
-      dischargeDate: discharged ? new Date().toISOString().slice(0, 10) : undefined,
+      dischargeDate: discharged ? toLocalISODate() : undefined,
     })
   }
 
@@ -221,9 +226,24 @@ function App() {
     ].join('\n')
 
   const toDailySummary = (patient: Patient, update: DailyUpdateFormState) => {
+    const hasAnyUpdate =
+      update.vitals ||
+      update.fluid ||
+      update.respiratory ||
+      update.infectious ||
+      update.cardio ||
+      update.hema ||
+      update.metabolic ||
+      update.output ||
+      update.neuro ||
+      update.drugs ||
+      update.other ||
+      update.assessment ||
+      update.plans
+    const vitalsLine = update.vitals ? `Vitals: ${update.vitals}` : hasAnyUpdate ? '' : 'No update yet.'
     const lines = [
       `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
-      update.vitals ? `Vitals: ${update.vitals}` : 'No update yet.',
+      vitalsLine,
       update.fluid ? `F: ${update.fluid}` : '',
       update.respiratory ? `R: ${update.respiratory}` : '',
       update.infectious ? `I: ${update.infectious}` : '',
