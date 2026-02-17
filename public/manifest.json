@@ -4,8 +4,8 @@
   "description": "Offline-first patient tracking for hospital rounds",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#d7c0aeff",
+  "theme_color": "#e17e65ff",
   "icons": [
     {
       "src": "vite.svg",
