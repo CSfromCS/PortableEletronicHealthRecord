@@ -119,6 +119,83 @@ type LabFormState = {
   note: string
 }
 
+type LabTemplateTest = {
+  key: string
+  displayName: string
+  fullName?: string
+  unit?: string
+}
+
+type LabTemplate = {
+  id: string
+  name: string
+  tests: LabTemplateTest[]
+}
+
+const LAB_TEMPLATES: LabTemplate[] = [
+  {
+    id: 'ust-cbc',
+    name: 'UST - CBC',
+    tests: [
+      { key: 'rbc', displayName: 'RBC', fullName: 'RBC count', unit: 'x10^12/L' },
+      { key: 'hgb', displayName: 'Hgb', fullName: 'Hemoglobin', unit: 'g/L' },
+      { key: 'hct', displayName: 'Hct', fullName: 'Hematocrit' },
+      { key: 'mcv', displayName: 'MCV', fullName: 'Mean Cell Volume', unit: 'fL' },
+      { key: 'mch', displayName: 'MCH', fullName: 'Mean Cell Hemoglobin', unit: 'pg' },
+      { key: 'mchc', displayName: 'MCHC', fullName: 'Mean Cell Hemoglobin Concentration', unit: 'g/dL' },
+      { key: 'rdw', displayName: 'RDW', fullName: 'Red Cell Distribution Width', unit: '%' },
+      { key: 'plt', displayName: 'Plt', fullName: 'Platelet Count', unit: 'x10^9/L' },
+      { key: 'mpv', displayName: 'MPV', fullName: 'Mean Platelet Volume', unit: 'fL' },
+      { key: 'wbc', displayName: 'WBC', fullName: 'WBC Count', unit: 'x10^9/L' },
+      { key: 'n', displayName: 'N', fullName: 'Neutrophils' },
+      { key: 'metamyelocytes', displayName: 'Metamyelocytes' },
+      { key: 'bands', displayName: 'Bands' },
+      { key: 's', displayName: 'S', fullName: 'Segmenters' },
+      { key: 'l', displayName: 'L', fullName: 'Lymphocytes' },
+      { key: 'm', displayName: 'M', fullName: 'Monocytes' },
+      { key: 'e', displayName: 'E', fullName: 'Eosinophils' },
+      { key: 'b', displayName: 'B', fullName: 'Basophils' },
+      { key: 'blasts', displayName: 'Blasts' },
+      { key: 'myelocytes', displayName: 'Myelocytes' },
+      { key: 'mdw', displayName: 'MDW', fullName: 'Monocyte Distribution Width' },
+    ],
+  },
+  {
+    id: 'ust-urinalysis',
+    name: 'UST - Urinalysis',
+    tests: [
+      { key: 'ua-color', displayName: 'Color' },
+      { key: 'ua-clarity', displayName: 'Transparency' },
+      { key: 'ua-sg', displayName: 'Specific Gravity' },
+      { key: 'ua-ph', displayName: 'pH' },
+      { key: 'ua-protein', displayName: 'Protein' },
+      { key: 'ua-glucose', displayName: 'Glucose' },
+      { key: 'ua-ketones', displayName: 'Ketones' },
+      { key: 'ua-blood', displayName: 'Blood' },
+      { key: 'ua-le', displayName: 'Leukocyte Esterase' },
+      { key: 'ua-nitrite', displayName: 'Nitrite' },
+      { key: 'ua-wbc', displayName: 'WBC /HPF' },
+      { key: 'ua-rbc', displayName: 'RBC /HPF' },
+      { key: 'ua-bacteria', displayName: 'Bacteria' },
+    ],
+  },
+  {
+    id: 'ust-electrolytes',
+    name: 'UST - Electrolytes / Renal',
+    tests: [
+      { key: 'na', displayName: 'Na', fullName: 'Sodium', unit: 'mmol/L' },
+      { key: 'k', displayName: 'K', fullName: 'Potassium', unit: 'mmol/L' },
+      { key: 'cl', displayName: 'Cl', fullName: 'Chloride', unit: 'mmol/L' },
+      { key: 'hco3', displayName: 'HCO3', fullName: 'Bicarbonate', unit: 'mmol/L' },
+      { key: 'bun', displayName: 'BUN', fullName: 'Blood Urea Nitrogen', unit: 'mg/dL' },
+      { key: 'crea', displayName: 'Crea', fullName: 'Creatinine', unit: 'mg/dL' },
+      { key: 'egfr', displayName: 'eGFR', unit: 'mL/min/1.73m²' },
+    ],
+  },
+]
+
+const DEFAULT_LAB_TEMPLATE_ID = LAB_TEMPLATES[0].id
+
 const initialDailyUpdateForm: DailyUpdateFormState = {
   fluid: '',
   respiratory: '',
@@ -220,6 +297,9 @@ function App() {
   const [orderDraftId, setOrderDraftId] = useState<number | null>(null)
   const [orderDirty, setOrderDirty] = useState(false)
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
+  const [selectedLabTemplateId, setSelectedLabTemplateId] = useState(DEFAULT_LAB_TEMPLATE_ID)
+  const [labTemplateDate, setLabTemplateDate] = useState(() => toLocalISODate())
+  const [labTemplateValues, setLabTemplateValues] = useState<Record<string, string>>({})
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
   const [profileDirty, setProfileDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -320,6 +400,11 @@ function App() {
     if (selectedPatientId === null) return []
     return structuredLabsByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredLabsByPatient])
+
+  const selectedLabTemplate = useMemo(
+    () => LAB_TEMPLATES.find((template) => template.id === selectedLabTemplateId) ?? LAB_TEMPLATES[0],
+    [selectedLabTemplateId],
+  )
 
   const structuredOrdersByPatient = useMemo(() => {
     const grouped = new Map<number, OrderEntry[]>()
@@ -521,6 +606,9 @@ function App() {
     setOrderDraftId(null)
     setOrderDirty(false)
     setLabForm(initialLabForm())
+    setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+    setLabTemplateDate(toLocalISODate())
+    setLabTemplateValues({})
     setEditingLabId(null)
     setSelectedTab('profile')
   }
@@ -567,6 +655,10 @@ function App() {
       setNotice('Unsaved changes.')
     }
   }, [isSaving])
+
+  const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
+    setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
+  }, [])
 
   const hasUnsavedChanges = profileDirty || dailyDirty || vitalDirty || orderDirty
 
@@ -1212,20 +1304,35 @@ function App() {
   }
 
   const addStructuredLab = async () => {
-    if (selectedPatientId === null || !labForm.testName.trim()) return
+    if (selectedPatientId === null) return
 
-    await db.labs.add({
-      patientId: selectedPatientId,
-      date: labForm.date,
-      testName: labForm.testName.trim(),
-      value: labForm.value.trim(),
-      unit: labForm.unit.trim(),
-      note: labForm.note.trim(),
-      createdAt: new Date().toISOString(),
-    })
+    const entryDate = labTemplateDate || toLocalISODate()
+    const createdAt = new Date().toISOString()
+    const entries: Omit<LabEntry, 'id'>[] = selectedLabTemplate.tests
+      .map((test) => {
+        const value = (labTemplateValues[test.key] ?? '').trim()
+        if (!value) return null
 
-    setLabForm((previous) => ({ ...initialLabForm(), date: previous.date }))
-    setNotice('Lab added.')
+        return {
+          patientId: selectedPatientId,
+          date: entryDate,
+          testName: test.displayName,
+          value,
+          unit: test.unit ?? '',
+          note: '',
+          createdAt,
+        }
+      })
+      .filter((entry): entry is Omit<LabEntry, 'id'> => entry !== null)
+
+    if (entries.length === 0) {
+      setNotice('Enter at least one lab value.')
+      return
+    }
+
+    await db.labs.bulkAdd(entries)
+    setLabTemplateValues({})
+    setNotice(`${entries.length} ${entries.length === 1 ? 'lab' : 'labs'} added from ${selectedLabTemplate.name}.`)
   }
 
   const deleteStructuredLab = async (labId?: number) => {
@@ -1348,6 +1455,9 @@ function App() {
       setOrderDraftId(null)
       setOrderDirty(false)
       setLabForm(initialLabForm())
+      setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+      setLabTemplateDate(toLocalISODate())
+      setLabTemplateValues({})
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setLastSavedAt(null)
@@ -1394,6 +1504,9 @@ function App() {
       setOrderDraftId(null)
       setOrderDirty(false)
       setLabForm(initialLabForm())
+      setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+      setLabTemplateDate(toLocalISODate())
+      setLabTemplateValues({})
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
@@ -1788,39 +1901,90 @@ function App() {
                         <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
-                        <div className='grid grid-cols-2 gap-2'>
-                          <div className='space-y-1'>
-                            <Label>Date</Label>
-                            <Input type='date' aria-label='Lab date' value={labForm.date} onChange={(event) => setLabForm({ ...labForm, date: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Test name</Label>
-                            <Input aria-label='Lab test name' placeholder='Test name' value={labForm.testName} onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Value</Label>
-                            <Input aria-label='Lab value' placeholder='Value' value={labForm.value} onChange={(event) => setLabForm({ ...labForm, value: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Unit</Label>
-                            <Input aria-label='Lab unit' placeholder='Unit' value={labForm.unit} onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })} />
-                          </div>
-                          <div className='space-y-1 col-span-2'>
-                            <Label>Note</Label>
-                            <Textarea aria-label='Lab note' placeholder='Note' value={labForm.note} onChange={(event) => setLabForm({ ...labForm, note: event.target.value })} />
-                          </div>
-                        </div>
-                        <div className='flex gap-2 flex-wrap'>
-                          {editingLabId === null ? (
-                            <Button size='sm' onClick={() => void addStructuredLab()}>Add lab</Button>
-                          ) : (
-                            <>
+                        {editingLabId === null ? (
+                          <>
+                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                              <div className='space-y-1'>
+                                <Label>Date</Label>
+                                <Input
+                                  type='date'
+                                  aria-label='Lab date'
+                                  value={labTemplateDate}
+                                  onChange={(event) => setLabTemplateDate(event.target.value)}
+                                />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label>Template</Label>
+                                <Select
+                                  value={selectedLabTemplateId}
+                                  onValueChange={(value) => {
+                                    setSelectedLabTemplateId(value)
+                                    setLabTemplateValues({})
+                                  }}
+                                >
+                                  <SelectTrigger aria-label='Lab template'>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {LAB_TEMPLATES.map((template) => (
+                                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className='space-y-2'>
+                              {selectedLabTemplate.tests.map((test) => (
+                                <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                                  <p className='text-sm text-mauve-shadow font-medium'>
+                                    {test.displayName}
+                                    {test.fullName ? ` - ${test.fullName}` : ''}
+                                    {test.unit ? ` (${test.unit})` : ''}
+                                  </p>
+                                  <Input
+                                    aria-label={`${selectedLabTemplate.name} ${test.displayName} value`}
+                                    placeholder='Value'
+                                    value={labTemplateValues[test.key] ?? ''}
+                                    onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                            <div className='flex gap-2 flex-wrap'>
+                              <Button size='sm' onClick={() => void addStructuredLab()}>Add template labs</Button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className='grid grid-cols-2 gap-2'>
+                              <div className='space-y-1'>
+                                <Label>Date</Label>
+                                <Input type='date' aria-label='Lab date' value={labForm.date} onChange={(event) => setLabForm({ ...labForm, date: event.target.value })} />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label>Test name</Label>
+                                <Input aria-label='Lab test name' placeholder='Test name' value={labForm.testName} onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })} />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label>Value</Label>
+                                <Input aria-label='Lab value' placeholder='Value' value={labForm.value} onChange={(event) => setLabForm({ ...labForm, value: event.target.value })} />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label>Unit</Label>
+                                <Input aria-label='Lab unit' placeholder='Unit' value={labForm.unit} onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })} />
+                              </div>
+                              <div className='space-y-1 col-span-2'>
+                                <Label>Note</Label>
+                                <Textarea aria-label='Lab note' placeholder='Note' value={labForm.note} onChange={(event) => setLabForm({ ...labForm, note: event.target.value })} />
+                              </div>
+                            </div>
+                            <div className='flex gap-2 flex-wrap'>
                               <Button size='sm' onClick={() => void saveEditingLab()}>Save</Button>
                               <Button size='sm' variant='secondary' onClick={cancelEditingLab}>Cancel</Button>
                               <Button size='sm' variant='destructive' onClick={() => void deleteStructuredLab(editingLabId)}>Remove</Button>
-                            </>
-                          )}
-                        </div>
+                            </div>
+                          </>
+                        )}
                         {selectedPatientStructuredLabs.length > 0 ? (
                           <ul className='space-y-1'>
                             {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
@@ -2277,7 +2441,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
-                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes.</li>
+                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes, and structured lab templates.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals Log tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Orders tab: doctor&apos;s orders with date, time, service, and status tracking.</li>
@@ -2300,6 +2464,7 @@ function App() {
               <div className='space-y-1'>
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
+                  <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Orders tab has Open orders text for quick copy/paste handoff.</li>
                   <li>Use Open all census text for one-shot census output for active patients.</li>
