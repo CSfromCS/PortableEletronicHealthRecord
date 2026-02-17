@@ -33,6 +33,7 @@ p {
 }
 
 input,
+textarea,
 select,
 button {
   border: 1px solid var(--taupe);
@@ -43,8 +44,15 @@ button {
 }
 
 input,
+textarea,
 select {
   background: #fff;
+}
+
+textarea {
+  min-height: 72px;
+  resize: vertical;
+  width: 100%;
 }
 
 button {
@@ -77,4 +85,26 @@ button {
 
 .actions button:last-child {
   background: var(--taupe);
+}
+
+.detail-panel {
+  background: var(--pale-oak);
+  border: 1px solid var(--taupe);
+  border-radius: 10px;
+  margin-top: 1rem;
+  padding: 0.75rem;
+}
+
+.stack {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.full-census-button {
+  margin-top: 0.75rem;
+}
+
+.notice {
+  color: var(--mauve-shadow);
+  font-weight: 600;
 }

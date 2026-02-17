@@ -14,7 +14,8 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 
 - ✅ Keep this as `DevPlan.md` (no `agent.md` file is needed for this project plan).
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient list with add/edit/discharge.
-- ⏳ Still in progress from Phase 1: patient profile tabs, daily update UI, text generators, settings backup/import.
+- ✅ Implemented in app: patient profile section, daily update section, and text generation/copy flows (census entry, daily summary, full census).
+- ⏳ Still in progress from Phase 1: settings backup/import and further UI polish.
 
 ---
 
