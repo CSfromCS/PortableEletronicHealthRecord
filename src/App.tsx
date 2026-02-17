@@ -1025,7 +1025,7 @@ function App() {
   }
 
   return (
-    <>
+    <div className='min-h-screen'>
       <main>
         <h1>Portable Electronic Health Record</h1>
         <p>DevPlan MVP: patient list, profile notes, daily update notes, and text generators.</p>
@@ -1835,6 +1835,48 @@ function App() {
                 Clear discharged patients
               </button>
             </div>
+
+            <section className='app-guide'>
+              <h3>How to use</h3>
+              <div className='app-guide-block'>
+                <h4>Main workflow</h4>
+                <ol>
+                  <li>Add/admit a patient from the Patients form.</li>
+                  <li>Open the patient card, then fill Profile and Daily Update.</li>
+                  <li>Use copy/share actions to generate handoff-ready text.</li>
+                  <li>Repeat daily using the date picker in Daily Update.</li>
+                </ol>
+              </div>
+
+              <div className='app-guide-block'>
+                <h4>Parts of the app</h4>
+                <ul>
+                  <li>Patients: add, edit, search/filter/sort, discharge/reactivate.</li>
+                  <li>Profile tab: diagnosis, plans, meds, labs, orders, pendings, notes.</li>
+                  <li>Daily Update tab: FRICHMOND notes, vitals, assessment, plan.</li>
+                  <li>Settings: backup export/import and clear discharged records.</li>
+                </ul>
+              </div>
+
+              <div className='app-guide-block'>
+                <h4>Saving and persistence</h4>
+                <ul>
+                  <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
+                  <li>Daily update fields auto-save while typing and can also be saved manually.</li>
+                  <li>App files are cached by the PWA service worker for offline loading.</li>
+                  <li>Data remains after page refresh or browser restart on the same browser profile.</li>
+                </ul>
+              </div>
+
+              <div className='app-guide-block'>
+                <h4>Quick tips</h4>
+                <ul>
+                  <li>Use Copy all census for one-shot census output for active patients.</li>
+                  <li>Share uses Web Share when available, with clipboard fallback.</li>
+                  <li>Export backup JSON regularly if you switch devices or browsers.</li>
+                </ul>
+              </div>
+            </section>
           </section>
         )}
 
@@ -1848,7 +1890,7 @@ function App() {
       <footer className='app-footer'>
         Version: v{__APP_VERSION__} ({__GIT_SHA__})
       </footer>
-    </>
+    </div>
   )
 }
 

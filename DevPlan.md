@@ -31,6 +31,7 @@ For any user-visible or behavior-changing update:
 - ✅ Phase 2 continued: structured labs store + quick-entry UI with per-test trend comparison is implemented in Profile and included in census output.
 - ✅ Profile workflow completed: "Copy Profile as Text" is implemented in the Profile tab for quick copy-paste handoff output.
 - ✅ Profile workflow improved: "Share Profile as Text" is implemented with Web Share API and clipboard fallback.
+- ✅ Usability/docs in-app: Settings includes a built-in "How to use" guide covering workflows, app sections, save behavior, and persistence/backup notes.
 
 ---
 
