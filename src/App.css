@@ -157,6 +157,45 @@ button {
   margin: 0;
 }
 
+.medications-section {
+  background: var(--pale-oak-2);
+  border: 1px solid var(--taupe);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.65rem;
+}
+
+.medications-section h3 {
+  margin: 0;
+}
+
+.medications-form {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.medications-list {
+  display: grid;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.medications-item {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--taupe);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
+  padding: 0.45rem 0.55rem;
+}
+
 .settings-panel p {
   margin-bottom: 0.75rem;
 }

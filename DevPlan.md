@@ -16,8 +16,9 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
 - ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas with manual save plus debounced auto-save, clipboard text generation for census entry, daily summary, and full census copy.
 - ✅ Phase 1 backlog completed in-app: list search/filter/sort controls, settings backup export/import UI, clear discharged patients action, and optional Web Share integration (clipboard fallback retained).
-- ⏳ Still pending (future phases): structured medications/labs/order stores and advanced derived generators.
+- ⏳ Still pending (future phases): structured labs/order stores and advanced derived generators.
 - ✅ Phase 2 started: structured vitals store + quick-entry UI is implemented as an optional enhancement in Daily Update.
+- ✅ Phase 2 continued: structured medications store + quick-entry UI is implemented as an optional enhancement in Profile.
 
 ---
 
@@ -151,6 +152,7 @@ interface DailyUpdate {
 
 #### Tab: Profile
 - Freeform textareas for diagnosis, plans, medications, labs, pendings, and clerk notes pulled straight from the selected patient record.
+- Structured medications quick-entry rows (name/dose/route/frequency/note/status) are stored per patient and can be toggled active/discontinued.
 - The save button writes the current form back into Dexie and a **"Copy Census Entry"** button copies the structured census text; the planned "Copy Profile as Text" feature remains on the backlog.
 
 #### Tab: Daily Update
@@ -250,7 +252,6 @@ Tasks:
 
 These are all the features from the original plan. Add them **one at a time** when freeform text stops being good enough:
 
-- **Structured medications store** — if managing med lists as text is error-prone
 - **Structured labs with comparison** — if you want automatic delta calculations (↑↓→)
 - **Doctor's orders tracking** — if you need to track order status (active/carried out/discontinued)
 - **Medication dose logging** — if you need to track when doses were given
@@ -336,7 +337,7 @@ rounding-app/
 | Data model | 2 stores, freeform text | Ship fast; add structure when freeform hurts |
 | Vitals | Hybrid: freeform + structured quick entries | Preserve fast notes while enabling timestamped row capture |
 | Labs | Freeform text on patient record | Structured comparison is Phase 2 |
-| Medications | Freeform text on patient record | Structured tracking is Phase 2 |
+| Medications | Hybrid: freeform + structured quick entries | Keep old note flow while enabling cleaner med list tracking |
 | Security | Deferred | Personal tool, phone/laptop already have lock screens |
 | Multi-user sync | Not planned | Personal tool |
 | Backend | None | All data in IndexedDB on the device |
@@ -350,7 +351,6 @@ The original plan had 7 Dexie stores, 13 agent sessions, and a 12-weekend timeli
 | Cut Feature | Add Back When... |
 |---|---|
 | `orders` store (status tracking) | You need to track which orders are done vs pending |
-| `medications` store (structured) | Managing med lists as text causes errors |
 | `medicationDoses` store (dose logging) | You need to know exactly when doses were given |
 | `labResults` store (structured panels + deltas) | You want automatic lab comparison with arrows |
 | Lab comparison text generator | You add the structured labs store |

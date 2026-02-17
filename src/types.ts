@@ -56,3 +56,15 @@ export interface VitalEntry {
   note: string
   createdAt: string
 }
+
+export interface MedicationEntry {
+  id?: number
+  patientId: number
+  medication: string
+  dose: string
+  route: string
+  frequency: string
+  note: string
+  status: 'active' | 'discontinued'
+  createdAt: string
+}
