@@ -40,7 +40,7 @@ Before it works, enable GitHub Pages in repository settings:
 3. Push to `main` (or run the workflow manually from the **Actions** tab).
 
 What to know:
-- GitHub project pages are hosted under `/<repo-name>/`, so the Vite config sets the correct base path in Actions.
+- The app now uses relative asset paths so the same build works on GitHub Pages and other static hosts.
 - The deployment URL appears in the workflow run after the `deploy` job finishes.
 
 ## Test/validate directly

@@ -5,8 +5,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execSync } from "node:child_process";
 
-const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1]
-const base = process.env.GITHUB_ACTIONS && repositoryName ? `/${repositoryName}/` : '/'
+const base = './'
 
 const packageJson = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8')) as {
   version?: string
