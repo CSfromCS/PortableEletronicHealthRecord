@@ -198,6 +198,7 @@ function App() {
   const [editingMedicationId, setEditingMedicationId] = useState<number | null>(null)
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
+  const [editingLabId, setEditingLabId] = useState<number | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
   const [notice, setNotice] = useState('')
@@ -412,6 +413,7 @@ function App() {
     setEditingMedicationId(null)
     setOrderForm(initialOrderForm())
     setLabForm(initialLabForm())
+    setEditingLabId(null)
     setSelectedTab('profile')
   }
 
@@ -852,7 +854,44 @@ function App() {
   const deleteStructuredLab = async (labId?: number) => {
     if (labId === undefined) return
     await db.labs.delete(labId)
+    if (editingLabId === labId) {
+      setEditingLabId(null)
+      setLabForm(initialLabForm())
+    }
     setNotice('Lab removed.')
+  }
+
+  const startEditingLab = (entry: LabEntry) => {
+    if (entry.id === undefined) return
+    setEditingLabId(entry.id)
+    setLabForm({
+      date: entry.date,
+      testName: entry.testName,
+      value: entry.value,
+      unit: entry.unit,
+      note: entry.note,
+    })
+  }
+
+  const saveEditingLab = async () => {
+    if (editingLabId === null || !labForm.testName.trim()) return
+
+    await db.labs.update(editingLabId, {
+      date: labForm.date,
+      testName: labForm.testName.trim(),
+      value: labForm.value.trim(),
+      unit: labForm.unit.trim(),
+      note: labForm.note.trim(),
+    })
+
+    setEditingLabId(null)
+    setLabForm(initialLabForm())
+    setNotice('Lab updated.')
+  }
+
+  const cancelEditingLab = () => {
+    setEditingLabId(null)
+    setLabForm(initialLabForm())
   }
 
   const exportBackup = async () => {
@@ -927,6 +966,7 @@ function App() {
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
       setLabForm(initialLabForm())
+      setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setNotice('Backup imported.')
     } catch {
@@ -966,6 +1006,7 @@ function App() {
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
       setLabForm(initialLabForm())
+      setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
     }
@@ -1278,9 +1319,6 @@ function App() {
                   <button type='button' onClick={() => setSelectedTab('daily')}>
                     Daily Update
                   </button>
-                  <button type='button' onClick={() => void toggleDischarge(selectedPatient)}>
-                    {selectedPatient.status === 'active' ? 'Discharge' : 'Re-activate'}
-                  </button>
                 </div>
 
                 {selectedTab === 'profile' ? (
@@ -1365,108 +1403,6 @@ function App() {
                     </div>
                     <div className='input-field'>
                       <textarea
-                        id='profile-medications'
-                        placeholder=' '
-                        value={profileForm.medications}
-                        onChange={(event) => setProfileForm({ ...profileForm, medications: event.target.value })}
-                      />
-                      <label htmlFor='profile-medications'>Medications</label>
-                    </div>
-                    <section className='medications-section'>
-                      <h3>Structured medications</h3>
-                      <div className='medications-form'>
-                        <input
-                          aria-label='Medication name'
-                          placeholder='Medication'
-                          value={medicationForm.medication}
-                          onChange={(event) =>
-                            setMedicationForm({ ...medicationForm, medication: event.target.value })
-                          }
-                        />
-                        <input
-                          aria-label='Medication dose'
-                          placeholder='Dose'
-                          value={medicationForm.dose}
-                          onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })}
-                        />
-                        <input
-                          aria-label='Medication route'
-                          placeholder='Route'
-                          value={medicationForm.route}
-                          onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })}
-                        />
-                        <input
-                          aria-label='Medication frequency'
-                          placeholder='Frequency'
-                          value={medicationForm.frequency}
-                          onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })}
-                        />
-                        <input
-                          aria-label='Medication note'
-                          placeholder='Note'
-                          value={medicationForm.note}
-                          onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })}
-                        />
-                        <select
-                          aria-label='Medication status'
-                          value={medicationForm.status}
-                          onChange={(event) =>
-                            setMedicationForm({
-                              ...medicationForm,
-                              status: event.target.value as 'active' | 'discontinued' | 'completed',
-                            })
-                          }
-                        >
-                          <option value='active'>Active</option>
-                          <option value='discontinued'>Discontinued</option>
-                          <option value='completed'>Completed</option>
-                        </select>
-                        {editingMedicationId === null ? (
-                          <button type='button' onClick={() => void addStructuredMedication()}>
-                            Add medication
-                          </button>
-                        ) : (
-                          <>
-                            <button type='button' onClick={() => void saveEditingMedication()}>
-                              Save
-                            </button>
-                            <button type='button' onClick={cancelEditingMedication}>
-                              Cancel
-                            </button>
-                            <button type='button' onClick={() => void deleteStructuredMedication(editingMedicationId)}>
-                              Remove
-                            </button>
-                          </>
-                        )}
-                      </div>
-                      {selectedPatientStructuredMeds.length > 0 ? (
-                        <ul className='medications-list'>
-                          {selectedPatientStructuredMeds.map((entry) => (
-                            <li key={entry.id} className='medications-item'>
-                              {editingMedicationId === entry.id ? (
-                                <span className='editing-indicator'>(Editing above...)</span>
-                              ) : (
-                                <>
-                                  <span>
-                                    {entry.medication} {entry.dose} {entry.route} {entry.frequency}
-                                    {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
-                                  </span>
-                                  <div className='actions'>
-                                    <button type='button' onClick={() => startEditingMedication(entry)}>
-                                      Edit
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No structured medications yet.</p>
-                      )}
-                    </section>
-                    <div className='input-field'>
-                      <textarea
                         id='profile-labs'
                         placeholder=' '
                         value={profileForm.labs}
@@ -1527,6 +1463,128 @@ function App() {
                         </ul>
                       ) : (
                         <p className='inline-note'>No structured labs yet.</p>
+                      )}
+                    </section>
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-medications'
+                        placeholder=' '
+                        value={profileForm.medications}
+                        onChange={(event) => setProfileForm({ ...profileForm, medications: event.target.value })}
+                      />
+                      <label htmlFor='profile-medications'>Medications</label>
+                    </div>
+                    <section className='medications-section'>
+                      <h3>Structured medications</h3>
+                      <div className='medications-form'>
+                        <div className='input-field'>
+                          <input
+                            aria-label='Medication name'
+                            placeholder=' '
+                            value={medicationForm.medication}
+                            onChange={(event) =>
+                              setMedicationForm({ ...medicationForm, medication: event.target.value })
+                            }
+                          />
+                          <label>Medication</label>
+                        </div>
+                        <div className='input-field'>
+                          <input
+                            aria-label='Medication dose'
+                            placeholder=' '
+                            value={medicationForm.dose}
+                            onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })}
+                          />
+                          <label>Dose</label>
+                        </div>
+                        <div className='input-field'>
+                          <input
+                            aria-label='Medication route'
+                            placeholder=' '
+                            value={medicationForm.route}
+                            onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })}
+                          />
+                          <label>Route</label>
+                        </div>
+                        <div className='input-field'>
+                          <input
+                            aria-label='Medication frequency'
+                            placeholder=' '
+                            value={medicationForm.frequency}
+                            onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })}
+                          />
+                          <label>Frequency</label>
+                        </div>
+                        <div className='input-field medication-note-field'>
+                          <textarea
+                            aria-label='Medication note'
+                            placeholder=' '
+                            value={medicationForm.note}
+                            onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })}
+                          />
+                          <label>Note</label>
+                        </div>
+                        <div className='input-field medication-status-field'>
+                          <select
+                            aria-label='Medication status'
+                            value={medicationForm.status}
+                            onChange={(event) =>
+                              setMedicationForm({
+                                ...medicationForm,
+                                status: event.target.value as 'active' | 'discontinued' | 'completed',
+                              })
+                            }
+                          >
+                            <option value='active'>Active</option>
+                            <option value='discontinued'>Discontinued</option>
+                            <option value='completed'>Completed</option>
+                          </select>
+                          <label>Status</label>
+                        </div>
+                        <div className='medications-form-actions'>
+                          {editingMedicationId === null ? (
+                            <button type='button' onClick={() => void addStructuredMedication()}>
+                              Add medication
+                            </button>
+                          ) : (
+                            <>
+                              <button type='button' onClick={() => void saveEditingMedication()}>
+                                Save
+                              </button>
+                              <button type='button' onClick={cancelEditingMedication}>
+                                Cancel
+                              </button>
+                              <button type='button' onClick={() => void deleteStructuredMedication(editingMedicationId)}>
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {selectedPatientStructuredMeds.length > 0 ? (
+                        <ul className='medications-list'>
+                          {selectedPatientStructuredMeds.map((entry) => (
+                            <li key={entry.id} className='medications-item'>
+                              {editingMedicationId === entry.id ? (
+                                <span className='editing-indicator'>(Editing above...)</span>
+                              ) : (
+                                <>
+                                  <span>
+                                    {entry.medication} {entry.dose} {entry.route} {entry.frequency}
+                                    {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
+                                  </span>
+                                  <div className='actions'>
+                                    <button type='button' onClick={() => startEditingMedication(entry)}>
+                                      Edit
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No structured medications yet.</p>
                       )}
                     </section>
                     <section className='medications-section'>
@@ -1667,6 +1725,12 @@ function App() {
                         }
                       >
                         Share census entry
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => void toggleDischarge(selectedPatient)}
+                      >
+                        {selectedPatient.status === 'active' ? 'Discharge' : 'Re-activate'}
                       </button>
                     </div>
                   </div>

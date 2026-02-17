@@ -172,6 +172,13 @@ button {
   color: var(--mauve-shadow);
 }
 
+.input-field input[type='date'] + label {
+  top: -0.5rem;
+  transform: translateY(0);
+  font-size: 0.75rem;
+  color: var(--mauve-shadow);
+}
+
 .input-field input:focus + label,
 .input-field input:not(:placeholder-shown) + label,
 .input-field select:focus + label,
@@ -260,12 +267,71 @@ button {
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  align-items: end;
+}
+
+.medications-form .input-field {
+  min-width: 0;
+}
+
+.medications-form .input-field input,
+.medications-form .input-field select,
+.medications-form .input-field textarea {
+  width: 100%;
+}
+
+.medication-note-field {
+  grid-column: 1 / -1;
+}
+
+.medication-note-field textarea {
+  min-height: 92px;
+}
+
+.medication-status-field {
+  grid-column: span 1;
+}
+
+.medications-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.medications-form-actions button {
+  align-self: center;
+}
+
+@media (max-width: 640px) {
+  .medications-form {
+    grid-template-columns: 1fr;
+  }
+
+  .medication-status-field {
+    grid-column: 1;
+  }
 }
 
 .labs-form {
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  align-items: end;
+}
+
+.labs-form .input-field {
+  min-width: 0;
+}
+
+.labs-form .input-field input {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .labs-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .medications-list {

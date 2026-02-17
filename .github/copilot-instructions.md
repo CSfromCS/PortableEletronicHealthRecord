@@ -97,4 +97,6 @@ For every user-visible or behavior-changing update:
 - Test on mobile viewport (360px width minimum)
 - Verify offline behavior (disable network in DevTools)
 - Check that generated text is readable and copy-paste-ready
+- Always update the in-app Settings "How to use" section when workflow, field order, labels, or user-visible behavior changes.
 - Keep README accurate for setup/deployment instructions
+- do not try to build
