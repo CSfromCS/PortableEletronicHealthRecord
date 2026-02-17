@@ -511,7 +511,7 @@ function App() {
       lastName: form.lastName.trim(),
       age,
       sex: form.sex,
-      service: form.service.trim(),
+      service: editingId !== null ? form.service.trim() : '',
       diagnosis: '',
       admitDate: toLocalISODate(),
       attendingPhysician: '',
@@ -1213,13 +1213,15 @@ function App() {
                 <option value='M'>M</option>
                 <option value='F'>F</option>
               </select>
-              <input
-                aria-label='Service'
-                placeholder='Service'
-                value={form.service}
-                onChange={(event) => setForm({ ...form, service: event.target.value })}
-                required
-              />
+              {editingId !== null ? (
+                <input
+                  aria-label='Service'
+                  placeholder='Service'
+                  value={form.service}
+                  onChange={(event) => setForm({ ...form, service: event.target.value })}
+                  required
+                />
+              ) : null}
               <button type='submit'>{editingId === null ? 'Add patient' : 'Save patient'}</button>
             </form>
 

@@ -32,7 +32,7 @@ For any user-visible or behavior-changing update:
 - ✅ Profile workflow completed: "Copy Profile as Text" is implemented in the Profile tab for quick copy-paste handoff output.
 - ✅ Profile workflow improved: "Share Profile as Text" is implemented with Web Share API and clipboard fallback.
 - ✅ Usability/docs in-app: Settings includes a built-in "How to use" guide covering workflows, app sections, save behavior, and persistence/backup notes.
-- ✅ UX simplification: Create patient form streamlined to core demographics only (room, name, age, sex, service); diagnosis and clinical details moved to Profile tab for data entry after admission.
+- ✅ UX simplification: Add patient form streamlined to minimal demographics (room, name, age, sex); service moved to Edit Patient form, diagnosis and clinical details in Profile tab for data entry after admission.
 - ✅ Demo/showcase support: Sample patient "Juan Dela Cruz" with complete clinical data is automatically initialized on first app load for quick demonstration purposes (one-time only).
 
 ---
@@ -45,7 +45,7 @@ One medical clerk at University of Santo Tomas Hospital. ~10 active patients at 
 
 ## Core Workflow
 
-1. Admit patient → enter basic demographics (room, name, age, sex, service) → open profile to add diagnosis, plans, and clinical details
+1. Admit patient → enter minimal demographics (room, name, age, sex) → open patient to edit and add service → open profile to add diagnosis, plans, and clinical details
 2. Daily rounds → jot FRICHMOND notes, vitals, meds, labs as freeform text
 3. Generate text → tap a button to get formatted census entry or daily summary
 4. Copy/share → paste into chat to send to laptop → paste into Google Docs
