@@ -1209,6 +1209,11 @@ function App() {
                     <span style={{ display: 'block', fontSize: '0.875rem', opacity: 0.9 }}>
                       {patient.age}/{patient.sex} • {patient.service.split('\n')[0]} • {patient.status}
                     </span>
+                    {patient.diagnosis && (
+                      <span style={{ display: 'block', fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
+                        {patient.diagnosis.split('\n')[0]}
+                      </span>
+                    )}
                   </div>
                   <button type='button' onClick={() => selectPatient(patient)}>
                     Open
