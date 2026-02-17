@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
 import type {
@@ -27,7 +27,7 @@ type PatientFormState = {
   firstName: string
   lastName: string
   age: string
-  sex: 'M' | 'F'
+  sex: 'M' | 'F' | 'O'
   service: string
 }
 
@@ -45,7 +45,7 @@ type ProfileFormState = {
   firstName: string
   lastName: string
   age: string
-  sex: 'M' | 'F'
+  sex: 'M' | 'F' | 'O'
   service: string
   diagnosis: string
   plans: string
@@ -92,6 +92,9 @@ type MedicationFormState = {
 }
 
 type OrderFormState = {
+  orderDate: string
+  orderTime: string
+  service: string
   orderText: string
   note: string
   status: 'active' | 'carriedOut' | 'discontinued'
@@ -127,7 +130,6 @@ const initialDailyUpdateForm: DailyUpdateFormState = {
   neuro: '',
   drugs: '',
   other: '',
-  vitals: '',
   assessment: '',
   plans: '',
 }
@@ -163,6 +165,9 @@ const initialMedicationForm = (): MedicationFormState => ({
 })
 
 const initialOrderForm = (): OrderFormState => ({
+  orderDate: toLocalISODate(),
+  orderTime: toLocalTime(),
+  service: '',
   orderText: '',
   note: '',
   status: 'active',
@@ -194,6 +199,7 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
 }
 
 function App() {
+  const backupFileInputRef = useRef<HTMLInputElement | null>(null)
   const [form, setForm] = useState<PatientFormState>(initialForm)
   const [view, setView] = useState<'patients' | 'settings'>('patients')
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
@@ -219,7 +225,7 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<'profile' | 'vitals' | 'orders'>('profile')
+  const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'orders'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
@@ -228,16 +234,35 @@ function App() {
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
   const orders = useLiveQuery(() => db.orders.toArray(), [])
-  const dailyVitals = useLiveQuery(async () => {
+  const patientVitals = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as VitalEntry[]
-    return db.vitals.where('[patientId+date]').equals([selectedPatientId, dailyDate]).sortBy('time')
-  }, [selectedPatientId, dailyDate])
+    const vitals = await db.vitals.where('patientId').equals(selectedPatientId).toArray()
+    return vitals.sort((a, b) => {
+      if (a.date !== b.date) {
+        return a.date.localeCompare(b.date)
+      }
+      if (a.time !== b.time) {
+        return a.time.localeCompare(b.time)
+      }
+      return a.createdAt.localeCompare(b.createdAt)
+    })
+  }, [selectedPatientId])
 
   useEffect(() => {
     if ('storage' in navigator && 'persist' in navigator.storage) {
       void navigator.storage.persist()
     }
   }, [])
+
+  useEffect(() => {
+    if (!notice || isSaving || notice === 'Saving...') return
+
+    const timeoutId = window.setTimeout(() => {
+      setNotice('')
+    }, 3000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isSaving, notice])
 
   const selectedPatient = useMemo(
     () => (patients ?? []).find((patient) => patient.id === selectedPatientId),
@@ -403,7 +428,6 @@ function App() {
       neuro: update.neuro,
       drugs: update.drugs,
       other: update.other,
-      vitals: update.vitals,
       assessment: update.assessment,
       plans: update.plans,
     })
@@ -611,8 +635,11 @@ function App() {
   }
 
   const formatOrderEntry = (entry: OrderEntry) => {
-    const withNote = [entry.orderText, entry.note].filter(Boolean).join(' — ')
-    return `${withNote} (${formatOrderStatus(entry.status)})`
+    const serviceText = (entry.service ?? '').trim()
+    const whenText = [entry.orderDate ?? '', entry.orderTime ?? ''].filter(Boolean).join(' ')
+    const header = [serviceText, whenText, entry.orderText].filter(Boolean).join(' • ')
+    const withNote = [header, entry.note].filter(Boolean).join(' — ')
+    return `${withNote || entry.orderText} (${formatOrderStatus(entry.status)})`
   }
 
   const compareLabValue = (currentValue: string, previousValue: string) => {
@@ -672,7 +699,12 @@ function App() {
     const labsCombined = [freeformLabs, ...structuredLabLines].filter(Boolean).join('\n')
     const activeOrders = orderEntries
       .filter((entry) => entry.status === 'active')
-      .map((entry) => [entry.orderText, entry.note].filter(Boolean).join(' — '))
+      .map((entry) => {
+        const serviceText = (entry.service ?? '').trim()
+        const whenText = [entry.orderDate ?? '', entry.orderTime ?? ''].filter(Boolean).join(' ')
+        const header = [serviceText, whenText, entry.orderText].filter(Boolean).join(' • ')
+        return [header || entry.orderText, entry.note].filter(Boolean).join(' — ')
+      })
       .filter(Boolean)
       .join('; ')
 
@@ -757,7 +789,6 @@ function App() {
   ) => {
     const hasAnyUpdate =
       vitalsEntries.length > 0 ||
-      update.vitals ||
       update.fluid ||
       update.respiratory ||
       update.infectious ||
@@ -772,10 +803,7 @@ function App() {
       update.plans
 
     const vitalsLines: string[] = []
-    if (update.vitals) {
-      vitalsLines.push(`Vitals: ${update.vitals}`)
-    }
-    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals: ${formatVitalEntry(entry)}`))
+    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals (${entry.date}): ${formatVitalEntry(entry)}`))
     if (vitalsLines.length === 0 && !hasAnyUpdate) {
       vitalsLines.push('No update yet.')
     }
@@ -804,6 +832,32 @@ function App() {
     ]
 
     return lines.filter(Boolean).join('\n')
+  }
+
+  const toVitalsLogSummary = (patient: Patient, vitalsEntries: VitalEntry[]) => {
+    const lines = [
+      `VITALS LOG — ${patient.lastName} (${patient.roomNumber})`,
+      ...vitalsEntries.map((entry) => `Vitals (${entry.date}): ${formatVitalEntry(entry)}`),
+    ]
+
+    if (vitalsEntries.length === 0) {
+      lines.push('No structured vitals yet.')
+    }
+
+    return lines.join('\n')
+  }
+
+  const toOrdersSummary = (patient: Patient, orderEntries: OrderEntry[]) => {
+    const lines = [
+      `ORDERS — ${patient.lastName} (${patient.roomNumber})`,
+      ...orderEntries.map((entry) => formatOrderEntry(entry)),
+    ]
+
+    if (orderEntries.length === 0) {
+      lines.push('No orders yet.')
+    }
+
+    return lines.join('\n')
   }
 
   const openCopyModal = (text: string, title: string) => {
@@ -981,7 +1035,7 @@ function App() {
           if (updatedCount === 0) {
             const nextId = await db.vitals.add({
               patientId: selectedPatientId,
-              date: dailyDate,
+              date: toLocalISODate(),
               ...payload,
               createdAt: new Date().toISOString(),
             })
@@ -990,7 +1044,7 @@ function App() {
         } else {
           const nextId = await db.vitals.add({
             patientId: selectedPatientId,
-            date: dailyDate,
+            date: toLocalISODate(),
             ...payload,
             createdAt: new Date().toISOString(),
           })
@@ -1008,7 +1062,7 @@ function App() {
         setIsSaving(false)
       }
     },
-    [dailyDate, editingVitalId, selectedPatientId, vitalDraftId, vitalForm],
+    [editingVitalId, selectedPatientId, vitalDraftId, vitalForm],
   )
 
   const saveOrderDraft = useCallback(
@@ -1019,6 +1073,9 @@ function App() {
       setNotice('Saving...')
 
       const payload = {
+        orderDate: orderForm.orderDate,
+        orderTime: orderForm.orderTime,
+        service: orderForm.service.trim(),
         orderText: orderForm.orderText.trim(),
         note: orderForm.note.trim(),
         status: orderForm.status,
@@ -1435,7 +1492,6 @@ function App() {
       neuro: 'Alert and oriented. No complaints.',
       drugs: 'Ceftriaxone 2g IV q12h, Amlodipine 10mg PO OD, Metformin 500mg PO BID',
       other: 'Patient ambulatory. Family at bedside.',
-      vitals: 'BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% RA',
       assessment: 'Community-acquired pneumonia, improving',
       plans: 'Continue IV antibiotics\nMonitor clinical response\nRepeat CXR in 3 days if improving',
       lastUpdated: new Date().toISOString(),
@@ -1465,6 +1521,9 @@ function App() {
     // Add sample doctor's order
     await db.orders.add({
       patientId: samplePatientId,
+      orderDate: today,
+      orderTime: '09:00',
+      service: 'Medicine',
       orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
       note: 'To assess pneumonia improvement',
       status: 'active',
@@ -1478,32 +1537,36 @@ function App() {
   return (
     <div className='min-h-screen'>
       <main>
-        <h1>Portable Unofficial Health Record - Really (PUHRR)</h1>
-        <p>DevPlan MVP: patient list, profile notes, daily update notes, and text generators.</p>
+        <h1 className='text-2xl font-semibold text-mauve-shadow'>Portable Unofficial Health Record - Really (PUHRR)</h1>
+        <p>Simple notes for bedside rounds.</p>
         {notice ? (
           <Alert className='border-action-primary/30 bg-cherry-blossom/50 mb-2'>
             <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
           </Alert>
         ) : null}
-        {selectedPatientId !== null ? (
-          <div className='flex items-center gap-2 mb-2 flex-wrap'>
-            <p className='text-sm text-taupe flex-1'>
-              Last saved:{' '}
-              {lastSavedAt
-                ? new Date(lastSavedAt).toLocaleTimeString([], {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })
-                : '—'}
-            </p>
-            <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
-              Save now
-            </Button>
+        <div className='flex items-center justify-between gap-2 mb-4 flex-wrap'>
+          <div className='flex items-center gap-2 flex-wrap min-h-9'>
+            {selectedPatientId !== null ? (
+              <>
+                <p className='text-sm text-taupe'>
+                  Last saved:{' '}
+                  {lastSavedAt
+                    ? new Date(lastSavedAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </p>
+                <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
+                  Save now
+                </Button>
+              </>
+            ) : null}
           </div>
-        ) : null}
-        <div className='flex gap-2 mb-4'>
-          <Button onClick={() => setView('patients')}>Patients</Button>
-          <Button variant='secondary' onClick={() => setView('settings')}>Settings</Button>
+          <div className='flex gap-2'>
+            <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
+            <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
+          </div>
         </div>
 
         {view === 'patients' ? (
@@ -1518,11 +1581,12 @@ function App() {
                   <Input aria-label='First name' placeholder='First name' value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} required />
                   <Input aria-label='Last name' placeholder='Last name' value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} required />
                   <Input aria-label='Age' placeholder='Age' type='number' min='0' value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} required />
-                  <Select value={form.sex} onValueChange={(v) => setForm({ ...form, sex: v as 'M' | 'F' })}>
+                  <Select value={form.sex} onValueChange={(v) => setForm({ ...form, sex: v as 'M' | 'F' | 'O' })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value='M'>M</SelectItem>
                       <SelectItem value='F'>F</SelectItem>
+                      <SelectItem value='O'>O</SelectItem>
                     </SelectContent>
                   </Select>
                   <Input aria-label='Service' placeholder='Service' value={form.service} onChange={(event) => setForm({ ...form, service: event.target.value })} required />
@@ -1621,14 +1685,15 @@ function App() {
               <Card className='bg-pale-oak border-taupe'>
                 <CardHeader className='py-3 px-4 pb-0'>
                   <CardTitle className='text-base text-mauve-shadow'>
-                    {selectedPatient.lastName}, {selectedPatient.firstName} ({selectedPatient.roomNumber})
+                    {selectedPatient.roomNumber} - {selectedPatient.lastName}, {selectedPatient.firstName}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className='px-4 pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
                   <TabsList className='mb-4 mt-2'>
                     <TabsTrigger value='profile'>Profile</TabsTrigger>
-                    <TabsTrigger value='vitals'>Vital Signs</TabsTrigger>
+                    <TabsTrigger value='frichmond'>FRICHMOND</TabsTrigger>
+                    <TabsTrigger value='vitals'>Vitals Log</TabsTrigger>
                     <TabsTrigger value='orders'>Orders</TabsTrigger>
                   </TabsList>
 
@@ -1673,7 +1738,7 @@ function App() {
                         <Label htmlFor='profile-sex'>Sex</Label>
                         <Select
                           value={profileForm.sex}
-                          onValueChange={(v) => updateProfileField('sex', v as 'M' | 'F')}
+                          onValueChange={(v) => updateProfileField('sex', v as 'M' | 'F' | 'O')}
                         >
                           <SelectTrigger id='profile-sex'>
                             <SelectValue />
@@ -1681,6 +1746,7 @@ function App() {
                           <SelectContent>
                             <SelectItem value='M'>M</SelectItem>
                             <SelectItem value='F'>F</SelectItem>
+                            <SelectItem value='O'>O</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1915,7 +1981,7 @@ function App() {
                     </div>
                   </div>
                 </TabsContent>
-                <TabsContent value='vitals'>
+                <TabsContent value='frichmond'>
                   <div className='space-y-3'>
                     <div className='space-y-1 max-w-60'>
                       <Label htmlFor='daily-date'>Date</Label>
@@ -1932,85 +1998,8 @@ function App() {
                           if (selectedPatient?.id) {
                             void loadDailyUpdate(selectedPatient.id, nextDate)
                           }
-                          setVitalForm(initialVitalForm())
-                          setEditingVitalId(null)
-                          setVitalDraftId(null)
-                          setVitalDirty(false)
                         }}
                       />
-                    </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
-                      <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured vitals</CardTitle>
-                      </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
-                        <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
-                          <div className='space-y-1'>
-                            <Label>Time</Label>
-                            <Input type='time' aria-label='Vital time' value={vitalForm.time} onChange={(event) => updateVitalField('time', event.target.value)} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>BP</Label>
-                            <Input aria-label='Vital blood pressure' placeholder='120/80' value={vitalForm.bp} onChange={(event) => updateVitalField('bp', event.target.value)} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>HR</Label>
-                            <Input aria-label='Vital heart rate' placeholder='80' value={vitalForm.hr} onChange={(event) => updateVitalField('hr', event.target.value)} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>RR</Label>
-                            <Input aria-label='Vital respiratory rate' placeholder='18' value={vitalForm.rr} onChange={(event) => updateVitalField('rr', event.target.value)} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Temp</Label>
-                            <Input aria-label='Vital temperature' placeholder='37.0' value={vitalForm.temp} onChange={(event) => updateVitalField('temp', event.target.value)} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>SpO2</Label>
-                            <Input aria-label='Vital oxygen saturation' placeholder='99%' value={vitalForm.spo2} onChange={(event) => updateVitalField('spo2', event.target.value)} />
-                          </div>
-                          <div className='space-y-1 col-span-2'>
-                            <Label>Note</Label>
-                            <Input aria-label='Vital note' placeholder='Note' value={vitalForm.note} onChange={(event) => updateVitalField('note', event.target.value)} />
-                          </div>
-                        </div>
-                        <div className='flex gap-2 flex-wrap'>
-                          {editingVitalId === null ? (
-                            <Button size='sm' onClick={() => void addStructuredVital()}>Add vital</Button>
-                          ) : (
-                            <>
-                              <Button size='sm' onClick={() => void saveEditingVital()}>Save</Button>
-                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredVital(editingVitalId)}>Remove</Button>
-                              <Button size='sm' variant='secondary' onClick={cancelEditingVital}>Cancel</Button>
-                            </>
-                          )}
-                        </div>
-                        {dailyVitals && dailyVitals.length > 0 ? (
-                          <ul className='space-y-1'>
-                            {dailyVitals.map((entry) => (
-                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                {editingVitalId === entry.id ? (
-                                  <span className='text-taupe italic'>(Editing above...)</span>
-                                ) : (
-                                  <>
-                                    <span>
-                                      {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
-                                      {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
-                                    </span>
-                                    <Button size='sm' variant='edit' onClick={() => startEditingVital(entry)}>Edit</Button>
-                                  </>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className='text-sm text-taupe'>No structured vitals for this date yet.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <div className='space-y-1'>
-                      <Label>Vitals</Label>
-                      <Textarea aria-label='Vitals' placeholder='Vitals' value={dailyUpdateForm.vitals} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, vitals: event.target.value }); setDailyDirty(true) }} />
                     </div>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
@@ -2061,14 +2050,13 @@ function App() {
                       <Textarea aria-label='Daily plan' placeholder='Plan' value={dailyUpdateForm.plans} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, plans: event.target.value }); setDailyDirty(true) }} />
                     </div>
                     <div className='flex gap-2 flex-wrap'>
-                      <Button onClick={() => void saveDailyUpdate()}>Save daily update</Button>
                       <Button
                         onClick={() =>
                           openCopyModal(
                             toDailySummary(
                               selectedPatient,
                               dailyUpdateForm,
-                              dailyVitals ?? [],
+                              patientVitals ?? [],
                               selectedPatientOrders,
                             ),
                             'Daily summary',
@@ -2080,6 +2068,94 @@ function App() {
                     </div>
                   </div>
                 </TabsContent>
+                <TabsContent value='vitals'>
+                  <div className='space-y-3'>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured vitals log</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
+                          <div className='space-y-1'>
+                            <Label>Time</Label>
+                            <Input type='time' aria-label='Vital time' value={vitalForm.time} onChange={(event) => updateVitalField('time', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>BP</Label>
+                            <Input aria-label='Vital blood pressure' placeholder='120/80' value={vitalForm.bp} onChange={(event) => updateVitalField('bp', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>HR</Label>
+                            <Input aria-label='Vital heart rate' placeholder='80' value={vitalForm.hr} onChange={(event) => updateVitalField('hr', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>RR</Label>
+                            <Input aria-label='Vital respiratory rate' placeholder='18' value={vitalForm.rr} onChange={(event) => updateVitalField('rr', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Temp</Label>
+                            <Input aria-label='Vital temperature' placeholder='37.0' value={vitalForm.temp} onChange={(event) => updateVitalField('temp', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>SpO2</Label>
+                            <Input aria-label='Vital oxygen saturation' placeholder='99%' value={vitalForm.spo2} onChange={(event) => updateVitalField('spo2', event.target.value)} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Note</Label>
+                            <Input aria-label='Vital note' placeholder='Note' value={vitalForm.note} onChange={(event) => updateVitalField('note', event.target.value)} />
+                          </div>
+                        </div>
+                        <div className='flex gap-2 flex-wrap'>
+                          {editingVitalId === null ? (
+                            <Button size='sm' onClick={() => void addStructuredVital()}>Add vital</Button>
+                          ) : (
+                            <>
+                              <Button size='sm' onClick={() => void saveEditingVital()}>Save</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredVital(editingVitalId)}>Remove</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingVital}>Cancel</Button>
+                            </>
+                          )}
+                        </div>
+                        {patientVitals && patientVitals.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {patientVitals.map((entry) => (
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                {editingVitalId === entry.id ? (
+                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                    <span>
+                                      {entry.date} {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
+                                      {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
+                                    </span>
+                                    <Button size='sm' variant='edit' onClick={() => startEditingVital(entry)}>Edit</Button>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured vitals in this log yet.</p>
+                        )}
+                        <div className='flex gap-2 flex-wrap'>
+                          <Button
+                            onClick={() =>
+                              openCopyModal(
+                                toVitalsLogSummary(
+                                  selectedPatient,
+                                  patientVitals ?? [],
+                                ),
+                                'Vitals log',
+                              )
+                            }
+                          >
+                            Open vitals log text
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
                 <TabsContent value='orders'>
                   <div className='space-y-3'>
                     <Card className='bg-pale-oak-2 border-taupe'>
@@ -2088,6 +2164,18 @@ function App() {
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Date</Label>
+                            <Input type='date' aria-label='Order date' value={orderForm.orderDate} onChange={(event) => updateOrderField('orderDate', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Time</Label>
+                            <Input type='time' aria-label='Order time' value={orderForm.orderTime} onChange={(event) => updateOrderField('orderTime', event.target.value)} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Service</Label>
+                            <Input aria-label='Order service' placeholder='Service' value={orderForm.service} onChange={(event) => updateOrderField('service', event.target.value)} />
+                          </div>
                           <div className='space-y-1 col-span-2'>
                             <Label>Order</Label>
                             <Input aria-label='Order text' placeholder='Order' value={orderForm.orderText} onChange={(event) => updateOrderField('orderText', event.target.value)} />
@@ -2108,7 +2196,24 @@ function App() {
                             </Select>
                           </div>
                         </div>
-                        <Button size='sm' onClick={() => void addOrder()}>Add order</Button>
+                        <div className='flex gap-2 flex-wrap'>
+                          <Button size='sm' onClick={() => void addOrder()}>Add order</Button>
+                          <Button
+                            size='sm'
+                            variant='secondary'
+                            onClick={() =>
+                              openCopyModal(
+                                toOrdersSummary(
+                                  selectedPatient,
+                                  selectedPatientOrders,
+                                ),
+                                'Orders',
+                              )
+                            }
+                          >
+                            Open orders text
+                          </Button>
+                        </div>
                         {selectedPatientOrders.length > 0 ? (
                           <ul className='space-y-1'>
                             {selectedPatientOrders.map((entry) => (
@@ -2144,10 +2249,14 @@ function App() {
               <p className='text-sm text-taupe'>Export/import backup JSON, add sample data, and clear discharged patients.</p>
               <div className='flex flex-col gap-2'>
                 <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
-                <label className='flex flex-col gap-1'>
-                  <span className='text-sm font-medium text-mauve-shadow'>Import backup JSON</span>
-                  <input type='file' accept='application/json' onChange={(event) => void importBackup(event)} />
-                </label>
+                <input
+                  ref={backupFileInputRef}
+                  type='file'
+                  accept='application/json'
+                  className='hidden'
+                  onChange={(event) => void importBackup(event)}
+                />
+                <Button variant='secondary' onClick={() => backupFileInputRef.current?.click()}>Import backup JSON</Button>
                 <Button variant='secondary' onClick={() => void addSamplePatient()}>Add sample patient (Juan Dela Cruz)</Button>
                 <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
               </div>
@@ -2158,19 +2267,20 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
-                  <li>Open the patient card, then fill Profile, Vital Signs, and Orders.</li>
+                  <li>Open the patient card, then fill Profile, FRICHMOND, Vitals Log, and Orders.</li>
                   <li>Use Open text actions to review, select, and copy handoff-ready text.</li>
-                  <li>Repeat daily using the date picker in Vital Signs.</li>
+                  <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
               </div>
 
               <div className='space-y-1'>
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
-                  <li>Patients: add, edit, search/filter/sort, discharge/reactivate.</li>
+                  <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes.</li>
-                  <li>Vital Signs tab: FRICHMOND notes, vitals, assessment, plan.</li>
-                  <li>Orders tab: doctor&apos;s orders and order status tracking.</li>
+                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
+                  <li>Vitals Log tab: structured vitals tracking across all dates, earliest entries first.</li>
+                  <li>Orders tab: doctor&apos;s orders with date, time, service, and status tracking.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
               </div>
@@ -2180,7 +2290,7 @@ function App() {
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
-                  <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits.</li>
+                  <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits and auto-hides after a short delay.</li>
                   <li>Use Save now near the top to force an immediate save for all pending edits.</li>
                   <li>App files are cached by the PWA service worker for offline loading.</li>
                   <li>Data remains after page refresh or browser restart on the same browser profile.</li>
@@ -2191,6 +2301,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
+                  <li>Orders tab has Open orders text for quick copy/paste handoff.</li>
                   <li>Use Open all census text for one-shot census output for active patients.</li>
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>

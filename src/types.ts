@@ -5,7 +5,7 @@ export interface Patient {
   firstName: string
   middleName?: string
   age: number
-  sex: 'M' | 'F'
+  sex: 'M' | 'F' | 'O'
   admitDate: string
   service: string
   attendingPhysician: string
@@ -37,7 +37,6 @@ export interface DailyUpdate {
   neuro: string
   drugs: string
   other: string
-  vitals: string
   assessment: string
   plans: string
   lastUpdated: string
@@ -83,6 +82,9 @@ export interface LabEntry {
 export interface OrderEntry {
   id?: number
   patientId: number
+  orderDate: string
+  orderTime: string
+  service: string
   orderText: string
   status: 'active' | 'carriedOut' | 'discontinued'
   note: string
