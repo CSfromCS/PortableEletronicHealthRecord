@@ -613,6 +613,40 @@ function App() {
     ].join('\n')
   }
 
+  const toProfileSummary = (
+    patient: Patient,
+    profile: ProfileFormState,
+    medicationEntries: MedicationEntry[],
+    labEntries: LabEntry[],
+    orderEntries: OrderEntry[],
+  ) => {
+    const activeStructuredMeds = medicationEntries
+      .filter((entry) => entry.status === 'active')
+      .map(formatStructuredMedication)
+      .filter(Boolean)
+    const medsCombined = [profile.medications.trim(), ...activeStructuredMeds].filter(Boolean).join('\n')
+
+    const structuredLabLines = buildStructuredLabLines(labEntries)
+    const labsCombined = [profile.labs.trim(), ...structuredLabLines].filter(Boolean).join('\n')
+
+    const ordersCombined = orderEntries.length
+      ? orderEntries.map((entry) => formatOrderEntry(entry)).join('\n')
+      : ''
+
+    return [
+      `PROFILE — ${patient.lastName}, ${patient.firstName} (${patient.roomNumber})`,
+      `${patient.age}/${patient.sex} • ${patient.service}`,
+      `Admit date: ${patient.admitDate}`,
+      `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
+      `Plans: ${profile.plans.trim() || '-'}`,
+      `Meds: ${medsCombined || '-'}`,
+      `Labs: ${labsCombined || '-'}`,
+      `Orders: ${ordersCombined || '-'}`,
+      `Pendings: ${profile.pendings.trim() || '-'}`,
+      `Clerk notes: ${profile.clerkNotes.trim() || '-'}`,
+    ].join('\n')
+  }
+
   const formatVitalEntry = (entry: VitalEntry) => {
     const values = [
       entry.bp ? `BP ${entry.bp}` : '',
@@ -1471,6 +1505,39 @@ function App() {
                     <div className='actions'>
                       <button type='button' onClick={() => void saveProfile()}>
                         Save profile
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          void copyText(
+                            toProfileSummary(
+                              selectedPatient,
+                              profileForm,
+                              selectedPatientStructuredMeds,
+                              selectedPatientStructuredLabs,
+                              selectedPatientOrders,
+                            ),
+                          )
+                        }
+                      >
+                        Copy profile as text
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          void shareText(
+                            toProfileSummary(
+                              selectedPatient,
+                              profileForm,
+                              selectedPatientStructuredMeds,
+                              selectedPatientStructuredLabs,
+                              selectedPatientOrders,
+                            ),
+                            'Profile summary',
+                          )
+                        }
+                      >
+                        Share profile as text
                       </button>
                       <button
                         type='button'

@@ -29,6 +29,8 @@ For any user-visible or behavior-changing update:
 - ✅ Phase 2 started: structured vitals store + quick-entry UI is implemented as an optional enhancement in Daily Update.
 - ✅ Phase 2 continued: structured medications store + quick-entry UI is implemented as an optional enhancement in Profile.
 - ✅ Phase 2 continued: structured labs store + quick-entry UI with per-test trend comparison is implemented in Profile and included in census output.
+- ✅ Profile workflow completed: "Copy Profile as Text" is implemented in the Profile tab for quick copy-paste handoff output.
+- ✅ Profile workflow improved: "Share Profile as Text" is implemented with Web Share API and clipboard fallback.
 
 ---
 
@@ -163,7 +165,7 @@ interface DailyUpdate {
 #### Tab: Profile
 - Freeform textareas for diagnosis, plans, medications, labs, pendings, and clerk notes pulled straight from the selected patient record.
 - Structured medications quick-entry rows (name/dose/route/frequency/note/status) are stored per patient and can be toggled active/discontinued.
-- The save button writes the current form back into Dexie and a **"Copy Census Entry"** button copies the structured census text; the planned "Copy Profile as Text" feature remains on the backlog.
+- The save button writes the current form back into Dexie and includes **"Copy Census Entry"**, **"Copy Profile as Text"**, and **"Share Profile as Text"** actions for quick handoff text.
 
 #### Tab: Daily Update
 - Date picker defaults to today and loads data via Dexie's `[patientId+date]` compound index so you can toggle between diary entries.
@@ -240,7 +242,7 @@ Tasks:
 
 3. **Patient profile tab** (Done)
    - Saveable freeform text areas for diagnosis, plans, meds, labs, pendings, notes
-   - Copy census text to clipboard and share output
+   - Copy census text, copy/share profile text, and share census output
    - Structured medications, labs, orders, and medication dose logging
 
 4. **Daily update tab** (Done)
