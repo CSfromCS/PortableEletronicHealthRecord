@@ -2,7 +2,6 @@ import Dexie, { type EntityTable } from 'dexie'
 import type {
   DailyUpdate,
   LabEntry,
-  MedicationDoseEntry,
   MedicationEntry,
   OrderEntry,
   Patient,
@@ -16,7 +15,6 @@ const db = new Dexie('roundingAppDatabase') as Dexie & {
   medications: EntityTable<MedicationEntry, 'id'>
   labs: EntityTable<LabEntry, 'id'>
   orders: EntityTable<OrderEntry, 'id'>
-  medicationDoses: EntityTable<MedicationDoseEntry, 'id'>
 }
 
 db.version(1).stores({
