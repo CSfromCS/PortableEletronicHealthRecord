@@ -200,6 +200,9 @@ function App() {
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
+  const [profileDirty, setProfileDirty] = useState(false)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileLastSavedAt, setProfileLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'vitals' | 'orders'>('profile')
   const [notice, setNotice] = useState('')
@@ -390,9 +393,64 @@ function App() {
     setDailyDirty(false)
   }
 
-  const selectPatient = (patient: Patient) => {
+  const saveProfile = useCallback(
+    async (manual = true) => {
+      if (selectedPatientId === null) return false
+
+      const age = Number.parseInt(profileForm.age, 10)
+      const ageIsValid = Number.isFinite(age)
+
+      setProfileSaving(true)
+      setNotice('Saving profile...')
+
+      try {
+        await db.patients.update(selectedPatientId, {
+          roomNumber: profileForm.roomNumber.trim(),
+          firstName: profileForm.firstName.trim(),
+          lastName: profileForm.lastName.trim(),
+          ...(ageIsValid ? { age } : {}),
+          sex: profileForm.sex,
+          service: profileForm.service.trim(),
+          diagnosis: profileForm.diagnosis,
+          plans: profileForm.plans,
+          medications: profileForm.medications,
+          labs: profileForm.labs,
+          pendings: profileForm.pendings,
+          clerkNotes: profileForm.clerkNotes,
+        })
+
+        setProfileLastSavedAt(new Date().toISOString())
+        setProfileDirty(false)
+        if (!ageIsValid) {
+          setNotice('Profile saved. Age not saved until valid.')
+        } else if (manual) {
+          setNotice('Profile saved.')
+        } else {
+          setNotice('Profile auto-saved.')
+        }
+        return true
+      } catch {
+        setNotice('Unable to save profile. Please try again.')
+        return false
+      } finally {
+        setProfileSaving(false)
+      }
+    },
+    [profileForm, selectedPatientId],
+  )
+
+  const selectPatient = async (patient: Patient) => {
     const patientId = patient.id ?? null
     if (patientId === null) return
+
+    if (profileDirty && selectedPatientId !== null && selectedPatientId !== patientId) {
+      const saved = await saveProfile(false)
+      if (!saved) {
+        setNotice('Fix profile save issue before switching patients.')
+        return
+      }
+    }
+
     setProfileForm({
       roomNumber: patient.roomNumber,
       firstName: patient.firstName,
@@ -407,6 +465,8 @@ function App() {
       pendings: patient.pendings,
       clerkNotes: patient.clerkNotes,
     })
+    setProfileLastSavedAt(null)
+    setProfileDirty(false)
     void loadDailyUpdate(patientId, dailyDate)
     setView('patients')
     setSelectedPatientId(patient.id ?? null)
@@ -429,29 +489,23 @@ function App() {
     })
   }
 
-  const saveProfile = async () => {
-    if (!selectedPatient?.id) return
-    const age = Number.parseInt(profileForm.age, 10)
-    if (!Number.isFinite(age)) {
-      setNotice('Invalid age value.')
-      return
+  useEffect(() => {
+    if (selectedPatientId === null || !profileDirty || profileSaving) return
+
+    const timeoutId = window.setTimeout(() => {
+      void saveProfile(false)
+    }, 800)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [profileDirty, profileSaving, saveProfile, selectedPatientId])
+
+  const updateProfileField = useCallback(<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => {
+    setProfileForm((previous) => ({ ...previous, [field]: value }))
+    setProfileDirty(true)
+    if (!profileSaving) {
+      setNotice('Unsaved profile changes.')
     }
-    await db.patients.update(selectedPatient.id, {
-      roomNumber: profileForm.roomNumber.trim(),
-      firstName: profileForm.firstName.trim(),
-      lastName: profileForm.lastName.trim(),
-      age,
-      sex: profileForm.sex,
-      service: profileForm.service.trim(),
-      diagnosis: profileForm.diagnosis,
-      plans: profileForm.plans,
-      medications: profileForm.medications,
-      labs: profileForm.labs,
-      pendings: profileForm.pendings,
-      clerkNotes: profileForm.clerkNotes,
-    })
-    setNotice('Profile saved.')
-  }
+  }, [profileSaving])
 
   const saveDailyUpdate = useCallback(
     async (manual = true) => {
@@ -1392,7 +1446,7 @@ function App() {
                           id='profile-room'
                           placeholder=' '
                           value={profileForm.roomNumber}
-                          onChange={(event) => setProfileForm({ ...profileForm, roomNumber: event.target.value })}
+                          onChange={(event) => updateProfileField('roomNumber', event.target.value)}
                         />
                         <label htmlFor='profile-room'>Room</label>
                       </div>
@@ -1401,7 +1455,7 @@ function App() {
                           id='profile-firstname'
                           placeholder=' '
                           value={profileForm.firstName}
-                          onChange={(event) => setProfileForm({ ...profileForm, firstName: event.target.value })}
+                          onChange={(event) => updateProfileField('firstName', event.target.value)}
                         />
                         <label htmlFor='profile-firstname'>First name</label>
                       </div>
@@ -1410,7 +1464,7 @@ function App() {
                           id='profile-lastname'
                           placeholder=' '
                           value={profileForm.lastName}
-                          onChange={(event) => setProfileForm({ ...profileForm, lastName: event.target.value })}
+                          onChange={(event) => updateProfileField('lastName', event.target.value)}
                         />
                         <label htmlFor='profile-lastname'>Last name</label>
                       </div>
@@ -1421,7 +1475,7 @@ function App() {
                           min='0'
                           placeholder=' '
                           value={profileForm.age}
-                          onChange={(event) => setProfileForm({ ...profileForm, age: event.target.value })}
+                          onChange={(event) => updateProfileField('age', event.target.value)}
                         />
                         <label htmlFor='profile-age'>Age</label>
                       </div>
@@ -1429,7 +1483,7 @@ function App() {
                         <select
                           id='profile-sex'
                           value={profileForm.sex}
-                          onChange={(event) => setProfileForm({ ...profileForm, sex: event.target.value as 'M' | 'F' })}
+                          onChange={(event) => updateProfileField('sex', event.target.value as 'M' | 'F')}
                         >
                           <option value='M'>M</option>
                           <option value='F'>F</option>
@@ -1442,7 +1496,7 @@ function App() {
                         id='profile-service'
                         placeholder=' '
                         value={profileForm.service}
-                        onChange={(event) => setProfileForm({ ...profileForm, service: event.target.value })}
+                        onChange={(event) => updateProfileField('service', event.target.value)}
                       />
                       <label htmlFor='profile-service'>Service</label>
                     </div>
@@ -1451,7 +1505,7 @@ function App() {
                         id='profile-diagnosis'
                         placeholder=' '
                         value={profileForm.diagnosis}
-                        onChange={(event) => setProfileForm({ ...profileForm, diagnosis: event.target.value })}
+                        onChange={(event) => updateProfileField('diagnosis', event.target.value)}
                       />
                       <label htmlFor='profile-diagnosis'>Diagnosis</label>
                     </div>
@@ -1460,7 +1514,7 @@ function App() {
                         id='profile-plans'
                         placeholder=' '
                         value={profileForm.plans}
-                        onChange={(event) => setProfileForm({ ...profileForm, plans: event.target.value })}
+                        onChange={(event) => updateProfileField('plans', event.target.value)}
                       />
                       <label htmlFor='profile-plans'>Plans</label>
                     </div>
@@ -1469,7 +1523,7 @@ function App() {
                         id='profile-labs'
                         placeholder=' '
                         value={profileForm.labs}
-                        onChange={(event) => setProfileForm({ ...profileForm, labs: event.target.value })}
+                        onChange={(event) => updateProfileField('labs', event.target.value)}
                       />
                       <label htmlFor='profile-labs'>Labs</label>
                     </div>
@@ -1572,7 +1626,7 @@ function App() {
                         id='profile-medications'
                         placeholder=' '
                         value={profileForm.medications}
-                        onChange={(event) => setProfileForm({ ...profileForm, medications: event.target.value })}
+                        onChange={(event) => updateProfileField('medications', event.target.value)}
                       />
                       <label htmlFor='profile-medications'>Medications</label>
                     </div>
@@ -1694,7 +1748,7 @@ function App() {
                         id='profile-pendings'
                         placeholder=' '
                         value={profileForm.pendings}
-                        onChange={(event) => setProfileForm({ ...profileForm, pendings: event.target.value })}
+                        onChange={(event) => updateProfileField('pendings', event.target.value)}
                       />
                       <label htmlFor='profile-pendings'>Pendings</label>
                     </div>
@@ -1703,13 +1757,22 @@ function App() {
                         id='profile-clerknotes'
                         placeholder=' '
                         value={profileForm.clerkNotes}
-                        onChange={(event) => setProfileForm({ ...profileForm, clerkNotes: event.target.value })}
+                        onChange={(event) => updateProfileField('clerkNotes', event.target.value)}
                       />
                       <label htmlFor='profile-clerknotes'>Clerk notes</label>
                     </div>
                     <div className='actions'>
-                      <button type='button' onClick={() => void saveProfile()}>
-                        Save profile
+                      <p className='inline-note'>
+                        Last saved:{' '}
+                        {profileLastSavedAt
+                          ? new Date(profileLastSavedAt).toLocaleTimeString([], {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })
+                          : '—'}
+                      </p>
+                      <button type='button' disabled={profileSaving || !profileDirty} onClick={() => void saveProfile(true)}>
+                        Save now
                       </button>
                       <button
                         type='button'
@@ -2156,7 +2219,9 @@ function App() {
                 <h4>Saving and persistence</h4>
                 <ul>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
-                  <li>Daily update fields auto-save while typing and can also be saved manually.</li>
+                  <li>Profile and daily update fields auto-save shortly after typing stops.</li>
+                  <li>The top status notice shows Unsaved, Saving, and Saved states for profile edits.</li>
+                  <li>Use Save now in Profile if you want to force an immediate save.</li>
                   <li>App files are cached by the PWA service worker for offline loading.</li>
                   <li>Data remains after page refresh or browser restart on the same browser profile.</li>
                 </ul>
