@@ -80,11 +80,26 @@ button {
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .actions button:last-child {
   background: var(--taupe);
+}
+
+.top-nav {
+  margin-bottom: 1rem;
+}
+
+.list-controls {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.full-census-actions {
+  margin-top: 0.75rem;
 }
 
 .detail-panel {
@@ -100,8 +115,12 @@ button {
   gap: 0.5rem;
 }
 
+.settings-panel p {
+  margin-bottom: 0.75rem;
+}
+
 .full-census-button {
-  margin-top: 0.75rem;
+  margin-top: 0;
 }
 
 .notice {

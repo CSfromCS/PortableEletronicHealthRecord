@@ -14,8 +14,9 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 
 - ✅ Keep this as `DevPlan.md` (no `agent.md` file is needed for this project plan).
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
-- ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas plus manual save buttons, clipboard text generation for census entry, daily summary, and full census copy.
-- ⏳ Work still pending: search/filter/sort controls for the list, auto-save or debounced saves, settings/backups/import UI, any structured vitals/meds/labs stores, and sharing beyond clipboard.
+- ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas with manual save plus debounced auto-save, clipboard text generation for census entry, daily summary, and full census copy.
+- ✅ Phase 1 backlog completed in-app: list search/filter/sort controls, settings backup export/import UI, clear discharged patients action, and optional Web Share integration (clipboard fallback retained).
+- ⏳ Still pending (future phases): structured vitals/medications/labs/order stores and advanced derived generators.
 
 ---
 
@@ -142,8 +143,8 @@ interface DailyUpdate {
 ### 1. Patient List (Home Screen)
 
 - Admission form at the top capturing room, name, age, sex, service, and working diagnosis in one shot.
-- List of active patients sorted by room number, showing room/name, age/sex, service and diagnosis with buttons to open the detail drawer, edit, or discharge.
-- Full census generator button reuses the same clipboard helper as the single-patient text exports; search/filter/sort toggles and the discharged-patient view are still future work.
+- List supports search, status filtering (active/discharged/all), and sorting (room/name/admit date), with cards showing room/name, age/sex, service/status, diagnosis, and buttons to open detail, edit, or discharge/reactivate.
+- Full census generator supports both copy-to-clipboard and Web Share (with clipboard fallback) for all active patients.
 
 ### 2. Patient Profile (2 Tabs)
 
@@ -153,11 +154,11 @@ interface DailyUpdate {
 
 #### Tab: Daily Update
 - Date picker defaults to today and loads data via Dexie's `[patientId+date]` compound index so you can toggle between diary entries.
-- FRICHMOND text areas for each category, plus vitals, assessment, and plan fields; you must tap **"Save daily update"** to persist changes, so debounced auto-save is still pending.
-- **"Copy Daily Summary"** button renders whichever fields currently have values into the formatted text block.
+- FRICHMOND text areas for each category, plus vitals, assessment, and plan fields; manual save remains available and debounced auto-save persists edits during typing.
+- **"Copy Daily Summary"** and **"Share Daily Summary"** buttons render the formatted text block from current values.
 
 ### 3. Settings
-- Not implemented yet. Planned items remain:
+- Implemented as an in-app settings view with:
    - JSON backup export (download file)
    - JSON import (restore from file)
    - Clear discharged patients
@@ -235,13 +236,13 @@ Tasks:
 5. **Deployment/installs** (Done)
    - App already runnable via `npm run dev` and deployable as a static site with a PWA manifest
 
-6. **Outstanding Phase 1 work**
-   - Add search/filter/sort controls for the patient list
-   - UI for JSON backup/import and clearing discharged patients
-   - Share API integration (beyond clipboard)
-   - Debounced or auto-save for daily updates
+6. **Outstanding Phase 1 work** (Completed)
+   - ✅ Search/filter/sort controls for the patient list
+   - ✅ UI for JSON backup/import and clearing discharged patients
+   - ✅ Share API integration (beyond clipboard)
+   - ✅ Debounced auto-save for daily updates
 
-**Checkpoint**: Patient flows are functional; finish Phase 1 by wiring the missing list controls, backup/import settings, and auto-save before tackling Phase 2.
+**Checkpoint**: Phase 1 flow is now complete and usable for day-to-day clerk notes; future work can focus on Phase 2 structured-data enhancements only when freeform text becomes limiting.
 
 ### Phase 2 — Nice-to-Haves (add when you feel the pain)
 
@@ -252,8 +253,6 @@ These are all the features from the original plan. Add them **one at a time** wh
 - **Structured labs with comparison** — if you want automatic delta calculations (↑↓→)
 - **Doctor's orders tracking** — if you need to track order status (active/carried out/discontinued)
 - **Medication dose logging** — if you need to track when doses were given
-- **Web Share API** — "Share" button opens Android share sheet instead of just clipboard
-- **JSON backup/import** — export/restore data as a file
 
 **Rule of thumb**: If you find yourself doing the same reformatting of freeform text repeatedly, that's when to add structure.
 
