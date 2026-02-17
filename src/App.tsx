@@ -200,7 +200,7 @@ function App() {
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
+  const [selectedTab, setSelectedTab] = useState<'profile' | 'vitals' | 'orders'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const patients = useLiveQuery(() => db.patients.toArray(), [])
@@ -1316,8 +1316,11 @@ function App() {
                   <button type='button' onClick={() => setSelectedTab('profile')}>
                     Profile
                   </button>
-                  <button type='button' onClick={() => setSelectedTab('daily')}>
-                    Daily Update
+                  <button type='button' onClick={() => setSelectedTab('vitals')}>
+                    Vital Signs
+                  </button>
+                  <button type='button' onClick={() => setSelectedTab('orders')}>
+                    Orders
                   </button>
                 </div>
 
@@ -1626,59 +1629,6 @@ function App() {
                         <p className='inline-note'>No structured medications yet.</p>
                       )}
                     </section>
-                    <section className='medications-section'>
-                      <h3>Doctor&apos;s orders</h3>
-                      <div className='medications-form'>
-                        <input
-                          aria-label='Order text'
-                          placeholder='Order'
-                          value={orderForm.orderText}
-                          onChange={(event) => setOrderForm({ ...orderForm, orderText: event.target.value })}
-                        />
-                        <input
-                          aria-label='Order note'
-                          placeholder='Note'
-                          value={orderForm.note}
-                          onChange={(event) => setOrderForm({ ...orderForm, note: event.target.value })}
-                        />
-                        <select
-                          aria-label='Order status'
-                          value={orderForm.status}
-                          onChange={(event) =>
-                            setOrderForm({
-                              ...orderForm,
-                              status: event.target.value as 'active' | 'carriedOut' | 'discontinued',
-                            })
-                          }
-                        >
-                          <option value='active'>Active</option>
-                          <option value='carriedOut'>Carried out</option>
-                          <option value='discontinued'>Discontinued</option>
-                        </select>
-                        <button type='button' onClick={() => void addOrder()}>
-                          Add order
-                        </button>
-                      </div>
-                      {selectedPatientOrders.length > 0 ? (
-                        <ul className='medications-list'>
-                          {selectedPatientOrders.map((entry) => (
-                            <li key={entry.id} className='medications-item'>
-                              <span>{formatOrderEntry(entry)}</span>
-                              <div className='actions'>
-                                <button type='button' onClick={() => void toggleOrderStatus(entry)}>
-                                  {getNextOrderActionLabel(entry.status)}
-                                </button>
-                                <button type='button' onClick={() => void deleteOrder(entry.id)}>
-                                  Remove
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No orders yet.</p>
-                      )}
-                    </section>
                     <div className='input-field'>
                       <textarea
                         id='profile-pendings'
@@ -1773,7 +1723,7 @@ function App() {
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : selectedTab === 'vitals' ? (
                   <div className='stack'>
                     <label>
                       Date
@@ -2014,6 +1964,62 @@ function App() {
                       </button>
                     </div>
                   </div>
+                ) : (
+                  <div className='stack'>
+                    <section className='medications-section'>
+                      <h3>Doctor&apos;s orders</h3>
+                      <div className='medications-form'>
+                        <input
+                          aria-label='Order text'
+                          placeholder='Order'
+                          value={orderForm.orderText}
+                          onChange={(event) => setOrderForm({ ...orderForm, orderText: event.target.value })}
+                        />
+                        <input
+                          aria-label='Order note'
+                          placeholder='Note'
+                          value={orderForm.note}
+                          onChange={(event) => setOrderForm({ ...orderForm, note: event.target.value })}
+                        />
+                        <select
+                          aria-label='Order status'
+                          value={orderForm.status}
+                          onChange={(event) =>
+                            setOrderForm({
+                              ...orderForm,
+                              status: event.target.value as 'active' | 'carriedOut' | 'discontinued',
+                            })
+                          }
+                        >
+                          <option value='active'>Active</option>
+                          <option value='carriedOut'>Carried out</option>
+                          <option value='discontinued'>Discontinued</option>
+                        </select>
+                        <button type='button' onClick={() => void addOrder()}>
+                          Add order
+                        </button>
+                      </div>
+                      {selectedPatientOrders.length > 0 ? (
+                        <ul className='medications-list'>
+                          {selectedPatientOrders.map((entry) => (
+                            <li key={entry.id} className='medications-item'>
+                              <span>{formatOrderEntry(entry)}</span>
+                              <div className='actions'>
+                                <button type='button' onClick={() => void toggleOrderStatus(entry)}>
+                                  {getNextOrderActionLabel(entry.status)}
+                                </button>
+                                <button type='button' onClick={() => void deleteOrder(entry.id)}>
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No orders yet.</p>
+                      )}
+                    </section>
+                  </div>
                 )}
               </section>
             ) : null}
@@ -2044,9 +2050,9 @@ function App() {
                 <h4>Main workflow</h4>
                 <ol>
                   <li>Add/admit a patient from the Patients form.</li>
-                  <li>Open the patient card, then fill Profile and Daily Update.</li>
+                  <li>Open the patient card, then fill Profile, Vital Signs, and Orders.</li>
                   <li>Use copy/share actions to generate handoff-ready text.</li>
-                  <li>Repeat daily using the date picker in Daily Update.</li>
+                  <li>Repeat daily using the date picker in Vital Signs.</li>
                 </ol>
               </div>
 
@@ -2054,8 +2060,9 @@ function App() {
                 <h4>Parts of the app</h4>
                 <ul>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate.</li>
-                  <li>Profile tab: diagnosis, plans, labs, meds, orders, pendings, notes.</li>
-                  <li>Daily Update tab: FRICHMOND notes, vitals, assessment, plan.</li>
+                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes.</li>
+                  <li>Vital Signs tab: FRICHMOND notes, vitals, assessment, plan.</li>
+                  <li>Orders tab: doctor&apos;s orders and order status tracking.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
               </div>
