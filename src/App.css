@@ -267,29 +267,42 @@ button {
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  align-items: end;
 }
 
-.medications-form .input-field {
+.structured-medications-form {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: start;
+}
+
+.structured-labs-form {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: start;
+}
+
+.simple-field {
+  display: grid;
+  gap: 0.25rem;
   min-width: 0;
 }
 
-.medications-form .input-field input,
-.medications-form .input-field select,
-.medications-form .input-field textarea {
-  width: 100%;
-}
-
-.medication-note-field {
+.simple-field-full {
   grid-column: 1 / -1;
 }
 
-.medication-note-field textarea {
-  min-height: 92px;
+.simple-field span {
+  color: var(--mauve-shadow);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
-.medication-status-field {
-  grid-column: span 1;
+.simple-field input,
+.simple-field select,
+.simple-field textarea {
+  width: 100%;
+}
+
+.simple-field textarea {
+  min-height: 80px;
 }
 
 .medications-form-actions {
@@ -307,9 +320,15 @@ button {
   .medications-form {
     grid-template-columns: 1fr;
   }
+}
 
-  .medication-status-field {
-    grid-column: 1;
+@media (max-width: 900px) {
+  .structured-medications-form {
+    grid-template-columns: 1fr;
+  }
+
+  .structured-labs-form {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -317,15 +336,6 @@ button {
   display: grid;
   gap: 0.5rem;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  align-items: end;
-}
-
-.labs-form .input-field {
-  min-width: 0;
-}
-
-.labs-form .input-field input {
-  width: 100%;
 }
 
 @media (max-width: 640px) {

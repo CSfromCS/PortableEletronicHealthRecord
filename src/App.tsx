@@ -1412,40 +1412,71 @@ function App() {
                     </div>
                     <section className='labs-section'>
                       <h3>Structured labs</h3>
-                      <div className='labs-form'>
-                        <input
-                          aria-label='Lab date'
-                          type='date'
-                          value={labForm.date}
-                          onChange={(event) => setLabForm({ ...labForm, date: event.target.value })}
-                        />
-                        <input
-                          aria-label='Lab test name'
-                          placeholder='Test name'
-                          value={labForm.testName}
-                          onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })}
-                        />
-                        <input
-                          aria-label='Lab value'
-                          placeholder='Value'
-                          value={labForm.value}
-                          onChange={(event) => setLabForm({ ...labForm, value: event.target.value })}
-                        />
-                        <input
-                          aria-label='Lab unit'
-                          placeholder='Unit'
-                          value={labForm.unit}
-                          onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })}
-                        />
-                        <input
-                          aria-label='Lab note'
-                          placeholder='Note'
-                          value={labForm.note}
-                          onChange={(event) => setLabForm({ ...labForm, note: event.target.value })}
-                        />
-                        <button type='button' onClick={() => void addStructuredLab()}>
-                          Add lab
-                        </button>
+                      <div className='labs-form structured-labs-form'>
+                        <div className='simple-field'>
+                          <span>Date</span>
+                          <input
+                            aria-label='Lab date'
+                            type='date'
+                            value={labForm.date}
+                            onChange={(event) => setLabForm({ ...labForm, date: event.target.value })}
+                          />
+                        </div>
+                        <div className='simple-field'>
+                          <span>Test name</span>
+                          <input
+                            aria-label='Lab test name'
+                            placeholder='Test name'
+                            value={labForm.testName}
+                            onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })}
+                          />
+                        </div>
+                        <div className='simple-field'>
+                          <span>Value</span>
+                          <input
+                            aria-label='Lab value'
+                            placeholder='Value'
+                            value={labForm.value}
+                            onChange={(event) => setLabForm({ ...labForm, value: event.target.value })}
+                          />
+                        </div>
+                        <div className='simple-field'>
+                          <span>Unit</span>
+                          <input
+                            aria-label='Lab unit'
+                            placeholder='Unit'
+                            value={labForm.unit}
+                            onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })}
+                          />
+                        </div>
+                        <div className='simple-field simple-field-full'>
+                          <span>Note</span>
+                          <textarea
+                            aria-label='Lab note'
+                            placeholder='Note'
+                            value={labForm.note}
+                            onChange={(event) => setLabForm({ ...labForm, note: event.target.value })}
+                          />
+                        </div>
+                        <div className='medications-form-actions'>
+                          {editingLabId === null ? (
+                            <button type='button' onClick={() => void addStructuredLab()}>
+                              Add lab
+                            </button>
+                          ) : (
+                            <>
+                              <button type='button' onClick={() => void saveEditingLab()}>
+                                Save
+                              </button>
+                              <button type='button' onClick={cancelEditingLab}>
+                                Cancel
+                              </button>
+                              <button type='button' onClick={() => void deleteStructuredLab(editingLabId)}>
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       {selectedPatientStructuredLabs.length > 0 ? (
                         <ul className='labs-list'>
@@ -1453,10 +1484,18 @@ function App() {
                             const entry = selectedPatientStructuredLabs[index]
                             return (
                               <li key={entry.id} className='labs-item'>
-                                <span>{line}</span>
-                                <button type='button' onClick={() => void deleteStructuredLab(entry.id)}>
-                                  Remove
-                                </button>
+                                {editingLabId === entry.id ? (
+                                  <span className='editing-indicator'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                    <span>{line}</span>
+                                    <div className='actions'>
+                                      <button type='button' onClick={() => startEditingLab(entry)}>
+                                        Edit
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </li>
                             )
                           })}
@@ -1476,55 +1515,56 @@ function App() {
                     </div>
                     <section className='medications-section'>
                       <h3>Structured medications</h3>
-                      <div className='medications-form'>
-                        <div className='input-field'>
+                      <div className='medications-form structured-medications-form'>
+                        <div className='simple-field'>
+                          <span>Medication</span>
                           <input
                             aria-label='Medication name'
-                            placeholder=' '
+                            placeholder='Medication'
                             value={medicationForm.medication}
                             onChange={(event) =>
                               setMedicationForm({ ...medicationForm, medication: event.target.value })
                             }
                           />
-                          <label>Medication</label>
                         </div>
-                        <div className='input-field'>
+                        <div className='simple-field'>
+                          <span>Dose</span>
                           <input
                             aria-label='Medication dose'
-                            placeholder=' '
+                            placeholder='Dose'
                             value={medicationForm.dose}
                             onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })}
                           />
-                          <label>Dose</label>
                         </div>
-                        <div className='input-field'>
+                        <div className='simple-field'>
+                          <span>Route</span>
                           <input
                             aria-label='Medication route'
-                            placeholder=' '
+                            placeholder='Route'
                             value={medicationForm.route}
                             onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })}
                           />
-                          <label>Route</label>
                         </div>
-                        <div className='input-field'>
+                        <div className='simple-field'>
+                          <span>Frequency</span>
                           <input
                             aria-label='Medication frequency'
-                            placeholder=' '
+                            placeholder='Frequency'
                             value={medicationForm.frequency}
                             onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })}
                           />
-                          <label>Frequency</label>
                         </div>
-                        <div className='input-field medication-note-field'>
+                        <div className='simple-field simple-field-full'>
+                          <span>Note</span>
                           <textarea
                             aria-label='Medication note'
-                            placeholder=' '
+                            placeholder='Note'
                             value={medicationForm.note}
                             onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })}
                           />
-                          <label>Note</label>
                         </div>
-                        <div className='input-field medication-status-field'>
+                        <div className='simple-field'>
+                          <span>Status</span>
                           <select
                             aria-label='Medication status'
                             value={medicationForm.status}
@@ -1539,7 +1579,6 @@ function App() {
                             <option value='discontinued'>Discontinued</option>
                             <option value='completed'>Completed</option>
                           </select>
-                          <label>Status</label>
                         </div>
                         <div className='medications-form-actions'>
                           {editingMedicationId === null ? (
@@ -2015,7 +2054,7 @@ function App() {
                 <h4>Parts of the app</h4>
                 <ul>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate.</li>
-                  <li>Profile tab: diagnosis, plans, meds, labs, orders, pendings, notes.</li>
+                  <li>Profile tab: diagnosis, plans, labs, meds, orders, pendings, notes.</li>
                   <li>Daily Update tab: FRICHMOND notes, vitals, assessment, plan.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
@@ -2034,6 +2073,7 @@ function App() {
               <div className='app-guide-block'>
                 <h4>Quick tips</h4>
                 <ul>
+                  <li>Structured medications and labs use simple labels with a flexible layout for easier mobile entry.</li>
                   <li>Use Copy all census for one-shot census output for active patients.</li>
                   <li>Share uses Web Share when available, with clipboard fallback.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
