@@ -1202,20 +1202,17 @@ function App() {
             <ul className='patient-list'>
               {visiblePatients.map((patient) => (
                 <li key={patient.id} className='patient-card'>
-                  <strong>
-                    {patient.roomNumber} — {patient.lastName}, {patient.firstName}
-                  </strong>
-                  <span>
-                    {patient.age}/{patient.sex} • {patient.service} • {patient.status}
-                  </span>
-                  <div className='actions'>
-                    <button type='button' onClick={() => selectPatient(patient)}>
-                      Open
-                    </button>
-                    <button type='button' onClick={() => void toggleDischarge(patient)}>
-                      {patient.status === 'active' ? 'Discharge' : 'Re-activate'}
-                    </button>
+                  <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                    <strong>
+                      {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                    </strong>
+                    <span style={{ display: 'block', fontSize: '0.875rem', opacity: 0.9 }}>
+                      {patient.age}/{patient.sex} • {patient.service.split('\n')[0]} • {patient.status}
+                    </span>
                   </div>
+                  <button type='button' onClick={() => selectPatient(patient)}>
+                    Open
+                  </button>
                 </li>
               ))}
             </ul>
@@ -1276,6 +1273,9 @@ function App() {
                   <button type='button' onClick={() => setSelectedTab('daily')}>
                     Daily Update
                   </button>
+                  <button type='button' onClick={() => void toggleDischarge(selectedPatient)}>
+                    {selectedPatient.status === 'active' ? 'Discharge' : 'Re-activate'}
+                  </button>
                 </div>
 
                 {selectedTab === 'profile' ? (
@@ -1332,7 +1332,7 @@ function App() {
                       </div>
                     </div>
                     <div className='input-field'>
-                      <input
+                      <textarea
                         id='profile-service'
                         placeholder=' '
                         value={profileForm.service}
