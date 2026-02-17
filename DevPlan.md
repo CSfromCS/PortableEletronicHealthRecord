@@ -24,7 +24,8 @@ For any user-visible or behavior-changing update:
 - ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
 - ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas with manual save plus debounced auto-save, clipboard text generation for census entry, daily summary, and full census copy.
 - ✅ Phase 1 backlog completed in-app: list search/filter/sort controls, settings backup export/import UI, clear discharged patients action, and optional Web Share integration (clipboard fallback retained).
-- ⏳ Still pending (future phases): doctor's orders tracking and medication dose logging.
+- ✅ Phase 2 continued: doctor's orders tracking is implemented in Profile with status tracking (active/carried out/discontinued).
+- ✅ Phase 2 continued: medication dose logging is implemented in Profile and can be included in daily summary output.
 - ✅ Phase 2 started: structured vitals store + quick-entry UI is implemented as an optional enhancement in Daily Update.
 - ✅ Phase 2 continued: structured medications store + quick-entry UI is implemented as an optional enhancement in Profile.
 - ✅ Phase 2 continued: structured labs store + quick-entry UI with per-test trend comparison is implemented in Profile and included in census output.
@@ -237,14 +238,15 @@ Tasks:
    - List active patients sorted by room with buttons to open detail, edit, and discharge
    - Full census generator button copying concatenated text
 
-3. **Patient profile tab** (Partially done)
+3. **Patient profile tab** (Done)
    - Saveable freeform text areas for diagnosis, plans, meds, labs, pendings, notes
-   - Copy census text to clipboard (profile-as-text is not yet in the UI)
+   - Copy census text to clipboard and share output
+   - Structured medications, labs, orders, and medication dose logging
 
-4. **Daily update tab** (Partially done)
+4. **Daily update tab** (Done)
    - Date picker that loads per-day FRICHMOND entries via `[patientId+date]`
    - Text areas for vitals and every FRICHMOND category with manual "Save" and "Copy daily summary" buttons
-   - Auto-save/debounced save is still pending
+   - Auto-save/debounced save is implemented
 
 5. **Deployment/installs** (Done)
    - App already runnable via `npm run dev` and deployable as a static site with a PWA manifest
@@ -262,8 +264,8 @@ Tasks:
 These are all the features from the original plan. Add them **one at a time** when freeform text stops being good enough:
 
 - ✅ **Structured labs with comparison** — implemented with per-test comparison indicators (↑↓→)
-- **Doctor's orders tracking** — if you need to track order status (active/carried out/discontinued)
-- **Medication dose logging** — if you need to track when doses were given
+- ✅ **Doctor's orders tracking** — implemented with order status tracking (active/carried out/discontinued)
+- ✅ **Medication dose logging** — implemented for structured medications with per-dose date/time entries
 
 **Rule of thumb**: If you find yourself doing the same reformatting of freeform text repeatedly, that's when to add structure.
 

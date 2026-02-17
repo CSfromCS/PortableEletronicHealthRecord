@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
-import type { DailyUpdate, LabEntry, MedicationEntry, Patient, VitalEntry } from './types'
+import type {
+  DailyUpdate,
+  LabEntry,
+  MedicationDoseEntry,
+  MedicationEntry,
+  OrderEntry,
+  Patient,
+  VitalEntry,
+} from './types'
 import './App.css'
 
 type PatientFormState = {
@@ -63,12 +71,28 @@ type MedicationFormState = {
   status: 'active' | 'discontinued'
 }
 
+type OrderFormState = {
+  orderText: string
+  note: string
+  status: 'active' | 'carriedOut' | 'discontinued'
+}
+
+type MedicationDoseFormState = {
+  medicationId: string
+  date: string
+  time: string
+  doseGiven: string
+  note: string
+}
+
 type BackupPayload = {
   patients: Patient[]
   dailyUpdates: DailyUpdate[]
   vitals?: VitalEntry[]
   medications?: MedicationEntry[]
   labs?: LabEntry[]
+  orders?: OrderEntry[]
+  medicationDoses?: MedicationDoseEntry[]
 }
 
 type LabFormState = {
@@ -125,6 +149,20 @@ const initialMedicationForm = (): MedicationFormState => ({
   status: 'active',
 })
 
+const initialOrderForm = (): OrderFormState => ({
+  orderText: '',
+  note: '',
+  status: 'active',
+})
+
+const initialMedicationDoseForm = (): MedicationDoseFormState => ({
+  medicationId: '',
+  date: toLocalISODate(),
+  time: toLocalTime(),
+  doseGiven: '',
+  note: '',
+})
+
 const initialLabForm = (): LabFormState => ({
   date: toLocalISODate(),
   testName: '',
@@ -146,7 +184,9 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
   const validVitals = candidate.vitals === undefined || Array.isArray(candidate.vitals)
   const validMedications = candidate.medications === undefined || Array.isArray(candidate.medications)
   const validLabs = candidate.labs === undefined || Array.isArray(candidate.labs)
-  return validVitals && validMedications && validLabs
+  const validOrders = candidate.orders === undefined || Array.isArray(candidate.orders)
+  const validMedicationDoses = candidate.medicationDoses === undefined || Array.isArray(candidate.medicationDoses)
+  return validVitals && validMedications && validLabs && validOrders && validMedicationDoses
 }
 
 function App() {
@@ -163,6 +203,8 @@ function App() {
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [medicationForm, setMedicationForm] = useState<MedicationFormState>(() => initialMedicationForm())
+  const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
+  const [medicationDoseForm, setMedicationDoseForm] = useState<MedicationDoseFormState>(() => initialMedicationDoseForm())
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'daily'>('profile')
@@ -171,6 +213,8 @@ function App() {
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
+  const orders = useLiveQuery(() => db.orders.toArray(), [])
+  const medicationDoses = useLiveQuery(() => db.medicationDoses.toArray(), [])
   const dailyVitals = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as VitalEntry[]
     return db.vitals.where('[patientId+date]').equals([selectedPatientId, dailyDate]).sortBy('time')
@@ -238,6 +282,62 @@ function App() {
     if (selectedPatientId === null) return []
     return structuredLabsByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredLabsByPatient])
+
+  const structuredOrdersByPatient = useMemo(() => {
+    const grouped = new Map<number, OrderEntry[]>()
+    ;(orders ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.status !== b.status) {
+          if (a.status === 'active') return -1
+          if (b.status === 'active') return 1
+          if (a.status === 'carriedOut') return -1
+          if (b.status === 'carriedOut') return 1
+        }
+        return b.createdAt.localeCompare(a.createdAt)
+      })
+    })
+
+    return grouped
+  }, [orders])
+
+  const selectedPatientOrders = useMemo(() => {
+    if (selectedPatientId === null) return []
+    return structuredOrdersByPatient.get(selectedPatientId) ?? []
+  }, [selectedPatientId, structuredOrdersByPatient])
+
+  const medicationDosesByPatient = useMemo(() => {
+    const grouped = new Map<number, MedicationDoseEntry[]>()
+    ;(medicationDoses ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.date !== b.date) {
+          return b.date.localeCompare(a.date)
+        }
+        if (a.time !== b.time) {
+          return b.time.localeCompare(a.time)
+        }
+        return b.createdAt.localeCompare(a.createdAt)
+      })
+    })
+
+    return grouped
+  }, [medicationDoses])
+
+  const selectedPatientMedicationDoses = useMemo(() => {
+    if (selectedPatientId === null) return []
+    return medicationDosesByPatient.get(selectedPatientId) ?? []
+  }, [selectedPatientId, medicationDosesByPatient])
 
   const visiblePatients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -359,6 +459,8 @@ function App() {
     setView('patients')
     setSelectedPatientId(patient.id ?? null)
     setMedicationForm(initialMedicationForm())
+    setOrderForm(initialOrderForm())
+    setMedicationDoseForm(initialMedicationDoseForm())
     setLabForm(initialLabForm())
     setSelectedTab('profile')
   }
@@ -418,6 +520,28 @@ function App() {
     return withNote
   }
 
+  const formatOrderStatus = (status: OrderEntry['status']) => {
+    if (status === 'carriedOut') return 'carried out'
+    return status
+  }
+
+  const getNextOrderActionLabel = (status: OrderEntry['status']) => {
+    if (status === 'active') return 'Mark carried out'
+    if (status === 'carriedOut') return 'Mark discontinued'
+    return 'Mark active'
+  }
+
+  const formatOrderEntry = (entry: OrderEntry) => {
+    const withNote = [entry.orderText, entry.note].filter(Boolean).join(' — ')
+    return `${withNote} (${formatOrderStatus(entry.status)})`
+  }
+
+  const formatMedicationDose = (entry: MedicationDoseEntry) => {
+    const given = entry.doseGiven ? `: ${entry.doseGiven}` : ''
+    const note = entry.note ? ` — ${entry.note}` : ''
+    return `${entry.date} ${entry.time} ${entry.medicationLabel}${given}${note}`
+  }
+
   const compareLabValue = (currentValue: string, previousValue: string) => {
     const current = Number.parseFloat(currentValue)
     const previous = Number.parseFloat(previousValue)
@@ -457,7 +581,12 @@ function App() {
     return lines
   }
 
-  const toCensusEntry = (patient: Patient, medicationEntries: MedicationEntry[], labEntries: LabEntry[]) => {
+  const toCensusEntry = (
+    patient: Patient,
+    medicationEntries: MedicationEntry[],
+    labEntries: LabEntry[],
+    orderEntries: OrderEntry[],
+  ) => {
     const activeStructuredMeds = medicationEntries
       .filter((entry) => entry.status === 'active')
       .map(formatStructuredMedication)
@@ -468,12 +597,18 @@ function App() {
     const freeformLabs = patient.labs.trim()
     const structuredLabLines = buildStructuredLabLines(labEntries)
     const labsCombined = [freeformLabs, ...structuredLabLines].filter(Boolean).join('\n')
+    const activeOrders = orderEntries
+      .filter((entry) => entry.status === 'active')
+      .map((entry) => [entry.orderText, entry.note].filter(Boolean).join(' — '))
+      .filter(Boolean)
+      .join('; ')
 
     return [
       `${patient.roomNumber} ${patient.lastName}, ${patient.firstName} ${patient.age}/${patient.sex}`,
       patient.diagnosis,
       `Labs: ${labsCombined || '-'}`,
       `Meds: ${medsCombined || '-'}`,
+      `Orders: ${activeOrders || '-'}`,
       `Pendings: ${patient.pendings || '-'}`,
     ].join('\n')
   }
@@ -493,7 +628,13 @@ function App() {
     return `${entry.time} ${values}`.trim()
   }
 
-  const toDailySummary = (patient: Patient, update: DailyUpdateFormState, vitalsEntries: VitalEntry[]) => {
+  const toDailySummary = (
+    patient: Patient,
+    update: DailyUpdateFormState,
+    vitalsEntries: VitalEntry[],
+    orderEntries: OrderEntry[],
+    doseEntries: MedicationDoseEntry[],
+  ) => {
     const hasAnyUpdate =
       vitalsEntries.length > 0 ||
       update.vitals ||
@@ -519,6 +660,10 @@ function App() {
       vitalsLines.push('No update yet.')
     }
 
+    const doseLines = doseEntries
+      .filter((entry) => entry.date === dailyDate)
+      .map((entry) => `${entry.time} ${entry.medicationLabel}${entry.doseGiven ? ` (${entry.doseGiven})` : ''}`)
+
     const lines = [
       `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
       ...vitalsLines,
@@ -532,6 +677,15 @@ function App() {
       update.neuro ? `N: ${update.neuro}` : '',
       update.drugs ? `D: ${update.drugs}` : '',
       update.other ? `Other: ${update.other}` : '',
+      orderEntries.filter((entry) => entry.status === 'active').length > 0
+        ? `Orders: ${orderEntries
+            .filter((entry) => entry.status === 'active')
+            .map((entry) => entry.orderText)
+            .join('; ')}`
+        : '',
+      doseLines.length > 0
+        ? `Medication doses: ${doseLines.join('; ')}`
+        : '',
       update.assessment ? `Assessment: ${update.assessment}` : '',
       update.plans ? `Plan: ${update.plans}` : '',
     ]
@@ -609,6 +763,72 @@ function App() {
     setNotice('Medication added.')
   }
 
+  const addOrder = async () => {
+    if (selectedPatientId === null || !orderForm.orderText.trim()) return
+
+    await db.orders.add({
+      patientId: selectedPatientId,
+      orderText: orderForm.orderText.trim(),
+      note: orderForm.note.trim(),
+      status: orderForm.status,
+      createdAt: new Date().toISOString(),
+    })
+
+    setOrderForm(initialOrderForm())
+    setNotice('Order added.')
+  }
+
+  const toggleOrderStatus = async (entry: OrderEntry) => {
+    if (entry.id === undefined) return
+    const nextStatus: OrderEntry['status'] =
+      entry.status === 'active'
+        ? 'carriedOut'
+        : entry.status === 'carriedOut'
+          ? 'discontinued'
+          : 'active'
+    await db.orders.update(entry.id, { status: nextStatus })
+    setNotice('Order updated.')
+  }
+
+  const deleteOrder = async (orderId?: number) => {
+    if (orderId === undefined) return
+    await db.orders.delete(orderId)
+    setNotice('Order removed.')
+  }
+
+  const addMedicationDose = async () => {
+    if (selectedPatientId === null || !medicationDoseForm.medicationId) return
+    const medicationId = Number.parseInt(medicationDoseForm.medicationId, 10)
+    if (!Number.isFinite(medicationId)) return
+
+    const medication = selectedPatientStructuredMeds.find((entry) => entry.id === medicationId)
+    if (!medication) return
+
+    await db.medicationDoses.add({
+      patientId: selectedPatientId,
+      medicationId,
+      medicationLabel: medication.medication,
+      date: medicationDoseForm.date,
+      time: medicationDoseForm.time,
+      doseGiven: medicationDoseForm.doseGiven.trim(),
+      note: medicationDoseForm.note.trim(),
+      createdAt: new Date().toISOString(),
+    })
+
+    setMedicationDoseForm((previous) => ({
+      ...initialMedicationDoseForm(),
+      medicationId: previous.medicationId,
+      date: previous.date,
+    }))
+    setNotice('Medication dose logged.')
+  }
+
+  const deleteMedicationDose = async (doseId?: number) => {
+    if (doseId === undefined) return
+    await db.medicationDoses.delete(doseId)
+    setNotice('Medication dose removed.')
+  }
+
   const toggleMedicationStatus = async (entry: MedicationEntry) => {
     if (entry.id === undefined) return
     await db.medications.update(entry.id, {
@@ -653,6 +873,8 @@ function App() {
       vitals: await db.vitals.toArray(),
       medications: await db.medications.toArray(),
       labs: await db.labs.toArray(),
+      orders: await db.orders.toArray(),
+      medicationDoses: await db.medicationDoses.toArray(),
     }
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
@@ -678,9 +900,14 @@ function App() {
         return
       }
 
-      await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs], async () => {
+      await db.transaction(
+        'rw',
+        [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders, db.medicationDoses],
+        async () => {
         await db.labs.clear()
         await db.medications.clear()
+        await db.medicationDoses.clear()
+        await db.orders.clear()
         await db.vitals.clear()
         await db.dailyUpdates.clear()
         await db.patients.clear()
@@ -699,13 +926,22 @@ function App() {
         if ((parsed.labs ?? []).length > 0) {
           await db.labs.bulkPut(parsed.labs ?? [])
         }
-      })
+        if ((parsed.orders ?? []).length > 0) {
+          await db.orders.bulkPut(parsed.orders ?? [])
+        }
+        if ((parsed.medicationDoses ?? []).length > 0) {
+          await db.medicationDoses.bulkPut(parsed.medicationDoses ?? [])
+        }
+      },
+      )
 
       setSelectedPatientId(null)
       setDailyUpdateId(undefined)
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setMedicationForm(initialMedicationForm())
+      setOrderForm(initialOrderForm())
+      setMedicationDoseForm(initialMedicationDoseForm())
       setLabForm(initialLabForm())
       setProfileForm(initialProfileForm)
       setNotice('Backup imported.')
@@ -725,19 +961,27 @@ function App() {
       return
     }
 
-    await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs], async () => {
+    await db.transaction(
+      'rw',
+      [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders, db.medicationDoses],
+      async () => {
       await db.patients.bulkDelete(dischargedIds)
       await db.dailyUpdates.where('patientId').anyOf(dischargedIds).delete()
       await db.vitals.where('patientId').anyOf(dischargedIds).delete()
       await db.medications.where('patientId').anyOf(dischargedIds).delete()
       await db.labs.where('patientId').anyOf(dischargedIds).delete()
-    })
+      await db.orders.where('patientId').anyOf(dischargedIds).delete()
+      await db.medicationDoses.where('patientId').anyOf(dischargedIds).delete()
+    },
+    )
 
     if (selectedPatientId !== null && dischargedIds.includes(selectedPatientId)) {
       setSelectedPatientId(null)
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setMedicationForm(initialMedicationForm())
+      setOrderForm(initialOrderForm())
+      setMedicationDoseForm(initialMedicationDoseForm())
       setLabForm(initialLabForm())
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
@@ -887,6 +1131,7 @@ function App() {
                           patient,
                           structuredMedsByPatient.get(patient.id ?? -1) ?? [],
                           structuredLabsByPatient.get(patient.id ?? -1) ?? [],
+                          structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
                         ),
                       )
                       .join('\n\n'),
@@ -906,6 +1151,7 @@ function App() {
                           patient,
                           structuredMedsByPatient.get(patient.id ?? -1) ?? [],
                           structuredLabsByPatient.get(patient.id ?? -1) ?? [],
+                          structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
                         ),
                       )
                       .join('\n\n'),
@@ -1026,6 +1272,76 @@ function App() {
                         <p className='inline-note'>No structured medications yet.</p>
                       )}
                     </section>
+                    <section className='medications-section'>
+                      <h3>Medication dose log</h3>
+                      <div className='medications-form'>
+                        <select
+                          aria-label='Dose medication'
+                          value={medicationDoseForm.medicationId}
+                          onChange={(event) =>
+                            setMedicationDoseForm({ ...medicationDoseForm, medicationId: event.target.value })
+                          }
+                        >
+                          <option value=''>Select medication</option>
+                          {selectedPatientStructuredMeds
+                            .filter((entry) => entry.status === 'active' && entry.id !== undefined)
+                            .map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                {[entry.medication, entry.dose, entry.route, entry.frequency].filter(Boolean).join(' ')}
+                              </option>
+                            ))}
+                        </select>
+                        <input
+                          aria-label='Dose date'
+                          type='date'
+                          value={medicationDoseForm.date}
+                          onChange={(event) =>
+                            setMedicationDoseForm({ ...medicationDoseForm, date: event.target.value })
+                          }
+                        />
+                        <input
+                          aria-label='Dose time'
+                          type='time'
+                          value={medicationDoseForm.time}
+                          onChange={(event) =>
+                            setMedicationDoseForm({ ...medicationDoseForm, time: event.target.value })
+                          }
+                        />
+                        <input
+                          aria-label='Dose given'
+                          placeholder='Dose given (optional)'
+                          value={medicationDoseForm.doseGiven}
+                          onChange={(event) =>
+                            setMedicationDoseForm({ ...medicationDoseForm, doseGiven: event.target.value })
+                          }
+                        />
+                        <input
+                          aria-label='Dose note'
+                          placeholder='Note'
+                          value={medicationDoseForm.note}
+                          onChange={(event) =>
+                            setMedicationDoseForm({ ...medicationDoseForm, note: event.target.value })
+                          }
+                        />
+                        <button type='button' onClick={() => void addMedicationDose()}>
+                          Log dose
+                        </button>
+                      </div>
+                      {selectedPatientMedicationDoses.length > 0 ? (
+                        <ul className='medications-list'>
+                          {selectedPatientMedicationDoses.map((entry) => (
+                            <li key={entry.id} className='medications-item'>
+                              <span>{formatMedicationDose(entry)}</span>
+                              <button type='button' onClick={() => void deleteMedicationDose(entry.id)}>
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No dose logs yet.</p>
+                      )}
+                    </section>
                     <textarea
                       aria-label='Labs'
                       placeholder='Labs'
@@ -1087,6 +1403,59 @@ function App() {
                         <p className='inline-note'>No structured labs yet.</p>
                       )}
                     </section>
+                    <section className='medications-section'>
+                      <h3>Doctor&apos;s orders</h3>
+                      <div className='medications-form'>
+                        <input
+                          aria-label='Order text'
+                          placeholder='Order'
+                          value={orderForm.orderText}
+                          onChange={(event) => setOrderForm({ ...orderForm, orderText: event.target.value })}
+                        />
+                        <input
+                          aria-label='Order note'
+                          placeholder='Note'
+                          value={orderForm.note}
+                          onChange={(event) => setOrderForm({ ...orderForm, note: event.target.value })}
+                        />
+                        <select
+                          aria-label='Order status'
+                          value={orderForm.status}
+                          onChange={(event) =>
+                            setOrderForm({
+                              ...orderForm,
+                              status: event.target.value as 'active' | 'carriedOut' | 'discontinued',
+                            })
+                          }
+                        >
+                          <option value='active'>Active</option>
+                          <option value='carriedOut'>Carried out</option>
+                          <option value='discontinued'>Discontinued</option>
+                        </select>
+                        <button type='button' onClick={() => void addOrder()}>
+                          Add order
+                        </button>
+                      </div>
+                      {selectedPatientOrders.length > 0 ? (
+                        <ul className='medications-list'>
+                          {selectedPatientOrders.map((entry) => (
+                            <li key={entry.id} className='medications-item'>
+                              <span>{formatOrderEntry(entry)}</span>
+                              <div className='actions'>
+                                <button type='button' onClick={() => void toggleOrderStatus(entry)}>
+                                  {getNextOrderActionLabel(entry.status)}
+                                </button>
+                                <button type='button' onClick={() => void deleteOrder(entry.id)}>
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className='inline-note'>No orders yet.</p>
+                      )}
+                    </section>
                     <textarea
                       aria-label='Pendings'
                       placeholder='Pendings'
@@ -1107,7 +1476,12 @@ function App() {
                         type='button'
                         onClick={() =>
                           void copyText(
-                            toCensusEntry(selectedPatient, selectedPatientStructuredMeds, selectedPatientStructuredLabs),
+                            toCensusEntry(
+                              selectedPatient,
+                              selectedPatientStructuredMeds,
+                              selectedPatientStructuredLabs,
+                              selectedPatientOrders,
+                            ),
                           )
                         }
                       >
@@ -1117,7 +1491,12 @@ function App() {
                         type='button'
                         onClick={() =>
                           void shareText(
-                            toCensusEntry(selectedPatient, selectedPatientStructuredMeds, selectedPatientStructuredLabs),
+                            toCensusEntry(
+                              selectedPatient,
+                              selectedPatientStructuredMeds,
+                              selectedPatientStructuredLabs,
+                              selectedPatientOrders,
+                            ),
                             'Census entry',
                           )
                         }
@@ -1336,14 +1715,33 @@ function App() {
                       </button>
                       <button
                         type='button'
-                        onClick={() => void copyText(toDailySummary(selectedPatient, dailyUpdateForm, dailyVitals ?? []))}
+                        onClick={() =>
+                          void copyText(
+                            toDailySummary(
+                              selectedPatient,
+                              dailyUpdateForm,
+                              dailyVitals ?? [],
+                              selectedPatientOrders,
+                              selectedPatientMedicationDoses,
+                            ),
+                          )
+                        }
                       >
                         Copy daily summary
                       </button>
                       <button
                         type='button'
                         onClick={() =>
-                          void shareText(toDailySummary(selectedPatient, dailyUpdateForm, dailyVitals ?? []), 'Daily summary')
+                          void shareText(
+                            toDailySummary(
+                              selectedPatient,
+                              dailyUpdateForm,
+                              dailyVitals ?? [],
+                              selectedPatientOrders,
+                              selectedPatientMedicationDoses,
+                            ),
+                            'Daily summary',
+                          )
                         }
                       >
                         Share daily summary

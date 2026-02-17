@@ -79,3 +79,24 @@ export interface LabEntry {
   note: string
   createdAt: string
 }
+
+export interface OrderEntry {
+  id?: number
+  patientId: number
+  orderText: string
+  status: 'active' | 'carriedOut' | 'discontinued'
+  note: string
+  createdAt: string
+}
+
+export interface MedicationDoseEntry {
+  id?: number
+  patientId: number
+  medicationId?: number
+  medicationLabel: string
+  date: string
+  time: string
+  doseGiven: string
+  note: string
+  createdAt: string
+}

@@ -1,5 +1,13 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { DailyUpdate, LabEntry, MedicationEntry, Patient, VitalEntry } from './types'
+import type {
+  DailyUpdate,
+  LabEntry,
+  MedicationDoseEntry,
+  MedicationEntry,
+  OrderEntry,
+  Patient,
+  VitalEntry,
+} from './types'
 
 const db = new Dexie('roundingAppDatabase') as Dexie & {
   patients: EntityTable<Patient, 'id'>
@@ -7,6 +15,8 @@ const db = new Dexie('roundingAppDatabase') as Dexie & {
   vitals: EntityTable<VitalEntry, 'id'>
   medications: EntityTable<MedicationEntry, 'id'>
   labs: EntityTable<LabEntry, 'id'>
+  orders: EntityTable<OrderEntry, 'id'>
+  medicationDoses: EntityTable<MedicationDoseEntry, 'id'>
 }
 
 db.version(1).stores({
@@ -33,6 +43,16 @@ db.version(4).stores({
   vitals: '++id, patientId, date, [patientId+date], time',
   medications: '++id, patientId, medication, status, [patientId+status], createdAt',
   labs: '++id, patientId, date, testName, [patientId+testName], createdAt',
+})
+
+db.version(5).stores({
+  patients: '++id, lastName, roomNumber, service, status, admitDate',
+  dailyUpdates: '++id, patientId, date, [patientId+date]',
+  vitals: '++id, patientId, date, [patientId+date], time',
+  medications: '++id, patientId, medication, status, [patientId+status], createdAt',
+  labs: '++id, patientId, date, testName, [patientId+testName], createdAt',
+  orders: '++id, patientId, status, [patientId+status], createdAt',
+  medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
 })
 
 export { db }
