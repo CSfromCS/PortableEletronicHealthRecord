@@ -19,7 +19,6 @@ type PatientFormState = {
   age: string
   sex: 'M' | 'F'
   service: string
-  diagnosis: string
 }
 
 const initialForm: PatientFormState = {
@@ -29,7 +28,6 @@ const initialForm: PatientFormState = {
   age: '',
   sex: 'M',
   service: '',
-  diagnosis: '',
 }
 
 type ProfileFormState = {
@@ -226,6 +224,142 @@ function App() {
     }
   }, [])
 
+  // Initialize sample data on first load
+  useEffect(() => {
+    const initializeSampleData = async () => {
+      const count = await db.patients.count()
+      if (count > 0) return // Skip if data already exists
+
+      const today = toLocalISODate()
+      
+      // Add sample patient Juan Dela Cruz
+      const samplePatientId = await db.patients.add({
+        roomNumber: '301B',
+        lastName: 'Dela Cruz',
+        firstName: 'Juan',
+        middleName: 'Santos',
+        age: 45,
+        sex: 'M',
+        admitDate: today,
+        service: 'Medicine',
+        attendingPhysician: 'Dr. Maria Garcia',
+        diagnosis: 'Community-Acquired Pneumonia, Right Lower Lobe',
+        chiefComplaint: 'Cough with fever for 3 days',
+        hpiText: '45M presented with productive cough with yellowish sputum, fever (38.5°C), and difficulty breathing. Patient reports progressive dyspnea on exertion.',
+        pmhText: 'Hypertension x 5 years, Type 2 Diabetes Mellitus x 3 years',
+        peText: 'Awake, coherent, not in respiratory distress\nVS: BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% on room air\nChest: decreased breath sounds right base, crackles noted',
+        plans: 'Maintain IV antibiotics\nMonitor vitals and O2 saturation\nRepeat chest x-ray in 3 days',
+        medications: '',
+        labs: '',
+        pendings: 'CBC, Chest X-ray PA/Lateral\nSputum culture pending',
+        clerkNotes: 'Patient improving, tolerating oral intake',
+        status: 'active',
+      }) as number
+
+      // Add sample medications
+      await db.medications.add({
+        patientId: samplePatientId,
+        medication: 'Ceftriaxone',
+        dose: '2g',
+        route: 'IV',
+        frequency: 'q12h',
+        note: 'For pneumonia coverage',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      })
+
+      await db.medications.add({
+        patientId: samplePatientId,
+        medication: 'Amlodipine',
+        dose: '10mg',
+        route: 'PO',
+        frequency: 'OD',
+        note: 'Maintenance for hypertension',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      })
+
+      await db.medications.add({
+        patientId: samplePatientId,
+        medication: 'Metformin',
+        dose: '500mg',
+        route: 'PO',
+        frequency: 'BID',
+        note: 'Maintenance for diabetes',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      })
+
+      // Add sample vitals for today
+      await db.vitals.add({
+        patientId: samplePatientId,
+        date: today,
+        time: '08:00',
+        bp: '130/80',
+        hr: '88',
+        rr: '20',
+        temp: '37.8',
+        spo2: '95',
+        note: 'on room air',
+        createdAt: new Date().toISOString(),
+      })
+
+      // Add sample daily update for today
+      await db.dailyUpdates.add({
+        patientId: samplePatientId,
+        date: today,
+        fluid: 'D5LRS 1L q8h, taking clear liquids PO',
+        respiratory: 'Productive cough improved, breathing easier. No O2 requirement.',
+        infectious: 'Low-grade fever resolved. On IV Ceftriaxone day 2.',
+        cardio: 'Stable. No chest pain. BP controlled.',
+        hema: 'No active issues. CBC pending.',
+        metabolic: 'Blood sugar controlled on oral meds. Tolerating diet.',
+        output: 'Urinary output adequate. No dysuria.',
+        neuro: 'Alert and oriented. No complaints.',
+        drugs: 'Ceftriaxone 2g IV q12h, Amlodipine 10mg PO OD, Metformin 500mg PO BID',
+        other: 'Patient ambulatory. Family at bedside.',
+        vitals: 'BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% RA',
+        assessment: 'Community-acquired pneumonia, improving',
+        plans: 'Continue IV antibiotics\nMonitor clinical response\nRepeat CXR in 3 days if improving',
+        lastUpdated: new Date().toISOString(),
+      })
+
+      // Add sample lab results
+      await db.labs.add({
+        patientId: samplePatientId,
+        date: today,
+        testName: 'WBC',
+        value: '12.5',
+        unit: 'x10^9/L',
+        note: 'Elevated, consistent with infection',
+        createdAt: new Date().toISOString(),
+      })
+
+      await db.labs.add({
+        patientId: samplePatientId,
+        date: today,
+        testName: 'Hemoglobin',
+        value: '130',
+        unit: 'g/L',
+        note: 'Within normal limits',
+        createdAt: new Date().toISOString(),
+      })
+
+      // Add sample doctor's order
+      await db.orders.add({
+        patientId: samplePatientId,
+        orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
+        note: 'To assess pneumonia improvement',
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      })
+
+      console.log('Sample patient "Juan Dela Cruz" initialized')
+    }
+
+    void initializeSampleData()
+  }, [])
+
   const selectedPatient = useMemo(
     () => (patients ?? []).find((patient) => patient.id === selectedPatientId),
     [patients, selectedPatientId],
@@ -343,7 +477,7 @@ function App() {
     const query = searchQuery.trim().toLowerCase()
     const matchesQuery = (patient: Patient) => {
       if (!query) return true
-      return [patient.roomNumber, patient.lastName, patient.firstName, patient.service, patient.diagnosis]
+      return [patient.roomNumber, patient.lastName, patient.firstName, patient.service]
         .join(' ')
         .toLowerCase()
         .includes(query)
@@ -378,7 +512,7 @@ function App() {
       age,
       sex: form.sex,
       service: form.service.trim(),
-      diagnosis: form.diagnosis.trim(),
+      diagnosis: '',
       admitDate: toLocalISODate(),
       attendingPhysician: '',
       chiefComplaint: '',
@@ -412,7 +546,6 @@ function App() {
       age: patient.age.toString(),
       sex: patient.sex,
       service: patient.service,
-      diagnosis: patient.diagnosis,
     })
   }
 
@@ -1087,13 +1220,6 @@ function App() {
                 onChange={(event) => setForm({ ...form, service: event.target.value })}
                 required
               />
-              <input
-                aria-label='Diagnosis'
-                placeholder='Diagnosis'
-                value={form.diagnosis}
-                onChange={(event) => setForm({ ...form, diagnosis: event.target.value })}
-                required
-              />
               <button type='submit'>{editingId === null ? 'Add patient' : 'Save patient'}</button>
             </form>
 
@@ -1101,7 +1227,7 @@ function App() {
               <div className='list-controls'>
                 <input
                   aria-label='Search patients'
-                  placeholder='Search room, name, service, diagnosis'
+                  placeholder='Search room, name, service'
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                 />
@@ -1137,7 +1263,6 @@ function App() {
                   <span>
                     {patient.age}/{patient.sex} • {patient.service} • {patient.status}
                   </span>
-                  <span>{patient.diagnosis}</span>
                   <div className='actions'>
                     <button type='button' onClick={() => selectPatient(patient)}>
                       Open
