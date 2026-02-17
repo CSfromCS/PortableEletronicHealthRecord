@@ -33,7 +33,7 @@ For any user-visible or behavior-changing update:
 - ✅ Profile workflow improved: "Share Profile as Text" is implemented with Web Share API and clipboard fallback.
 - ✅ Usability/docs in-app: Settings includes a built-in "How to use" guide covering workflows, app sections, save behavior, and persistence/backup notes.
 - ✅ UX simplification: Add patient form streamlined to minimal demographics (room, name, age, sex); service moved to Edit Patient form, diagnosis and clinical details in Profile tab for data entry after admission.
-- ✅ Demo/showcase support: Sample patient "Juan Dela Cruz" with complete clinical data is automatically initialized on first app load for quick demonstration purposes (one-time only).
+- ✅ Demo/showcase support: Settings includes "Add sample patient" button to create a pre-populated demo patient (Juan Dela Cruz) with complete clinical data for testing/demonstration purposes.
 
 ---
 

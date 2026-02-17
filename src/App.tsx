@@ -30,6 +30,12 @@ const initialForm: PatientFormState = {
 }
 
 type ProfileFormState = {
+  roomNumber: string
+  firstName: string
+  lastName: string
+  age: string
+  sex: 'M' | 'F'
+  service: string
   diagnosis: string
   plans: string
   medications: string
@@ -39,6 +45,12 @@ type ProfileFormState = {
 }
 
 const initialProfileForm: ProfileFormState = {
+  roomNumber: '',
+  firstName: '',
+  lastName: '',
+  age: '',
+  sex: 'M',
+  service: '',
   diagnosis: '',
   plans: '',
   medications: '',
@@ -173,7 +185,6 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
 function App() {
   const [form, setForm] = useState<PatientFormState>(initialForm)
   const [view, setView] = useState<'patients' | 'settings'>('patients')
-  const [editingId, setEditingId] = useState<number | null>(null)
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'active' | 'discharged' | 'all'>('active')
@@ -204,142 +215,6 @@ function App() {
     if ('storage' in navigator && 'persist' in navigator.storage) {
       void navigator.storage.persist()
     }
-  }, [])
-
-  // Initialize sample data on first load
-  useEffect(() => {
-    const initializeSampleData = async () => {
-      const count = await db.patients.count()
-      if (count > 0) return // Skip if data already exists
-
-      const today = toLocalISODate()
-      
-      // Add sample patient Juan Dela Cruz
-      const samplePatientId = await db.patients.add({
-        roomNumber: '301B',
-        lastName: 'Dela Cruz',
-        firstName: 'Juan',
-        middleName: 'Santos',
-        age: 45,
-        sex: 'M',
-        admitDate: today,
-        service: 'Medicine',
-        attendingPhysician: 'Dr. Maria Garcia',
-        diagnosis: 'Community-Acquired Pneumonia, Right Lower Lobe',
-        chiefComplaint: 'Cough with fever for 3 days',
-        hpiText: '45M presented with productive cough with yellowish sputum, fever (38.5°C), and difficulty breathing. Patient reports progressive dyspnea on exertion.',
-        pmhText: 'Hypertension x 5 years, Type 2 Diabetes Mellitus x 3 years',
-        peText: 'Awake, coherent, not in respiratory distress\nVS: BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% on room air\nChest: decreased breath sounds right base, crackles noted',
-        plans: 'Maintain IV antibiotics\nMonitor vitals and O2 saturation\nRepeat chest x-ray in 3 days',
-        medications: '',
-        labs: '',
-        pendings: 'CBC, Chest X-ray PA/Lateral\nSputum culture pending',
-        clerkNotes: 'Patient improving, tolerating oral intake',
-        status: 'active',
-      }) as number
-
-      // Add sample medications
-      await db.medications.add({
-        patientId: samplePatientId,
-        medication: 'Ceftriaxone',
-        dose: '2g',
-        route: 'IV',
-        frequency: 'q12h',
-        note: 'For pneumonia coverage',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      })
-
-      await db.medications.add({
-        patientId: samplePatientId,
-        medication: 'Amlodipine',
-        dose: '10mg',
-        route: 'PO',
-        frequency: 'OD',
-        note: 'Maintenance for hypertension',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      })
-
-      await db.medications.add({
-        patientId: samplePatientId,
-        medication: 'Metformin',
-        dose: '500mg',
-        route: 'PO',
-        frequency: 'BID',
-        note: 'Maintenance for diabetes',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      })
-
-      // Add sample vitals for today
-      await db.vitals.add({
-        patientId: samplePatientId,
-        date: today,
-        time: '08:00',
-        bp: '130/80',
-        hr: '88',
-        rr: '20',
-        temp: '37.8',
-        spo2: '95',
-        note: 'on room air',
-        createdAt: new Date().toISOString(),
-      })
-
-      // Add sample daily update for today
-      await db.dailyUpdates.add({
-        patientId: samplePatientId,
-        date: today,
-        fluid: 'D5LRS 1L q8h, taking clear liquids PO',
-        respiratory: 'Productive cough improved, breathing easier. No O2 requirement.',
-        infectious: 'Low-grade fever resolved. On IV Ceftriaxone day 2.',
-        cardio: 'Stable. No chest pain. BP controlled.',
-        hema: 'No active issues. CBC pending.',
-        metabolic: 'Blood sugar controlled on oral meds. Tolerating diet.',
-        output: 'Urinary output adequate. No dysuria.',
-        neuro: 'Alert and oriented. No complaints.',
-        drugs: 'Ceftriaxone 2g IV q12h, Amlodipine 10mg PO OD, Metformin 500mg PO BID',
-        other: 'Patient ambulatory. Family at bedside.',
-        vitals: 'BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% RA',
-        assessment: 'Community-acquired pneumonia, improving',
-        plans: 'Continue IV antibiotics\nMonitor clinical response\nRepeat CXR in 3 days if improving',
-        lastUpdated: new Date().toISOString(),
-      })
-
-      // Add sample lab results
-      await db.labs.add({
-        patientId: samplePatientId,
-        date: today,
-        testName: 'WBC',
-        value: '12.5',
-        unit: 'x10^9/L',
-        note: 'Elevated, consistent with infection',
-        createdAt: new Date().toISOString(),
-      })
-
-      await db.labs.add({
-        patientId: samplePatientId,
-        date: today,
-        testName: 'Hemoglobin',
-        value: '130',
-        unit: 'g/L',
-        note: 'Within normal limits',
-        createdAt: new Date().toISOString(),
-      })
-
-      // Add sample doctor's order
-      await db.orders.add({
-        patientId: samplePatientId,
-        orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
-        note: 'To assess pneumonia improvement',
-        status: 'active',
-        createdAt: new Date().toISOString(),
-      })
-
-      console.log('Sample patient "Juan Dela Cruz" initialized')
-    }
-
-    void initializeSampleData()
   }, [])
 
   const selectedPatient = useMemo(
@@ -465,7 +340,7 @@ function App() {
       lastName: form.lastName.trim(),
       age,
       sex: form.sex,
-      service: editingId !== null ? form.service.trim() : '',
+      service: form.service.trim(),
       diagnosis: '',
       admitDate: toLocalISODate(),
       attendingPhysician: '',
@@ -481,26 +356,8 @@ function App() {
       status: 'active',
     }
 
-    if (editingId !== null) {
-      await db.patients.update(editingId, patientPayload)
-      setEditingId(null)
-    } else {
-      await db.patients.add(patientPayload)
-    }
-
+    await db.patients.add(patientPayload)
     setForm(initialForm)
-  }
-
-  const startEdit = (patient: Patient) => {
-    setEditingId(patient.id ?? null)
-    setForm({
-      roomNumber: patient.roomNumber,
-      firstName: patient.firstName,
-      lastName: patient.lastName,
-      age: patient.age.toString(),
-      sex: patient.sex,
-      service: patient.service,
-    })
   }
 
   const loadDailyUpdate = async (patientId: number, date: string) => {
@@ -535,6 +392,12 @@ function App() {
     const patientId = patient.id ?? null
     if (patientId === null) return
     setProfileForm({
+      roomNumber: patient.roomNumber,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      age: patient.age.toString(),
+      sex: patient.sex,
+      service: patient.service,
       diagnosis: patient.diagnosis,
       plans: patient.plans,
       medications: patient.medications,
@@ -563,7 +426,25 @@ function App() {
 
   const saveProfile = async () => {
     if (!selectedPatient?.id) return
-    await db.patients.update(selectedPatient.id, profileForm)
+    const age = Number.parseInt(profileForm.age, 10)
+    if (!Number.isFinite(age)) {
+      setNotice('Invalid age value.')
+      return
+    }
+    await db.patients.update(selectedPatient.id, {
+      roomNumber: profileForm.roomNumber.trim(),
+      firstName: profileForm.firstName.trim(),
+      lastName: profileForm.lastName.trim(),
+      age,
+      sex: profileForm.sex,
+      service: profileForm.service.trim(),
+      diagnosis: profileForm.diagnosis,
+      plans: profileForm.plans,
+      medications: profileForm.medications,
+      labs: profileForm.labs,
+      pendings: profileForm.pendings,
+      clerkNotes: profileForm.clerkNotes,
+    })
     setNotice('Profile saved.')
   }
 
@@ -1092,6 +973,135 @@ function App() {
     setNotice('Cleared discharged patients.')
   }
 
+  const addSamplePatient = async () => {
+    const today = toLocalISODate()
+    
+    // Add sample patient Juan Dela Cruz
+    const samplePatientId = await db.patients.add({
+      roomNumber: '301B',
+      lastName: 'Dela Cruz',
+      firstName: 'Juan',
+      middleName: 'Santos',
+      age: 45,
+      sex: 'M',
+      admitDate: today,
+      service: 'Medicine',
+      attendingPhysician: 'Dr. Maria Garcia',
+      diagnosis: 'Community-Acquired Pneumonia, Right Lower Lobe',
+      chiefComplaint: 'Cough with fever for 3 days',
+      hpiText: '45M presented with productive cough with yellowish sputum, fever (38.5°C), and difficulty breathing. Patient reports progressive dyspnea on exertion.',
+      pmhText: 'Hypertension x 5 years, Type 2 Diabetes Mellitus x 3 years',
+      peText: 'Awake, coherent, not in respiratory distress\nVS: BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% on room air\nChest: decreased breath sounds right base, crackles noted',
+      plans: 'Maintain IV antibiotics\nMonitor vitals and O2 saturation\nRepeat chest x-ray in 3 days',
+      medications: '',
+      labs: '',
+      pendings: 'CBC, Chest X-ray PA/Lateral\nSputum culture pending',
+      clerkNotes: 'Patient improving, tolerating oral intake',
+      status: 'active',
+    }) as number
+
+    // Add sample medications
+    await db.medications.add({
+      patientId: samplePatientId,
+      medication: 'Ceftriaxone',
+      dose: '2g',
+      route: 'IV',
+      frequency: 'q12h',
+      note: 'For pneumonia coverage',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    })
+
+    await db.medications.add({
+      patientId: samplePatientId,
+      medication: 'Amlodipine',
+      dose: '10mg',
+      route: 'PO',
+      frequency: 'OD',
+      note: 'Maintenance for hypertension',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    })
+
+    await db.medications.add({
+      patientId: samplePatientId,
+      medication: 'Metformin',
+      dose: '500mg',
+      route: 'PO',
+      frequency: 'BID',
+      note: 'Maintenance for diabetes',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    })
+
+    // Add sample vitals for today
+    await db.vitals.add({
+      patientId: samplePatientId,
+      date: today,
+      time: '08:00',
+      bp: '130/80',
+      hr: '88',
+      rr: '20',
+      temp: '37.8',
+      spo2: '95',
+      note: 'on room air',
+      createdAt: new Date().toISOString(),
+    })
+
+    // Add sample daily update for today
+    await db.dailyUpdates.add({
+      patientId: samplePatientId,
+      date: today,
+      fluid: 'D5LRS 1L q8h, taking clear liquids PO',
+      respiratory: 'Productive cough improved, breathing easier. No O2 requirement.',
+      infectious: 'Low-grade fever resolved. On IV Ceftriaxone day 2.',
+      cardio: 'Stable. No chest pain. BP controlled.',
+      hema: 'No active issues. CBC pending.',
+      metabolic: 'Blood sugar controlled on oral meds. Tolerating diet.',
+      output: 'Urinary output adequate. No dysuria.',
+      neuro: 'Alert and oriented. No complaints.',
+      drugs: 'Ceftriaxone 2g IV q12h, Amlodipine 10mg PO OD, Metformin 500mg PO BID',
+      other: 'Patient ambulatory. Family at bedside.',
+      vitals: 'BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% RA',
+      assessment: 'Community-acquired pneumonia, improving',
+      plans: 'Continue IV antibiotics\nMonitor clinical response\nRepeat CXR in 3 days if improving',
+      lastUpdated: new Date().toISOString(),
+    })
+
+    // Add sample lab results
+    await db.labs.add({
+      patientId: samplePatientId,
+      date: today,
+      testName: 'WBC',
+      value: '12.5',
+      unit: 'x10^9/L',
+      note: 'Elevated, consistent with infection',
+      createdAt: new Date().toISOString(),
+    })
+
+    await db.labs.add({
+      patientId: samplePatientId,
+      date: today,
+      testName: 'Hemoglobin',
+      value: '130',
+      unit: 'g/L',
+      note: 'Within normal limits',
+      createdAt: new Date().toISOString(),
+    })
+
+    // Add sample doctor's order
+    await db.orders.add({
+      patientId: samplePatientId,
+      orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
+      note: 'To assess pneumonia improvement',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    })
+
+    setNotice('Sample patient "Juan Dela Cruz" added successfully.')
+    setSelectedPatientId(samplePatientId)
+  }
+
   return (
     <div className='min-h-screen'>
       <main>
@@ -1148,16 +1158,14 @@ function App() {
                 <option value='M'>M</option>
                 <option value='F'>F</option>
               </select>
-              {editingId !== null ? (
-                <input
-                  aria-label='Service'
-                  placeholder='Service'
-                  value={form.service}
-                  onChange={(event) => setForm({ ...form, service: event.target.value })}
-                  required
-                />
-              ) : null}
-              <button type='submit'>{editingId === null ? 'Add patient' : 'Save patient'}</button>
+              <input
+                aria-label='Service'
+                placeholder='Service'
+                value={form.service}
+                onChange={(event) => setForm({ ...form, service: event.target.value })}
+                required
+              />
+              <button type='submit'>Add patient</button>
             </form>
 
             <section className='detail-panel'>
@@ -1203,9 +1211,6 @@ function App() {
                   <div className='actions'>
                     <button type='button' onClick={() => selectPatient(patient)}>
                       Open
-                    </button>
-                    <button type='button' onClick={() => startEdit(patient)}>
-                      Edit
                     </button>
                     <button type='button' onClick={() => void toggleDischarge(patient)}>
                       {patient.status === 'active' ? 'Discharge' : 'Re-activate'}
@@ -1275,24 +1280,93 @@ function App() {
 
                 {selectedTab === 'profile' ? (
                   <div className='stack'>
-                    <textarea
-                      aria-label='Diagnosis details'
-                      placeholder='Diagnosis'
-                      value={profileForm.diagnosis}
-                      onChange={(event) => setProfileForm({ ...profileForm, diagnosis: event.target.value })}
-                    />
-                    <textarea
-                      aria-label='Plans'
-                      placeholder='Plans'
-                      value={profileForm.plans}
-                      onChange={(event) => setProfileForm({ ...profileForm, plans: event.target.value })}
-                    />
-                    <textarea
-                      aria-label='Medications'
-                      placeholder='Medications'
-                      value={profileForm.medications}
-                      onChange={(event) => setProfileForm({ ...profileForm, medications: event.target.value })}
-                    />
+                    <div className='demographics-grid'>
+                      <div className='input-field'>
+                        <input
+                          id='profile-room'
+                          placeholder=' '
+                          value={profileForm.roomNumber}
+                          onChange={(event) => setProfileForm({ ...profileForm, roomNumber: event.target.value })}
+                        />
+                        <label htmlFor='profile-room'>Room</label>
+                      </div>
+                      <div className='input-field'>
+                        <input
+                          id='profile-firstname'
+                          placeholder=' '
+                          value={profileForm.firstName}
+                          onChange={(event) => setProfileForm({ ...profileForm, firstName: event.target.value })}
+                        />
+                        <label htmlFor='profile-firstname'>First name</label>
+                      </div>
+                      <div className='input-field'>
+                        <input
+                          id='profile-lastname'
+                          placeholder=' '
+                          value={profileForm.lastName}
+                          onChange={(event) => setProfileForm({ ...profileForm, lastName: event.target.value })}
+                        />
+                        <label htmlFor='profile-lastname'>Last name</label>
+                      </div>
+                      <div className='input-field'>
+                        <input
+                          id='profile-age'
+                          type='number'
+                          min='0'
+                          placeholder=' '
+                          value={profileForm.age}
+                          onChange={(event) => setProfileForm({ ...profileForm, age: event.target.value })}
+                        />
+                        <label htmlFor='profile-age'>Age</label>
+                      </div>
+                      <div className='input-field'>
+                        <select
+                          id='profile-sex'
+                          value={profileForm.sex}
+                          onChange={(event) => setProfileForm({ ...profileForm, sex: event.target.value as 'M' | 'F' })}
+                        >
+                          <option value='M'>M</option>
+                          <option value='F'>F</option>
+                        </select>
+                        <label htmlFor='profile-sex'>Sex</label>
+                      </div>
+                    </div>
+                    <div className='input-field'>
+                      <input
+                        id='profile-service'
+                        placeholder=' '
+                        value={profileForm.service}
+                        onChange={(event) => setProfileForm({ ...profileForm, service: event.target.value })}
+                      />
+                      <label htmlFor='profile-service'>Service</label>
+                    </div>
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-diagnosis'
+                        placeholder=' '
+                        value={profileForm.diagnosis}
+                        onChange={(event) => setProfileForm({ ...profileForm, diagnosis: event.target.value })}
+                      />
+                      <label htmlFor='profile-diagnosis'>Diagnosis</label>
+                    </div>
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-plans'
+                        placeholder=' '
+                        value={profileForm.plans}
+                        onChange={(event) => setProfileForm({ ...profileForm, plans: event.target.value })}
+                      />
+                      <label htmlFor='profile-plans'>Plans</label>
+                    </div>
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-medications'
+                        placeholder=' '
+                        value={profileForm.medications}
+                        onChange={(event) => setProfileForm({ ...profileForm, medications: event.target.value })}
+                      />
+                      <label htmlFor='profile-medications'>Medications</label>
+                    </div>
                     <section className='medications-section'>
                       <h3>Structured medications</h3>
                       <div className='medications-form'>
@@ -1386,12 +1460,15 @@ function App() {
                         <p className='inline-note'>No structured medications yet.</p>
                       )}
                     </section>
-                    <textarea
-                      aria-label='Labs'
-                      placeholder='Labs'
-                      value={profileForm.labs}
-                      onChange={(event) => setProfileForm({ ...profileForm, labs: event.target.value })}
-                    />
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-labs'
+                        placeholder=' '
+                        value={profileForm.labs}
+                        onChange={(event) => setProfileForm({ ...profileForm, labs: event.target.value })}
+                      />
+                      <label htmlFor='profile-labs'>Labs</label>
+                    </div>
                     <section className='labs-section'>
                       <h3>Structured labs</h3>
                       <div className='labs-form'>
@@ -1500,18 +1577,24 @@ function App() {
                         <p className='inline-note'>No orders yet.</p>
                       )}
                     </section>
-                    <textarea
-                      aria-label='Pendings'
-                      placeholder='Pendings'
-                      value={profileForm.pendings}
-                      onChange={(event) => setProfileForm({ ...profileForm, pendings: event.target.value })}
-                    />
-                    <textarea
-                      aria-label='Clerk notes'
-                      placeholder='Clerk notes'
-                      value={profileForm.clerkNotes}
-                      onChange={(event) => setProfileForm({ ...profileForm, clerkNotes: event.target.value })}
-                    />
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-pendings'
+                        placeholder=' '
+                        value={profileForm.pendings}
+                        onChange={(event) => setProfileForm({ ...profileForm, pendings: event.target.value })}
+                      />
+                      <label htmlFor='profile-pendings'>Pendings</label>
+                    </div>
+                    <div className='input-field'>
+                      <textarea
+                        id='profile-clerknotes'
+                        placeholder=' '
+                        value={profileForm.clerkNotes}
+                        onChange={(event) => setProfileForm({ ...profileForm, clerkNotes: event.target.value })}
+                      />
+                      <label htmlFor='profile-clerknotes'>Clerk notes</label>
+                    </div>
                     <div className='actions'>
                       <button type='button' onClick={() => void saveProfile()}>
                         Save profile
@@ -1830,7 +1913,7 @@ function App() {
         ) : (
           <section className='detail-panel settings-panel'>
             <h2>Settings</h2>
-            <p>Export/import backup JSON and clear discharged patients.</p>
+            <p>Export/import backup JSON, add sample data, and clear discharged patients.</p>
             <div className='stack'>
               <button type='button' onClick={() => void exportBackup()}>
                 Export backup JSON
@@ -1839,6 +1922,9 @@ function App() {
                 Import backup JSON
                 <input type='file' accept='application/json' onChange={(event) => void importBackup(event)} />
               </label>
+              <button type='button' onClick={() => void addSamplePatient()}>
+                Add sample patient (Juan Dela Cruz)
+              </button>
               <button type='button' onClick={() => void clearDischargedPatients()}>
                 Clear discharged patients
               </button>
