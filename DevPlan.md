@@ -13,9 +13,9 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 ## Current Progress (as of 2026-02-17)
 
 - ✅ Keep this as `DevPlan.md` (no `agent.md` file is needed for this project plan).
-- ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient list with add/edit/discharge.
-- ✅ Implemented in app: patient profile section, daily update section, and text generation/copy flows (census entry, daily summary, full census).
-- ⏳ Still in progress from Phase 1: settings backup/import and further UI polish.
+- ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient add/edit form, and patient list/selection panel.
+- ✅ In-app behavior: profile tab with editable freeform fields, daily update tab with FRICHMOND text areas plus manual save buttons, clipboard text generation for census entry, daily summary, and full census copy.
+- ⏳ Work still pending: search/filter/sort controls for the list, auto-save or debounced saves, settings/backups/import UI, any structured vitals/meds/labs stores, and sharing beyond clipboard.
 
 ---
 
@@ -141,35 +141,26 @@ interface DailyUpdate {
 
 ### 1. Patient List (Home Screen)
 
-- List of active patients
-- Each row: Room | Name | Age/Sex | Service | Diagnosis (truncated)
-- Sort toggle: by Room Number | by Name | by Service
-- Search/filter bar
-- Tap → opens Patient Profile
-- "+" button → Add Patient
-- Toggle to show discharged patients
-- **"Generate Census"** button → generates text for all active patients
+- Admission form at the top capturing room, name, age, sex, service, and working diagnosis in one shot.
+- List of active patients sorted by room number, showing room/name, age/sex, service and diagnosis with buttons to open the detail drawer, edit, or discharge.
+- Full census generator button reuses the same clipboard helper as the single-patient text exports; search/filter/sort toggles and the discharged-patient view are still future work.
 
 ### 2. Patient Profile (2 Tabs)
 
 #### Tab: Profile
-- All patient data in readable format
-- Edit button to modify any field
-- Large text areas for: HPI, PMH, PE, diagnosis, plans, meds, labs, pendings, notes
-- **"Copy Profile as Text"** button
-- **"Copy Census Entry"** button
+- Freeform textareas for diagnosis, plans, medications, labs, pendings, and clerk notes pulled straight from the selected patient record.
+- The save button writes the current form back into Dexie and a **"Copy Census Entry"** button copies the structured census text; the planned "Copy Profile as Text" feature remains on the backlog.
 
 #### Tab: Daily Update
-- Date picker (defaults to today)
-- FRICHMOND form: 10 textarea fields + vitals + assessment + plans
-- Auto-saves as you type (debounced)
-- Date picker to view previous days' notes
-- **"Copy Daily Summary"** button
+- Date picker defaults to today and loads data via Dexie's `[patientId+date]` compound index so you can toggle between diary entries.
+- FRICHMOND text areas for each category, plus vitals, assessment, and plan fields; you must tap **"Save daily update"** to persist changes, so debounced auto-save is still pending.
+- **"Copy Daily Summary"** button renders whichever fields currently have values into the formatted text block.
 
 ### 3. Settings
-- JSON backup export (download file)
-- JSON import (restore from file)
-- Clear discharged patients
+- Not implemented yet. Planned items remain:
+   - JSON backup export (download file)
+   - JSON import (restore from file)
+   - Clear discharged patients
 
 ---
 
@@ -219,45 +210,38 @@ Concatenate all active patients' census entries, separated by blank lines. One t
 
 ### Phase 1 — Ship It (~1–2 sessions)
 
-**Goal**: Working app on phone and laptop. Can add patients, take daily notes, copy formatted text.
+**Goal**: Confirm the current single-page flow matches the DevPlan states so the BP-level copy generator is reliable on both phone and laptop.
 
 Tasks:
-1. **Scaffold**
+1. **Scaffold and storage** (Done)
    - Vite + React + TypeScript + vite-plugin-pwa
-   - Install: dexie, dexie-react-hooks, react-hook-form, @hookform/resolvers, zod
-   - Install: tailwindcss, shadcn/ui (button, input, textarea, tabs, card, dialog, toast)
-   - Set up Dexie database with 2 stores (patients, dailyUpdates)
-   - `navigator.storage.persist()` on mount
-   - Responsive layout: works on phone (360px) and laptop (1200px+)
+   - Dexie with `patients` and `dailyUpdates` stores plus `navigator.storage.persist()`
+   - Responsive CSS that works on phone and laptop
 
-2. **Patient List + Add/Edit**
-   - List active patients with Room | Name | Age/Sex | Service | Diagnosis
-   - Sort by room/name/service, search bar
-   - Add Patient form (React Hook Form + Zod)
-   - Edit patient inline
-   - Discharge toggle
+2. **Patient list + admission form** (Done)
+   - Top entry form for room/name/age/sex/service/diagnosis
+   - List active patients sorted by room with buttons to open detail, edit, and discharge
+   - Full census generator button copying concatenated text
 
-3. **Patient Profile — Profile tab**
-   - Display all patient fields
-   - Edit mode toggle
-   - "Copy Census Entry" button → clipboard + toast
-   - "Copy Profile as Text" button
+3. **Patient profile tab** (Partially done)
+   - Saveable freeform text areas for diagnosis, plans, meds, labs, pendings, notes
+   - Copy census text to clipboard (profile-as-text is not yet in the UI)
 
-4. **Patient Profile — Daily Update tab**
-   - Date picker defaulting to today
-   - FRICHMOND textareas + vitals + assessment + plans
-   - Auto-save with debounce (save on blur or 2s idle)
-   - "Copy Daily Summary" button → clipboard + toast
+4. **Daily update tab** (Partially done)
+   - Date picker that loads per-day FRICHMOND entries via `[patientId+date]`
+   - Text areas for vitals and every FRICHMOND category with manual "Save" and "Copy daily summary" buttons
+   - Auto-save/debounced save is still pending
 
-5. **Census generator**
-   - "Generate All Census" from patient list → all active patients → clipboard
+5. **Deployment/installs** (Done)
+   - App already runnable via `npm run dev` and deployable as a static site with a PWA manifest
 
-6. **Deploy**
-   - Push to GitHub Pages or Netlify
-   - Install on phone as PWA
-   - Bookmark on laptop
+6. **Outstanding Phase 1 work**
+   - Add search/filter/sort controls for the patient list
+   - UI for JSON backup/import and clearing discharged patients
+   - Share API integration (beyond clipboard)
+   - Debounced or auto-save for daily updates
 
-**Checkpoint**: Usable for rounds. Everything after this is gravy.
+**Checkpoint**: Patient flows are functional; finish Phase 1 by wiring the missing list controls, backup/import settings, and auto-save before tackling Phase 2.
 
 ### Phase 2 — Nice-to-Haves (add when you feel the pain)
 
