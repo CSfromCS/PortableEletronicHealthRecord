@@ -111,17 +111,8 @@ type BackupPayload = {
   orders?: OrderEntry[]
 }
 
-type LabFormState = {
-  date: string
-  testName: string
-  value: string
-  unit: string
-  note: string
-}
-
 type LabTemplateTest = {
   key: string
-  displayName: string
   fullName?: string
   unit?: string
 }
@@ -137,59 +128,59 @@ const LAB_TEMPLATES: LabTemplate[] = [
     id: 'ust-cbc',
     name: 'UST - CBC',
     tests: [
-      { key: 'rbc', displayName: 'RBC', fullName: 'RBC count', unit: 'x10^12/L' },
-      { key: 'hgb', displayName: 'Hgb', fullName: 'Hemoglobin', unit: 'g/L' },
-      { key: 'hct', displayName: 'Hct', fullName: 'Hematocrit' },
-      { key: 'mcv', displayName: 'MCV', fullName: 'Mean Cell Volume', unit: 'fL' },
-      { key: 'mch', displayName: 'MCH', fullName: 'Mean Cell Hemoglobin', unit: 'pg' },
-      { key: 'mchc', displayName: 'MCHC', fullName: 'Mean Cell Hemoglobin Concentration', unit: 'g/dL' },
-      { key: 'rdw', displayName: 'RDW', fullName: 'Red Cell Distribution Width', unit: '%' },
-      { key: 'plt', displayName: 'Plt', fullName: 'Platelet Count', unit: 'x10^9/L' },
-      { key: 'mpv', displayName: 'MPV', fullName: 'Mean Platelet Volume', unit: 'fL' },
-      { key: 'wbc', displayName: 'WBC', fullName: 'WBC Count', unit: 'x10^9/L' },
-      { key: 'n', displayName: 'N', fullName: 'Neutrophils' },
-      { key: 'metamyelocytes', displayName: 'Metamyelocytes' },
-      { key: 'bands', displayName: 'Bands' },
-      { key: 's', displayName: 'S', fullName: 'Segmenters' },
-      { key: 'l', displayName: 'L', fullName: 'Lymphocytes' },
-      { key: 'm', displayName: 'M', fullName: 'Monocytes' },
-      { key: 'e', displayName: 'E', fullName: 'Eosinophils' },
-      { key: 'b', displayName: 'B', fullName: 'Basophils' },
-      { key: 'blasts', displayName: 'Blasts' },
-      { key: 'myelocytes', displayName: 'Myelocytes' },
-      { key: 'mdw', displayName: 'MDW', fullName: 'Monocyte Distribution Width' },
+      { key: 'RBC', fullName: 'RBC count', unit: 'x10^12/L' },
+      { key: 'Hgb', fullName: 'Hemoglobin', unit: 'g/L' },
+      { key: 'Hct', fullName: 'Hematocrit' },
+      { key: 'MCV', fullName: 'Mean Cell Volume', unit: 'fL' },
+      { key: 'MCH', fullName: 'Mean Cell Hemoglobin', unit: 'pg' },
+      { key: 'MCHC', fullName: 'Mean Cell Hemoglobin Concentration', unit: 'g/dL' },
+      { key: 'RDW', fullName: 'Red Cell Distribution Width', unit: '%' },
+      { key: 'Plt', fullName: 'Platelet Count', unit: 'x10^9/L' },
+      { key: 'MPV', fullName: 'Mean Platelet Volume', unit: 'fL' },
+      { key: 'WBC', fullName: 'WBC Count', unit: 'x10^9/L' },
+      { key: 'N', fullName: 'Neutrophils' },
+      { key: 'Metamyelocytes' },
+      { key: 'Bands' },
+      { key: 'S', fullName: 'Segmenters' },
+      { key: 'L', fullName: 'Lymphocytes' },
+      { key: 'M', fullName: 'Monocytes' },
+      { key: 'E', fullName: 'Eosinophils' },
+      { key: 'B', fullName: 'Basophils' },
+      { key: 'Blasts' },
+      { key: 'Myelocytes' },
+      { key: 'MDW', fullName: 'Monocyte Distribution Width' },
     ],
   },
   {
     id: 'ust-urinalysis',
     name: 'UST - Urinalysis',
     tests: [
-      { key: 'ua-color', displayName: 'Color' },
-      { key: 'ua-clarity', displayName: 'Transparency' },
-      { key: 'ua-sg', displayName: 'Specific Gravity' },
-      { key: 'ua-ph', displayName: 'pH' },
-      { key: 'ua-protein', displayName: 'Protein' },
-      { key: 'ua-glucose', displayName: 'Glucose' },
-      { key: 'ua-ketones', displayName: 'Ketones' },
-      { key: 'ua-blood', displayName: 'Blood' },
-      { key: 'ua-le', displayName: 'Leukocyte Esterase' },
-      { key: 'ua-nitrite', displayName: 'Nitrite' },
-      { key: 'ua-wbc', displayName: 'WBC /HPF' },
-      { key: 'ua-rbc', displayName: 'RBC /HPF' },
-      { key: 'ua-bacteria', displayName: 'Bacteria' },
+      { key: 'Color' },
+      { key: 'Transparency' },
+      { key: 'Specific Gravity' },
+      { key: 'pH' },
+      { key: 'Protein' },
+      { key: 'Glucose' },
+      { key: 'Ketones' },
+      { key: 'Blood' },
+      { key: 'Leukocyte Esterase' },
+      { key: 'Nitrite' },
+      { key: 'WBC /HPF' },
+      { key: 'RBC /HPF' },
+      { key: 'Bacteria' },
     ],
   },
   {
     id: 'ust-electrolytes',
     name: 'UST - Electrolytes / Renal',
     tests: [
-      { key: 'na', displayName: 'Na', fullName: 'Sodium', unit: 'mmol/L' },
-      { key: 'k', displayName: 'K', fullName: 'Potassium', unit: 'mmol/L' },
-      { key: 'cl', displayName: 'Cl', fullName: 'Chloride', unit: 'mmol/L' },
-      { key: 'hco3', displayName: 'HCO3', fullName: 'Bicarbonate', unit: 'mmol/L' },
-      { key: 'bun', displayName: 'BUN', fullName: 'Blood Urea Nitrogen', unit: 'mg/dL' },
-      { key: 'crea', displayName: 'Crea', fullName: 'Creatinine', unit: 'mg/dL' },
-      { key: 'egfr', displayName: 'eGFR', unit: 'mL/min/1.73m²' },
+      { key: 'Na', unit: 'mmol/L' },
+      { key: 'K', unit: 'mmol/L' },
+      { key: 'Cl', unit: 'mmol/L' },
+      { key: 'HCO3', unit: 'mmol/L' },
+      { key: 'BUN', unit: 'mg/dL' },
+      { key: 'Crea', unit: 'mg/dL' },
+      { key: 'eGFR', unit: 'mL/min/1.73m²' },
     ],
   },
 ]
@@ -250,14 +241,6 @@ const initialOrderForm = (): OrderFormState => ({
   status: 'active',
 })
 
-const initialLabForm = (): LabFormState => ({
-  date: toLocalISODate(),
-  testName: '',
-  value: '',
-  unit: '',
-  note: '',
-})
-
 declare const __APP_VERSION__: string;
 declare const __GIT_SHA__: string;
 
@@ -296,10 +279,10 @@ function App() {
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
   const [orderDraftId, setOrderDraftId] = useState<number | null>(null)
   const [orderDirty, setOrderDirty] = useState(false)
-  const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [selectedLabTemplateId, setSelectedLabTemplateId] = useState(DEFAULT_LAB_TEMPLATE_ID)
   const [labTemplateDate, setLabTemplateDate] = useState(() => toLocalISODate())
   const [labTemplateValues, setLabTemplateValues] = useState<Record<string, string>>({})
+  const [labTemplateNote, setLabTemplateNote] = useState('')
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
   const [profileDirty, setProfileDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -400,6 +383,11 @@ function App() {
     if (selectedPatientId === null) return []
     return structuredLabsByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredLabsByPatient])
+
+  const labTemplatesById = useMemo(
+    () => new Map(LAB_TEMPLATES.map((template) => [template.id, template] as const)),
+    [],
+  )
 
   const selectedLabTemplate = useMemo(
     () => LAB_TEMPLATES.find((template) => template.id === selectedLabTemplateId) ?? LAB_TEMPLATES[0],
@@ -605,10 +593,10 @@ function App() {
     setOrderForm(initialOrderForm())
     setOrderDraftId(null)
     setOrderDirty(false)
-    setLabForm(initialLabForm())
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
     setLabTemplateDate(toLocalISODate())
     setLabTemplateValues({})
+    setLabTemplateNote('')
     setEditingLabId(null)
     setSelectedTab('profile')
   }
@@ -734,43 +722,22 @@ function App() {
     return `${withNote || entry.orderText} (${formatOrderStatus(entry.status)})`
   }
 
-  const compareLabValue = (currentValue: string, previousValue: string) => {
-    const current = Number.parseFloat(currentValue)
-    const previous = Number.parseFloat(previousValue)
-    if (!Number.isFinite(current) || !Number.isFinite(previous)) {
-      return ''
-    }
-
-    const delta = current - previous
-    if (Math.abs(delta) < 0.0001) {
-      return '→ vs prev'
-    }
-
-    const sign = delta > 0 ? '+' : ''
-    const arrow = delta > 0 ? '↑' : '↓'
-    return `${arrow} ${sign}${delta.toFixed(2)} vs prev`
-  }
-
-  const formatStructuredLab = (entry: LabEntry, previousByTest: Map<string, LabEntry>) => {
-    const valueWithUnit = [entry.value, entry.unit].filter(Boolean).join(' ')
-    const previous = previousByTest.get(entry.testName.trim().toLowerCase())
-    const comparison = previous ? compareLabValue(entry.value, previous.value) : ''
-    const note = entry.note ? ` — ${entry.note}` : ''
-    return `${entry.date} ${entry.testName}: ${valueWithUnit || '-'}${comparison ? ` (${comparison})` : ''}${note}`
-  }
-
   const buildStructuredLabLines = (entries: LabEntry[]) => {
-    const previousByTest = new Map<string, LabEntry>()
-    const lines: string[] = []
+    return entries.map((entry) => {
+      const template = labTemplatesById.get(entry.templateId)
+      const resultTexts = (template?.tests ?? [])
+        .map((test) => {
+          const value = (entry.results?.[test.key] ?? '').trim()
+          if (!value) return null
+          return `${test.key}: ${value}${test.unit ? ` ${test.unit}` : ''}`
+        })
+        .filter((text): text is string => text !== null)
 
-    entries.forEach((entry) => {
-      const testKey = entry.testName.trim().toLowerCase()
-      if (!testKey) return
-      lines.push(formatStructuredLab(entry, previousByTest))
-      previousByTest.set(testKey, entry)
+      const label = template?.name ?? entry.templateId
+      const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
+      const note = entry.note ? ` — ${entry.note}` : ''
+      return `${entry.date} ${label}: ${details}${note}`
     })
-
-    return lines
   }
 
   const toCensusEntry = (
@@ -1307,32 +1274,31 @@ function App() {
     if (selectedPatientId === null) return
 
     const entryDate = labTemplateDate || toLocalISODate()
-    const createdAt = new Date().toISOString()
-    const entries: Omit<LabEntry, 'id'>[] = selectedLabTemplate.tests
-      .map((test) => {
-        const value = (labTemplateValues[test.key] ?? '').trim()
-        if (!value) return null
+    const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
+      const value = (labTemplateValues[test.key] ?? '').trim()
+      if (value) {
+        accumulator[test.key] = value
+      }
+      return accumulator
+    }, {})
 
-        return {
-          patientId: selectedPatientId,
-          date: entryDate,
-          testName: test.displayName,
-          value,
-          unit: test.unit ?? '',
-          note: '',
-          createdAt,
-        }
-      })
-      .filter((entry): entry is Omit<LabEntry, 'id'> => entry !== null)
-
-    if (entries.length === 0) {
+    if (Object.keys(filteredResults).length === 0) {
       setNotice('Enter at least one lab value.')
       return
     }
 
-    await db.labs.bulkAdd(entries)
+    await db.labs.add({
+      patientId: selectedPatientId,
+      date: entryDate,
+      templateId: selectedLabTemplate.id,
+      results: filteredResults,
+      note: labTemplateNote.trim(),
+      createdAt: new Date().toISOString(),
+    })
+
     setLabTemplateValues({})
-    setNotice(`${entries.length} ${entries.length === 1 ? 'lab' : 'labs'} added from ${selectedLabTemplate.name}.`)
+    setLabTemplateNote('')
+    setNotice(`Lab added from ${selectedLabTemplate.name}.`)
   }
 
   const deleteStructuredLab = async (labId?: number) => {
@@ -1340,42 +1306,62 @@ function App() {
     await db.labs.delete(labId)
     if (editingLabId === labId) {
       setEditingLabId(null)
-      setLabForm(initialLabForm())
+      setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+      setLabTemplateDate(toLocalISODate())
+      setLabTemplateValues({})
+      setLabTemplateNote('')
     }
     setNotice('Lab removed.')
   }
 
   const startEditingLab = (entry: LabEntry) => {
     if (entry.id === undefined) return
+    if (!labTemplatesById.has(entry.templateId)) return
+
     setEditingLabId(entry.id)
-    setLabForm({
-      date: entry.date,
-      testName: entry.testName,
-      value: entry.value,
-      unit: entry.unit,
-      note: entry.note,
-    })
+    setSelectedLabTemplateId(entry.templateId)
+    setLabTemplateDate(entry.date)
+    setLabTemplateValues(entry.results ?? {})
+    setLabTemplateNote(entry.note ?? '')
   }
 
   const saveEditingLab = async () => {
-    if (editingLabId === null || !labForm.testName.trim()) return
+    if (editingLabId === null) return
+
+    const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
+      const value = (labTemplateValues[test.key] ?? '').trim()
+      if (value) {
+        accumulator[test.key] = value
+      }
+      return accumulator
+    }, {})
+
+    if (Object.keys(filteredResults).length === 0) {
+      setNotice('Enter at least one lab value.')
+      return
+    }
 
     await db.labs.update(editingLabId, {
-      date: labForm.date,
-      testName: labForm.testName.trim(),
-      value: labForm.value.trim(),
-      unit: labForm.unit.trim(),
-      note: labForm.note.trim(),
+      date: labTemplateDate || toLocalISODate(),
+      templateId: selectedLabTemplate.id,
+      results: filteredResults,
+      note: labTemplateNote.trim(),
     })
 
     setEditingLabId(null)
-    setLabForm(initialLabForm())
+    setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+    setLabTemplateDate(toLocalISODate())
+    setLabTemplateValues({})
+    setLabTemplateNote('')
     setNotice('Lab updated.')
   }
 
   const cancelEditingLab = () => {
     setEditingLabId(null)
-    setLabForm(initialLabForm())
+    setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+    setLabTemplateDate(toLocalISODate())
+    setLabTemplateValues({})
+    setLabTemplateNote('')
   }
 
   const exportBackup = async () => {
@@ -1454,10 +1440,10 @@ function App() {
       setOrderForm(initialOrderForm())
       setOrderDraftId(null)
       setOrderDirty(false)
-      setLabForm(initialLabForm())
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
       setLabTemplateDate(toLocalISODate())
       setLabTemplateValues({})
+      setLabTemplateNote('')
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setLastSavedAt(null)
@@ -1503,10 +1489,10 @@ function App() {
       setOrderForm(initialOrderForm())
       setOrderDraftId(null)
       setOrderDirty(false)
-      setLabForm(initialLabForm())
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
       setLabTemplateDate(toLocalISODate())
       setLabTemplateValues({})
+      setLabTemplateNote('')
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
@@ -1614,20 +1600,12 @@ function App() {
     await db.labs.add({
       patientId: samplePatientId,
       date: today,
-      testName: 'WBC',
-      value: '12.5',
-      unit: 'x10^9/L',
+      templateId: 'ust-cbc',
+      results: {
+        WBC: '12.5',
+        Hgb: '130',
+      },
       note: 'Elevated, consistent with infection',
-      createdAt: new Date().toISOString(),
-    })
-
-    await db.labs.add({
-      patientId: samplePatientId,
-      date: today,
-      testName: 'Hemoglobin',
-      value: '130',
-      unit: 'g/L',
-      note: 'Within normal limits',
       createdAt: new Date().toISOString(),
     })
 
@@ -1901,90 +1879,73 @@ function App() {
                         <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
-                        {editingLabId === null ? (
-                          <>
-                            <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                              <div className='space-y-1'>
-                                <Label>Date</Label>
-                                <Input
-                                  type='date'
-                                  aria-label='Lab date'
-                                  value={labTemplateDate}
-                                  onChange={(event) => setLabTemplateDate(event.target.value)}
-                                />
-                              </div>
-                              <div className='space-y-1'>
-                                <Label>Template</Label>
-                                <Select
-                                  value={selectedLabTemplateId}
-                                  onValueChange={(value) => {
-                                    setSelectedLabTemplateId(value)
-                                    setLabTemplateValues({})
-                                  }}
-                                >
-                                  <SelectTrigger aria-label='Lab template'>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {LAB_TEMPLATES.map((template) => (
-                                      <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Date</Label>
+                            <Input
+                              type='date'
+                              aria-label='Lab date'
+                              value={labTemplateDate}
+                              onChange={(event) => setLabTemplateDate(event.target.value)}
+                            />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Template</Label>
+                            <Select
+                              value={selectedLabTemplateId}
+                              onValueChange={(value) => {
+                                setSelectedLabTemplateId(value)
+                                setLabTemplateValues({})
+                              }}
+                            >
+                              <SelectTrigger aria-label='Lab template'>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LAB_TEMPLATES.map((template) => (
+                                  <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className='space-y-2'>
+                          {selectedLabTemplate.tests.map((test) => (
+                            <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                              <p className='text-sm text-mauve-shadow font-medium'>
+                                {test.key}
+                                {test.fullName ? ` - ${test.fullName}` : ''}
+                                {test.unit ? ` (${test.unit})` : ''}
+                              </p>
+                              <Input
+                                aria-label={`${selectedLabTemplate.name} ${test.key} value`}
+                                placeholder='Value'
+                                value={labTemplateValues[test.key] ?? ''}
+                                onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                              />
                             </div>
-                            <div className='space-y-2'>
-                              {selectedLabTemplate.tests.map((test) => (
-                                <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
-                                  <p className='text-sm text-mauve-shadow font-medium'>
-                                    {test.displayName}
-                                    {test.fullName ? ` - ${test.fullName}` : ''}
-                                    {test.unit ? ` (${test.unit})` : ''}
-                                  </p>
-                                  <Input
-                                    aria-label={`${selectedLabTemplate.name} ${test.displayName} value`}
-                                    placeholder='Value'
-                                    value={labTemplateValues[test.key] ?? ''}
-                                    onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            <div className='flex gap-2 flex-wrap'>
-                              <Button size='sm' onClick={() => void addStructuredLab()}>Add template labs</Button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className='grid grid-cols-2 gap-2'>
-                              <div className='space-y-1'>
-                                <Label>Date</Label>
-                                <Input type='date' aria-label='Lab date' value={labForm.date} onChange={(event) => setLabForm({ ...labForm, date: event.target.value })} />
-                              </div>
-                              <div className='space-y-1'>
-                                <Label>Test name</Label>
-                                <Input aria-label='Lab test name' placeholder='Test name' value={labForm.testName} onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })} />
-                              </div>
-                              <div className='space-y-1'>
-                                <Label>Value</Label>
-                                <Input aria-label='Lab value' placeholder='Value' value={labForm.value} onChange={(event) => setLabForm({ ...labForm, value: event.target.value })} />
-                              </div>
-                              <div className='space-y-1'>
-                                <Label>Unit</Label>
-                                <Input aria-label='Lab unit' placeholder='Unit' value={labForm.unit} onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })} />
-                              </div>
-                              <div className='space-y-1 col-span-2'>
-                                <Label>Note</Label>
-                                <Textarea aria-label='Lab note' placeholder='Note' value={labForm.note} onChange={(event) => setLabForm({ ...labForm, note: event.target.value })} />
-                              </div>
-                            </div>
-                            <div className='flex gap-2 flex-wrap'>
+                          ))}
+                        </div>
+                        <div className='space-y-1'>
+                          <Label>Note</Label>
+                          <Textarea
+                            aria-label='Lab note'
+                            placeholder='Optional note for this lab run'
+                            value={labTemplateNote}
+                            onChange={(event) => setLabTemplateNote(event.target.value)}
+                          />
+                        </div>
+                        <div className='flex gap-2 flex-wrap'>
+                          {editingLabId === null ? (
+                            <Button size='sm' onClick={() => void addStructuredLab()}>Add lab</Button>
+                          ) : (
+                            <>
                               <Button size='sm' onClick={() => void saveEditingLab()}>Save</Button>
                               <Button size='sm' variant='secondary' onClick={cancelEditingLab}>Cancel</Button>
                               <Button size='sm' variant='destructive' onClick={() => void deleteStructuredLab(editingLabId)}>Remove</Button>
-                            </div>
-                          </>
-                        )}
+                            </>
+                          )}
+                        </div>
                         {selectedPatientStructuredLabs.length > 0 ? (
                           <ul className='space-y-1'>
                             {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {

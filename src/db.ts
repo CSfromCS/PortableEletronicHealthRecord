@@ -53,4 +53,18 @@ db.version(5).stores({
   medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
 })
 
+db.version(6)
+  .stores({
+    patients: '++id, lastName, roomNumber, service, status, admitDate',
+    dailyUpdates: '++id, patientId, date, [patientId+date]',
+    vitals: '++id, patientId, date, [patientId+date], time',
+    medications: '++id, patientId, medication, status, [patientId+status], createdAt',
+    labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
+    orders: '++id, patientId, status, [patientId+status], createdAt',
+    medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
+  })
+  .upgrade(async (tx) => {
+    await tx.table('labs').clear()
+  })
+
 export { db }
