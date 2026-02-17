@@ -10,6 +10,15 @@ A personal patient tracking tool for a medical clerk doing hospital rounds. Buil
 
 ---
 
+## Current Progress (as of 2026-02-17)
+
+- ✅ Keep this as `DevPlan.md` (no `agent.md` file is needed for this project plan).
+- ✅ MVP foundation implemented: React + TypeScript + Vite PWA setup, Dexie DB with `patients` + `dailyUpdates`, patient list with add/edit/discharge.
+- ✅ Implemented in app: patient profile section, daily update section, and text generation/copy flows (census entry, daily summary, full census).
+- ⏳ Still in progress from Phase 1: settings backup/import and further UI polish.
+
+---
+
 ## Who Uses It
 
 One medical clerk at University of Santo Tomas Hospital. ~10 active patients at a time. Up to 100 patients total over a 2-month rotation. Data is entered manually. Output is copy-paste text shared via messaging apps (Viber/WhatsApp) to a laptop for Google Docs.
@@ -272,7 +281,7 @@ The simplified plan means fewer sessions. Keep this file in the project root for
 
 **Session 1 — Scaffold + Patient List:**
 ```
-"Set up this project as a React + TypeScript + Vite PWA. Read RoundingApp-DevPlan.md
+"Set up this project as a React + TypeScript + Vite PWA. Read DevPlan.md
 for the full tech stack and data model. Install all dependencies, configure
 vite-plugin-pwa, set up Tailwind and shadcn/ui. Create the Dexie database with
 2 stores (patients, dailyUpdates). Build the Patient List page with sort, search,
@@ -282,7 +291,7 @@ add patient form, and discharge toggle. Make it responsive for phone and laptop.
 **Session 2 — Patient Profile + Text Generators:**
 ```
 "Build the Patient Profile view with 2 tabs: Profile and Daily Update. Read
-RoundingApp-DevPlan.md for the interfaces and text output formats. Profile tab
+DevPlan.md for the interfaces and text output formats. Profile tab
 shows all patient data with edit toggle. Daily Update tab has FRICHMOND textareas
 with auto-save. Add 'Copy Census Entry', 'Copy Profile as Text', and 'Copy Daily
 Summary' buttons. Add 'Generate All Census' to the patient list page."
@@ -306,7 +315,7 @@ Make sure all touch targets are 44px minimum. Test on mobile viewport."
 
 ```
 rounding-app/
-├── RoundingApp-DevPlan.md
+├── DevPlan.md
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
