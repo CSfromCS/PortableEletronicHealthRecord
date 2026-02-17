@@ -9,7 +9,18 @@ import type {
   Patient,
   VitalEntry,
 } from './types'
-import './App.css'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 type PatientFormState = {
   roomNumber: string
@@ -1469,10 +1480,14 @@ function App() {
       <main>
         <h1>Portable Unofficial Health Record - Really (PUHRR)</h1>
         <p>DevPlan MVP: patient list, profile notes, daily update notes, and text generators.</p>
-        {notice ? <p className='notice'>{notice}</p> : null}
+        {notice ? (
+          <Alert className='border-action-primary/30 bg-cherry-blossom/50 mb-2'>
+            <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
+          </Alert>
+        ) : null}
         {selectedPatientId !== null ? (
-          <div className='actions'>
-            <p className='inline-note'>
+          <div className='flex items-center gap-2 mb-2 flex-wrap'>
+            <p className='text-sm text-taupe flex-1'>
               Last saved:{' '}
               {lastSavedAt
                 ? new Date(lastSavedAt).toLocaleTimeString([], {
@@ -1481,129 +1496,107 @@ function App() {
                   })
                 : '—'}
             </p>
-            <button type='button' className='btn-secondary' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
+            <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
               Save now
-            </button>
+            </Button>
           </div>
         ) : null}
-        <div className='actions top-nav'>
-          <button type='button' onClick={() => setView('patients')}>
-            Patients
-          </button>
-          <button type='button' className='btn-secondary' onClick={() => setView('settings')}>
-            Settings
-          </button>
+        <div className='flex gap-2 mb-4'>
+          <Button onClick={() => setView('patients')}>Patients</Button>
+          <Button variant='secondary' onClick={() => setView('settings')}>Settings</Button>
         </div>
 
         {view === 'patients' ? (
           <>
-            <form className='patient-form' onSubmit={handleSubmit}>
-              <input
-                aria-label='Room'
-                placeholder='Room'
-                value={form.roomNumber}
-                onChange={(event) => setForm({ ...form, roomNumber: event.target.value })}
-                required
-              />
-              <input
-                aria-label='First name'
-                placeholder='First name'
-                value={form.firstName}
-                onChange={(event) => setForm({ ...form, firstName: event.target.value })}
-                required
-              />
-              <input
-                aria-label='Last name'
-                placeholder='Last name'
-                value={form.lastName}
-                onChange={(event) => setForm({ ...form, lastName: event.target.value })}
-                required
-              />
-              <input
-                aria-label='Age'
-                placeholder='Age'
-                type='number'
-                min='0'
-                value={form.age}
-                onChange={(event) => setForm({ ...form, age: event.target.value })}
-                required
-              />
-              <select
-                aria-label='Sex'
-                value={form.sex}
-                onChange={(event) => setForm({ ...form, sex: event.target.value as 'M' | 'F' })}
-              >
-                <option value='M'>M</option>
-                <option value='F'>F</option>
-              </select>
-              <input
-                aria-label='Service'
-                placeholder='Service'
-                value={form.service}
-                onChange={(event) => setForm({ ...form, service: event.target.value })}
-                required
-              />
-              <button type='submit'>Add patient</button>
-            </form>
+            <Card className='bg-pale-oak border-taupe mb-4'>
+              <CardHeader className='py-2 px-3 pb-0'>
+                <CardTitle className='text-sm text-mauve-shadow'>Add patient</CardTitle>
+              </CardHeader>
+              <CardContent className='px-3 pb-3'>
+                <form className='grid grid-cols-2 gap-2 sm:grid-cols-3' onSubmit={handleSubmit}>
+                  <Input aria-label='Room' placeholder='Room' value={form.roomNumber} onChange={(event) => setForm({ ...form, roomNumber: event.target.value })} required />
+                  <Input aria-label='First name' placeholder='First name' value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} required />
+                  <Input aria-label='Last name' placeholder='Last name' value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} required />
+                  <Input aria-label='Age' placeholder='Age' type='number' min='0' value={form.age} onChange={(event) => setForm({ ...form, age: event.target.value })} required />
+                  <Select value={form.sex} onValueChange={(v) => setForm({ ...form, sex: v as 'M' | 'F' })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='M'>M</SelectItem>
+                      <SelectItem value='F'>F</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input aria-label='Service' placeholder='Service' value={form.service} onChange={(event) => setForm({ ...form, service: event.target.value })} required />
+                  <Button type='submit' className='col-span-2 sm:col-span-3'>Add patient</Button>
+                </form>
+              </CardContent>
+            </Card>
 
-            <section className='detail-panel'>
-              <div className='list-controls'>
-                <input
-                  aria-label='Search patients'
-                  placeholder='Search room, name, service'
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-                <select
-                  aria-label='Status filter'
-                  value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as 'active' | 'discharged' | 'all')
-                  }
-                >
-                  <option value='active'>Active</option>
-                  <option value='discharged'>Discharged</option>
-                  <option value='all'>All</option>
-                </select>
-                <select
-                  aria-label='Sort patients'
-                  value={sortBy}
-                  onChange={(event) => setSortBy(event.target.value as 'room' | 'name' | 'admitDate')}
-                >
-                  <option value='room'>Sort: Room</option>
-                  <option value='name'>Sort: Name</option>
-                  <option value='admitDate'>Sort: Admit date</option>
-                </select>
-              </div>
-            </section>
+            <Card className='bg-pale-oak border-taupe mb-4'>
+              <CardContent className='px-3 py-2'>
+                <div className='flex gap-2 flex-wrap'>
+                  <Input
+                    aria-label='Search patients'
+                    placeholder='Search room, name, service'
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className='flex-1 min-w-0'
+                  />
+                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'discharged' | 'all')}>
+                    <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='active'>Active</SelectItem>
+                      <SelectItem value='discharged'>Discharged</SelectItem>
+                      <SelectItem value='all'>All</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'room' | 'name' | 'admitDate')}>
+                    <SelectTrigger className='w-36'><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='room'>Sort: Room</SelectItem>
+                      <SelectItem value='name'>Sort: Name</SelectItem>
+                      <SelectItem value='admitDate'>Sort: Admit date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
-            <ul className='patient-list'>
+            <div className='flex flex-col gap-2'>
               {visiblePatients.map((patient) => (
-                <li key={patient.id} className='patient-card'>
-                  <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                    <strong>
-                      {patient.roomNumber} — {patient.lastName}, {patient.firstName}
-                    </strong>
-                    <span style={{ display: 'block', fontSize: '0.875rem', opacity: 0.9 }}>
-                      {patient.age}/{patient.sex} • {patient.service.split('\n')[0]} • {patient.status}
-                    </span>
-                    {patient.diagnosis && (
-                      <span style={{ display: 'block', fontSize: '0.875rem', opacity: 0.8, marginTop: '0.25rem' }}>
-                        {patient.diagnosis.split('\n')[0]}
-                      </span>
-                    )}
-                  </div>
-                  <button type='button' onClick={() => selectPatient(patient)}>
-                    Open
-                  </button>
-                </li>
+                <Card key={patient.id} className='bg-cherry-blossom border-taupe hover:shadow-md transition-shadow'>
+                  <CardContent className='flex items-center justify-between gap-3 py-3 px-4'>
+                    <div className='flex-1 min-w-0'>
+                      <p className='font-semibold text-mauve-shadow truncate'>
+                        {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                      </p>
+                      <p className='text-sm text-taupe mt-0.5'>
+                        {patient.age}/{patient.sex} • {patient.service.split('\n')[0]}
+                      </p>
+                      <div className='flex items-center gap-2 mt-1 flex-wrap'>
+                        <Badge className={cn(
+                          'text-xs',
+                          patient.status === 'active'
+                            ? 'bg-action-primary text-white'
+                            : 'bg-action-secondary/20 text-action-secondary'
+                        )}>
+                          {patient.status}
+                        </Badge>
+                        {patient.diagnosis && (
+                          <span className='text-xs text-mauve-shadow/80 truncate'>
+                            {patient.diagnosis.split('\n')[0]}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Button size='sm' onClick={() => selectPatient(patient)}>Open</Button>
+                  </CardContent>
+                </Card>
               ))}
-            </ul>
+            </div>
 
-            <div className='actions full-census-actions'>
-              <button
-                type='button'
-                className='full-census-button'
+            <div className='flex justify-end mb-2'>
+              <Button
+                variant='secondary'
                 onClick={() =>
                   openCopyModal(
                     activePatients
@@ -1621,364 +1614,268 @@ function App() {
                 }
               >
                 Open all census text
-              </button>
+              </Button>
             </div>
 
             {selectedPatient ? (
-              <section className='detail-panel'>
-                <h2>
-                  {selectedPatient.lastName}, {selectedPatient.firstName} ({selectedPatient.roomNumber})
-                </h2>
-                <div className='actions'>
-                  <button
-                    type='button'
-                    className={selectedTab === 'profile' ? '' : 'btn-secondary'}
-                    onClick={() => setSelectedTab('profile')}
-                  >
-                    Profile
-                  </button>
-                  <button
-                    type='button'
-                    className={selectedTab === 'vitals' ? '' : 'btn-secondary'}
-                    onClick={() => setSelectedTab('vitals')}
-                  >
-                    Vital Signs
-                  </button>
-                  <button
-                    type='button'
-                    className={selectedTab === 'orders' ? '' : 'btn-secondary'}
-                    onClick={() => setSelectedTab('orders')}
-                  >
-                    Orders
-                  </button>
-                </div>
+              <Card className='bg-pale-oak border-taupe'>
+                <CardHeader className='py-3 px-4 pb-0'>
+                  <CardTitle className='text-base text-mauve-shadow'>
+                    {selectedPatient.lastName}, {selectedPatient.firstName} ({selectedPatient.roomNumber})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className='px-4 pb-4'>
+                <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
+                  <TabsList className='mb-4 mt-2'>
+                    <TabsTrigger value='profile'>Profile</TabsTrigger>
+                    <TabsTrigger value='vitals'>Vital Signs</TabsTrigger>
+                    <TabsTrigger value='orders'>Orders</TabsTrigger>
+                  </TabsList>
 
-                {selectedTab === 'profile' ? (
-                  <div className='stack'>
-                    <div className='demographics-grid'>
-                      <div className='input-field'>
-                        <input
+                <TabsContent value='profile'>
+                  <div className='space-y-3'>
+                    <div className='grid grid-cols-2 gap-2 sm:grid-cols-3'>
+                      <div className='space-y-1'>
+                        <Label htmlFor='profile-room'>Room</Label>
+                        <Input
                           id='profile-room'
-                          placeholder=' '
                           value={profileForm.roomNumber}
                           onChange={(event) => updateProfileField('roomNumber', event.target.value)}
                         />
-                        <label htmlFor='profile-room'>Room</label>
                       </div>
-                      <div className='input-field'>
-                        <input
+                      <div className='space-y-1'>
+                        <Label htmlFor='profile-firstname'>First name</Label>
+                        <Input
                           id='profile-firstname'
-                          placeholder=' '
                           value={profileForm.firstName}
                           onChange={(event) => updateProfileField('firstName', event.target.value)}
                         />
-                        <label htmlFor='profile-firstname'>First name</label>
                       </div>
-                      <div className='input-field'>
-                        <input
+                      <div className='space-y-1'>
+                        <Label htmlFor='profile-lastname'>Last name</Label>
+                        <Input
                           id='profile-lastname'
-                          placeholder=' '
                           value={profileForm.lastName}
                           onChange={(event) => updateProfileField('lastName', event.target.value)}
                         />
-                        <label htmlFor='profile-lastname'>Last name</label>
                       </div>
-                      <div className='input-field'>
-                        <input
+                      <div className='space-y-1'>
+                        <Label htmlFor='profile-age'>Age</Label>
+                        <Input
                           id='profile-age'
                           type='number'
                           min='0'
-                          placeholder=' '
                           value={profileForm.age}
                           onChange={(event) => updateProfileField('age', event.target.value)}
                         />
-                        <label htmlFor='profile-age'>Age</label>
                       </div>
-                      <div className='input-field'>
-                        <select
-                          id='profile-sex'
+                      <div className='space-y-1'>
+                        <Label htmlFor='profile-sex'>Sex</Label>
+                        <Select
                           value={profileForm.sex}
-                          onChange={(event) => updateProfileField('sex', event.target.value as 'M' | 'F')}
+                          onValueChange={(v) => updateProfileField('sex', v as 'M' | 'F')}
                         >
-                          <option value='M'>M</option>
-                          <option value='F'>F</option>
-                        </select>
-                        <label htmlFor='profile-sex'>Sex</label>
+                          <SelectTrigger id='profile-sex'>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value='M'>M</SelectItem>
+                            <SelectItem value='F'>F</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                    <div className='input-field'>
-                      <textarea
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-service'>Service</Label>
+                      <Textarea
                         id='profile-service'
-                        placeholder=' '
                         value={profileForm.service}
                         onChange={(event) => updateProfileField('service', event.target.value)}
                       />
-                      <label htmlFor='profile-service'>Service</label>
                     </div>
-                    <div className='input-field'>
-                      <textarea
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-diagnosis'>Diagnosis</Label>
+                      <Textarea
                         id='profile-diagnosis'
-                        placeholder=' '
                         value={profileForm.diagnosis}
                         onChange={(event) => updateProfileField('diagnosis', event.target.value)}
                       />
-                      <label htmlFor='profile-diagnosis'>Diagnosis</label>
                     </div>
-                    <div className='input-field'>
-                      <textarea
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-plans'>Plans</Label>
+                      <Textarea
                         id='profile-plans'
-                        placeholder=' '
                         value={profileForm.plans}
                         onChange={(event) => updateProfileField('plans', event.target.value)}
                       />
-                      <label htmlFor='profile-plans'>Plans</label>
                     </div>
-                    <div className='input-field'>
-                      <textarea
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-labs'>Labs</Label>
+                      <Textarea
                         id='profile-labs'
-                        placeholder=' '
                         value={profileForm.labs}
                         onChange={(event) => updateProfileField('labs', event.target.value)}
                       />
-                      <label htmlFor='profile-labs'>Labs</label>
                     </div>
-                    <section className='labs-section'>
-                      <h3>Structured labs</h3>
-                      <div className='labs-form structured-labs-form'>
-                        <div className='simple-field'>
-                          <span>Date</span>
-                          <input
-                            aria-label='Lab date'
-                            type='date'
-                            value={labForm.date}
-                            onChange={(event) => setLabForm({ ...labForm, date: event.target.value })}
-                          />
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Date</Label>
+                            <Input type='date' aria-label='Lab date' value={labForm.date} onChange={(event) => setLabForm({ ...labForm, date: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Test name</Label>
+                            <Input aria-label='Lab test name' placeholder='Test name' value={labForm.testName} onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Value</Label>
+                            <Input aria-label='Lab value' placeholder='Value' value={labForm.value} onChange={(event) => setLabForm({ ...labForm, value: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Unit</Label>
+                            <Input aria-label='Lab unit' placeholder='Unit' value={labForm.unit} onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Note</Label>
+                            <Textarea aria-label='Lab note' placeholder='Note' value={labForm.note} onChange={(event) => setLabForm({ ...labForm, note: event.target.value })} />
+                          </div>
                         </div>
-                        <div className='simple-field'>
-                          <span>Test name</span>
-                          <input
-                            aria-label='Lab test name'
-                            placeholder='Test name'
-                            value={labForm.testName}
-                            onChange={(event) => setLabForm({ ...labForm, testName: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field'>
-                          <span>Value</span>
-                          <input
-                            aria-label='Lab value'
-                            placeholder='Value'
-                            value={labForm.value}
-                            onChange={(event) => setLabForm({ ...labForm, value: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field'>
-                          <span>Unit</span>
-                          <input
-                            aria-label='Lab unit'
-                            placeholder='Unit'
-                            value={labForm.unit}
-                            onChange={(event) => setLabForm({ ...labForm, unit: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field simple-field-full'>
-                          <span>Note</span>
-                          <textarea
-                            aria-label='Lab note'
-                            placeholder='Note'
-                            value={labForm.note}
-                            onChange={(event) => setLabForm({ ...labForm, note: event.target.value })}
-                          />
-                        </div>
-                        <div className='medications-form-actions'>
+                        <div className='flex gap-2 flex-wrap'>
                           {editingLabId === null ? (
-                            <button type='button' onClick={() => void addStructuredLab()}>
-                              Add lab
-                            </button>
+                            <Button size='sm' onClick={() => void addStructuredLab()}>Add lab</Button>
                           ) : (
                             <>
-                              <button type='button' onClick={() => void saveEditingLab()}>
-                                Save
-                              </button>
-                              <button type='button' className='btn-secondary' onClick={cancelEditingLab}>
-                                Cancel
-                              </button>
-                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredLab(editingLabId)}>
-                                Remove
-                              </button>
+                              <Button size='sm' onClick={() => void saveEditingLab()}>Save</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingLab}>Cancel</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredLab(editingLabId)}>Remove</Button>
                             </>
                           )}
                         </div>
-                      </div>
-                      {selectedPatientStructuredLabs.length > 0 ? (
-                        <ul className='labs-list'>
-                          {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
-                            const entry = selectedPatientStructuredLabs[index]
-                            return (
-                              <li key={entry.id} className='labs-item'>
-                                {editingLabId === entry.id ? (
-                                  <span className='editing-indicator'>(Editing above...)</span>
-                                ) : (
-                                  <>
-                                    <span>{line}</span>
-                                    <div className='actions'>
-                                      <button type='button' className='btn-edit' onClick={() => startEditingLab(entry)}>
-                                        Edit
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No structured labs yet.</p>
-                      )}
-                    </section>
-                    <div className='input-field'>
-                      <textarea
+                        {selectedPatientStructuredLabs.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
+                              const entry = selectedPatientStructuredLabs[index]
+                              return (
+                                <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                  {editingLabId === entry.id ? (
+                                    <span className='text-taupe italic'>(Editing above...)</span>
+                                  ) : (
+                                    <>
+                                      <span>{line}</span>
+                                      <Button size='sm' variant='edit' onClick={() => startEditingLab(entry)}>Edit</Button>
+                                    </>
+                                  )}
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured labs yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-medications'>Medications</Label>
+                      <Textarea
                         id='profile-medications'
-                        placeholder=' '
                         value={profileForm.medications}
                         onChange={(event) => updateProfileField('medications', event.target.value)}
                       />
-                      <label htmlFor='profile-medications'>Medications</label>
                     </div>
-                    <section className='medications-section'>
-                      <h3>Structured medications</h3>
-                      <div className='medications-form structured-medications-form'>
-                        <div className='simple-field'>
-                          <span>Medication</span>
-                          <input
-                            aria-label='Medication name'
-                            placeholder='Medication'
-                            value={medicationForm.medication}
-                            onChange={(event) =>
-                              setMedicationForm({ ...medicationForm, medication: event.target.value })
-                            }
-                          />
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured medications</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Medication</Label>
+                            <Input aria-label='Medication name' placeholder='Medication' value={medicationForm.medication} onChange={(event) => setMedicationForm({ ...medicationForm, medication: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Dose</Label>
+                            <Input aria-label='Medication dose' placeholder='Dose' value={medicationForm.dose} onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Route</Label>
+                            <Input aria-label='Medication route' placeholder='Route' value={medicationForm.route} onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Frequency</Label>
+                            <Input aria-label='Medication frequency' placeholder='Frequency' value={medicationForm.frequency} onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Note</Label>
+                            <Textarea aria-label='Medication note' placeholder='Note' value={medicationForm.note} onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Status</Label>
+                            <Select value={medicationForm.status} onValueChange={(v) => setMedicationForm({ ...medicationForm, status: v as 'active' | 'discontinued' | 'completed' })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='active'>Active</SelectItem>
+                                <SelectItem value='discontinued'>Discontinued</SelectItem>
+                                <SelectItem value='completed'>Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <div className='simple-field'>
-                          <span>Dose</span>
-                          <input
-                            aria-label='Medication dose'
-                            placeholder='Dose'
-                            value={medicationForm.dose}
-                            onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field'>
-                          <span>Route</span>
-                          <input
-                            aria-label='Medication route'
-                            placeholder='Route'
-                            value={medicationForm.route}
-                            onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field'>
-                          <span>Frequency</span>
-                          <input
-                            aria-label='Medication frequency'
-                            placeholder='Frequency'
-                            value={medicationForm.frequency}
-                            onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field simple-field-full'>
-                          <span>Note</span>
-                          <textarea
-                            aria-label='Medication note'
-                            placeholder='Note'
-                            value={medicationForm.note}
-                            onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })}
-                          />
-                        </div>
-                        <div className='simple-field'>
-                          <span>Status</span>
-                          <select
-                            aria-label='Medication status'
-                            value={medicationForm.status}
-                            onChange={(event) =>
-                              setMedicationForm({
-                                ...medicationForm,
-                                status: event.target.value as 'active' | 'discontinued' | 'completed',
-                              })
-                            }
-                          >
-                            <option value='active'>Active</option>
-                            <option value='discontinued'>Discontinued</option>
-                            <option value='completed'>Completed</option>
-                          </select>
-                        </div>
-                        <div className='medications-form-actions'>
+                        <div className='flex gap-2 flex-wrap'>
                           {editingMedicationId === null ? (
-                            <button type='button' onClick={() => void addStructuredMedication()}>
-                              Add medication
-                            </button>
+                            <Button size='sm' onClick={() => void addStructuredMedication()}>Add medication</Button>
                           ) : (
                             <>
-                              <button type='button' onClick={() => void saveEditingMedication()}>
-                                Save
-                              </button>
-                              <button type='button' className='btn-secondary' onClick={cancelEditingMedication}>
-                                Cancel
-                              </button>
-                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredMedication(editingMedicationId)}>
-                                Remove
-                              </button>
+                              <Button size='sm' onClick={() => void saveEditingMedication()}>Save</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingMedication}>Cancel</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredMedication(editingMedicationId)}>Remove</Button>
                             </>
                           )}
                         </div>
-                      </div>
-                      {selectedPatientStructuredMeds.length > 0 ? (
-                        <ul className='medications-list'>
-                          {selectedPatientStructuredMeds.map((entry) => (
-                            <li key={entry.id} className='medications-item'>
-                              {editingMedicationId === entry.id ? (
-                                <span className='editing-indicator'>(Editing above...)</span>
-                              ) : (
-                                <>
-                                  <span>
-                                    {entry.medication} {entry.dose} {entry.route} {entry.frequency}
-                                    {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
-                                  </span>
-                                  <div className='actions'>
-                                    <button type='button' className='btn-edit' onClick={() => startEditingMedication(entry)}>
-                                      Edit
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No structured medications yet.</p>
-                      )}
-                    </section>
-                    <div className='input-field'>
-                      <textarea
+                        {selectedPatientStructuredMeds.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {selectedPatientStructuredMeds.map((entry) => (
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                {editingMedicationId === entry.id ? (
+                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                    <span>
+                                      {entry.medication} {entry.dose} {entry.route} {entry.frequency}
+                                      {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
+                                    </span>
+                                    <Button size='sm' variant='edit' onClick={() => startEditingMedication(entry)}>Edit</Button>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured medications yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-pendings'>Pendings</Label>
+                      <Textarea
                         id='profile-pendings'
-                        placeholder=' '
                         value={profileForm.pendings}
                         onChange={(event) => updateProfileField('pendings', event.target.value)}
                       />
-                      <label htmlFor='profile-pendings'>Pendings</label>
                     </div>
-                    <div className='input-field'>
-                      <textarea
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-clerknotes'>Clerk notes</Label>
+                      <Textarea
                         id='profile-clerknotes'
-                        placeholder=' '
                         value={profileForm.clerkNotes}
                         onChange={(event) => updateProfileField('clerkNotes', event.target.value)}
                       />
-                      <label htmlFor='profile-clerknotes'>Clerk notes</label>
                     </div>
-                    <div className='actions'>
-                      <button
-                        type='button'
+                    <div className='flex gap-2 flex-wrap'>
+                      <Button
                         onClick={() =>
                           openCopyModal(
                             toProfileSummary(
@@ -1993,9 +1890,8 @@ function App() {
                         }
                       >
                         Open profile text
-                      </button>
-                      <button
-                        type='button'
+                      </Button>
+                      <Button
                         onClick={() =>
                           openCopyModal(
                             toCensusEntry(
@@ -2009,21 +1905,22 @@ function App() {
                         }
                       >
                         Open census entry text
-                      </button>
-                      <button
-                        type='button'
-                        className={selectedPatient.status === 'active' ? 'btn-danger' : 'btn-secondary'}
+                      </Button>
+                      <Button
+                        variant={selectedPatient.status === 'active' ? 'destructive' : 'secondary'}
                         onClick={() => void toggleDischarge(selectedPatient)}
                       >
                         {selectedPatient.status === 'active' ? 'Discharge' : 'Re-activate'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                ) : selectedTab === 'vitals' ? (
-                  <div className='stack'>
-                    <label>
-                      Date
-                      <input
+                </TabsContent>
+                <TabsContent value='vitals'>
+                  <div className='space-y-3'>
+                    <div className='space-y-1 max-w-60'>
+                      <Label htmlFor='daily-date'>Date</Label>
+                      <Input
+                        id='daily-date'
                         type='date'
                         value={dailyDate}
                         onChange={(event) => {
@@ -2041,221 +1938,131 @@ function App() {
                           setVitalDirty(false)
                         }}
                       />
-                    </label>
-                    <section className='vitals-section'>
-                      <h3>Structured vitals</h3>
-                      <div className='vitals-form'>
-                        <input
-                          aria-label='Vital time'
-                          type='time'
-                          value={vitalForm.time}
-                          onChange={(event) => updateVitalField('time', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital blood pressure'
-                          placeholder='BP'
-                          value={vitalForm.bp}
-                          onChange={(event) => updateVitalField('bp', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital heart rate'
-                          placeholder='HR'
-                          value={vitalForm.hr}
-                          onChange={(event) => updateVitalField('hr', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital respiratory rate'
-                          placeholder='RR'
-                          value={vitalForm.rr}
-                          onChange={(event) => updateVitalField('rr', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital temperature'
-                          placeholder='Temp'
-                          value={vitalForm.temp}
-                          onChange={(event) => updateVitalField('temp', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital oxygen saturation'
-                          placeholder='SpO2'
-                          value={vitalForm.spo2}
-                          onChange={(event) => updateVitalField('spo2', event.target.value)}
-                        />
-                        <input
-                          aria-label='Vital note'
-                          placeholder='Note'
-                          value={vitalForm.note}
-                          onChange={(event) => updateVitalField('note', event.target.value)}
-                        />
-                        <div className='vitals-form-actions'>
+                    </div>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured vitals</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
+                          <div className='space-y-1'>
+                            <Label>Time</Label>
+                            <Input type='time' aria-label='Vital time' value={vitalForm.time} onChange={(event) => updateVitalField('time', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>BP</Label>
+                            <Input aria-label='Vital blood pressure' placeholder='120/80' value={vitalForm.bp} onChange={(event) => updateVitalField('bp', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>HR</Label>
+                            <Input aria-label='Vital heart rate' placeholder='80' value={vitalForm.hr} onChange={(event) => updateVitalField('hr', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>RR</Label>
+                            <Input aria-label='Vital respiratory rate' placeholder='18' value={vitalForm.rr} onChange={(event) => updateVitalField('rr', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Temp</Label>
+                            <Input aria-label='Vital temperature' placeholder='37.0' value={vitalForm.temp} onChange={(event) => updateVitalField('temp', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>SpO2</Label>
+                            <Input aria-label='Vital oxygen saturation' placeholder='99%' value={vitalForm.spo2} onChange={(event) => updateVitalField('spo2', event.target.value)} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Note</Label>
+                            <Input aria-label='Vital note' placeholder='Note' value={vitalForm.note} onChange={(event) => updateVitalField('note', event.target.value)} />
+                          </div>
+                        </div>
+                        <div className='flex gap-2 flex-wrap'>
                           {editingVitalId === null ? (
-                            <button type='button' onClick={() => void addStructuredVital()}>
-                              Add vital
-                            </button>
+                            <Button size='sm' onClick={() => void addStructuredVital()}>Add vital</Button>
                           ) : (
                             <>
-                              <button type='button' onClick={() => void saveEditingVital()}>
-                                Save
-                              </button>
-                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredVital(editingVitalId)}>
-                                Remove
-                              </button>
-                              <button type='button' className='btn-secondary' onClick={cancelEditingVital}>
-                                Cancel
-                              </button>
+                              <Button size='sm' onClick={() => void saveEditingVital()}>Save</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredVital(editingVitalId)}>Remove</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingVital}>Cancel</Button>
                             </>
                           )}
                         </div>
-                      </div>
-                      {dailyVitals && dailyVitals.length > 0 ? (
-                        <ul className='vitals-list'>
-                          {dailyVitals.map((entry) => (
-                            <li key={entry.id} className='vitals-item'>
-                              {editingVitalId === entry.id ? (
-                                <span className='editing-indicator'>(Editing above...)</span>
-                              ) : (
-                                <>
-                                  <span>
-                                    {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
-                                    {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
-                                  </span>
-                                  <div className='actions'>
-                                    <button type='button' className='btn-edit' onClick={() => startEditingVital(entry)}>
-                                      Edit
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No structured vitals for this date yet.</p>
-                      )}
-                    </section>
-                    <textarea
-                      aria-label='Vitals'
-                      placeholder='Vitals'
-                      value={dailyUpdateForm.vitals}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, vitals: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Fluid'
-                      placeholder='Fluid'
-                      value={dailyUpdateForm.fluid}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, fluid: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Respiratory'
-                      placeholder='Respiratory'
-                      value={dailyUpdateForm.respiratory}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, respiratory: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Infectious'
-                      placeholder='Infectious'
-                      value={dailyUpdateForm.infectious}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, infectious: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Cardio'
-                      placeholder='Cardio'
-                      value={dailyUpdateForm.cardio}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, cardio: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Hema'
-                      placeholder='Hema'
-                      value={dailyUpdateForm.hema}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, hema: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Metabolic'
-                      placeholder='Metabolic'
-                      value={dailyUpdateForm.metabolic}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, metabolic: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Output'
-                      placeholder='Output'
-                      value={dailyUpdateForm.output}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, output: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Neuro'
-                      placeholder='Neuro'
-                      value={dailyUpdateForm.neuro}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, neuro: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Drugs'
-                      placeholder='Drugs'
-                      value={dailyUpdateForm.drugs}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, drugs: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Other'
-                      placeholder='Other'
-                      value={dailyUpdateForm.other}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, other: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Assessment'
-                      placeholder='Assessment'
-                      value={dailyUpdateForm.assessment}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, assessment: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <textarea
-                      aria-label='Daily plan'
-                      placeholder='Plan'
-                      value={dailyUpdateForm.plans}
-                      onChange={(event) => {
-                        setDailyUpdateForm({ ...dailyUpdateForm, plans: event.target.value })
-                        setDailyDirty(true)
-                      }}
-                    />
-                    <div className='actions'>
-                      <button type='button' onClick={() => void saveDailyUpdate()}>
-                        Save daily update
-                      </button>
-                      <button
-                        type='button'
+                        {dailyVitals && dailyVitals.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {dailyVitals.map((entry) => (
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                {editingVitalId === entry.id ? (
+                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                    <span>
+                                      {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
+                                      {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
+                                    </span>
+                                    <Button size='sm' variant='edit' onClick={() => startEditingVital(entry)}>Edit</Button>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured vitals for this date yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <div className='space-y-1'>
+                      <Label>Vitals</Label>
+                      <Textarea aria-label='Vitals' placeholder='Vitals' value={dailyUpdateForm.vitals} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, vitals: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Fluid</Label>
+                      <Textarea aria-label='Fluid' placeholder='Fluid' value={dailyUpdateForm.fluid} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, fluid: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Respiratory</Label>
+                      <Textarea aria-label='Respiratory' placeholder='Respiratory' value={dailyUpdateForm.respiratory} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, respiratory: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Infectious</Label>
+                      <Textarea aria-label='Infectious' placeholder='Infectious' value={dailyUpdateForm.infectious} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, infectious: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Cardio</Label>
+                      <Textarea aria-label='Cardio' placeholder='Cardio' value={dailyUpdateForm.cardio} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, cardio: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Hema</Label>
+                      <Textarea aria-label='Hema' placeholder='Hema' value={dailyUpdateForm.hema} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, hema: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Metabolic</Label>
+                      <Textarea aria-label='Metabolic' placeholder='Metabolic' value={dailyUpdateForm.metabolic} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, metabolic: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Output</Label>
+                      <Textarea aria-label='Output' placeholder='Output' value={dailyUpdateForm.output} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, output: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Neuro</Label>
+                      <Textarea aria-label='Neuro' placeholder='Neuro' value={dailyUpdateForm.neuro} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, neuro: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Drugs</Label>
+                      <Textarea aria-label='Drugs' placeholder='Drugs' value={dailyUpdateForm.drugs} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, drugs: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Other</Label>
+                      <Textarea aria-label='Other' placeholder='Other' value={dailyUpdateForm.other} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, other: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Assessment</Label>
+                      <Textarea aria-label='Assessment' placeholder='Assessment' value={dailyUpdateForm.assessment} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, assessment: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label>Plan</Label>
+                      <Textarea aria-label='Daily plan' placeholder='Plan' value={dailyUpdateForm.plans} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, plans: event.target.value }); setDailyDirty(true) }} />
+                    </div>
+                    <div className='flex gap-2 flex-wrap'>
+                      <Button onClick={() => void saveDailyUpdate()}>Save daily update</Button>
+                      <Button
                         onClick={() =>
                           openCopyModal(
                             toDailySummary(
@@ -2269,91 +2076,87 @@ function App() {
                         }
                       >
                         Open daily summary text
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className='stack'>
-                    <section className='medications-section'>
-                      <h3>Doctor&apos;s orders</h3>
-                      <div className='medications-form'>
-                        <input
-                          aria-label='Order text'
-                          placeholder='Order'
-                          value={orderForm.orderText}
-                          onChange={(event) => updateOrderField('orderText', event.target.value)}
-                        />
-                        <input
-                          aria-label='Order note'
-                          placeholder='Note'
-                          value={orderForm.note}
-                          onChange={(event) => updateOrderField('note', event.target.value)}
-                        />
-                        <select
-                          aria-label='Order status'
-                          value={orderForm.status}
-                          onChange={(event) =>
-                            updateOrderField('status', event.target.value as 'active' | 'carriedOut' | 'discontinued')
-                          }
-                        >
-                          <option value='active'>Active</option>
-                          <option value='carriedOut'>Carried out</option>
-                          <option value='discontinued'>Discontinued</option>
-                        </select>
-                        <button type='button' onClick={() => void addOrder()}>
-                          Add order
-                        </button>
-                      </div>
-                      {selectedPatientOrders.length > 0 ? (
-                        <ul className='medications-list'>
-                          {selectedPatientOrders.map((entry) => (
-                            <li key={entry.id} className='medications-item'>
-                              <span>{formatOrderEntry(entry)}</span>
-                              <div className='actions'>
-                                <button type='button' onClick={() => void toggleOrderStatus(entry)}>
-                                  {getNextOrderActionLabel(entry.status)}
-                                </button>
-                                <button type='button' className='btn-danger' onClick={() => void deleteOrder(entry.id)}>
-                                  Remove
-                                </button>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className='inline-note'>No orders yet.</p>
-                      )}
-                    </section>
+                </TabsContent>
+                <TabsContent value='orders'>
+                  <div className='space-y-3'>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Doctor&apos;s orders</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-2 gap-2'>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Order</Label>
+                            <Input aria-label='Order text' placeholder='Order' value={orderForm.orderText} onChange={(event) => updateOrderField('orderText', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Note</Label>
+                            <Input aria-label='Order note' placeholder='Note' value={orderForm.note} onChange={(event) => updateOrderField('note', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Status</Label>
+                            <Select value={orderForm.status} onValueChange={(v) => updateOrderField('status', v as 'active' | 'carriedOut' | 'discontinued')}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='active'>Active</SelectItem>
+                                <SelectItem value='carriedOut'>Carried out</SelectItem>
+                                <SelectItem value='discontinued'>Discontinued</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <Button size='sm' onClick={() => void addOrder()}>Add order</Button>
+                        {selectedPatientOrders.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {selectedPatientOrders.map((entry) => (
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                <span>{formatOrderEntry(entry)}</span>
+                                <div className='flex gap-1'>
+                                  <Button size='sm' variant='secondary' onClick={() => void toggleOrderStatus(entry)}>
+                                    {getNextOrderActionLabel(entry.status)}
+                                  </Button>
+                                  <Button size='sm' variant='destructive' onClick={() => void deleteOrder(entry.id)}>Remove</Button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No orders yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                )}
-              </section>
+                </TabsContent>
+              </Tabs>
+                </CardContent>
+              </Card>
             ) : null}
           </>
         ) : (
-          <section className='detail-panel settings-panel'>
-            <h2>Settings</h2>
-            <p>Export/import backup JSON, add sample data, and clear discharged patients.</p>
-            <div className='stack'>
-              <button type='button' onClick={() => void exportBackup()}>
-                Export backup JSON
-              </button>
-              <label className='stack'>
-                Import backup JSON
-                <input type='file' accept='application/json' onChange={(event) => void importBackup(event)} />
-              </label>
-              <button type='button' onClick={() => void addSamplePatient()}>
-                Add sample patient (Juan Dela Cruz)
-              </button>
-              <button type='button' onClick={() => void clearDischargedPatients()}>
-                Clear discharged patients
-              </button>
-            </div>
+          <Card className='bg-pale-oak border-taupe'>
+            <CardHeader className='py-3 px-4 pb-0'>
+              <CardTitle className='text-base text-mauve-shadow'>Settings</CardTitle>
+            </CardHeader>
+            <CardContent className='px-4 pb-4 space-y-3'>
+              <p className='text-sm text-taupe'>Export/import backup JSON, add sample data, and clear discharged patients.</p>
+              <div className='flex flex-col gap-2'>
+                <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
+                <label className='flex flex-col gap-1'>
+                  <span className='text-sm font-medium text-mauve-shadow'>Import backup JSON</span>
+                  <input type='file' accept='application/json' onChange={(event) => void importBackup(event)} />
+                </label>
+                <Button variant='secondary' onClick={() => void addSamplePatient()}>Add sample patient (Juan Dela Cruz)</Button>
+                <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
+              </div>
 
-            <section className='app-guide'>
-              <h3>How to use</h3>
-              <div className='app-guide-block'>
-                <h4>Main workflow</h4>
-                <ol>
+            <section className='space-y-3 rounded-lg border border-taupe bg-pale-oak-2 p-3'>
+              <h3 className='text-base font-semibold text-mauve-shadow'>How to use</h3>
+              <div className='space-y-1'>
+                <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
+                <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>Open the patient card, then fill Profile, Vital Signs, and Orders.</li>
                   <li>Use Open text actions to review, select, and copy handoff-ready text.</li>
@@ -2361,9 +2164,9 @@ function App() {
                 </ol>
               </div>
 
-              <div className='app-guide-block'>
-                <h4>Parts of the app</h4>
-                <ul>
+              <div className='space-y-1'>
+                <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
+                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate.</li>
                   <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes.</li>
                   <li>Vital Signs tab: FRICHMOND notes, vitals, assessment, plan.</li>
@@ -2372,9 +2175,9 @@ function App() {
                 </ul>
               </div>
 
-              <div className='app-guide-block'>
-                <h4>Saving and persistence</h4>
-                <ul>
+              <div className='space-y-1'>
+                <h4 className='text-sm font-semibold text-mauve-shadow'>Saving and persistence</h4>
+                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
                   <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits.</li>
@@ -2384,9 +2187,9 @@ function App() {
                 </ul>
               </div>
 
-              <div className='app-guide-block'>
-                <h4>Quick tips</h4>
-                <ul>
+              <div className='space-y-1'>
+                <h4 className='text-sm font-semibold text-mauve-shadow'>Quick tips</h4>
+                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Open all census text for one-shot census output for active patients.</li>
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
@@ -2395,35 +2198,35 @@ function App() {
                 </ul>
               </div>
             </section>
-          </section>
+            </CardContent>
+          </Card>
         )}
 
-        {outputPreview ? (
-          <div className='copy-modal-backdrop' role='dialog' aria-modal='true' aria-label={outputPreviewTitle}>
-            <section className='copy-modal'>
-              <div className='copy-modal-header'>
-                <h2>{outputPreviewTitle}</h2>
-                <div className='actions'>
-                  {canUseWebShare ? (
-                    <button type='button' className='btn-secondary' onClick={() => void sharePreviewText()}>
-                      Share
-                    </button>
-                  ) : null}
-                  <button type='button' className='btn-secondary' onClick={() => void copyPreviewToClipboard()}>
-                    Copy full text
-                  </button>
-                  <button type='button' className='btn-danger' onClick={closeCopyModal}>
-                    Close
-                  </button>
-                </div>
-              </div>
-              <p className='inline-note'>Select any part manually, or tap Copy full text.</p>
-              <textarea className='copy-modal-textarea' aria-label='Generated text preview' readOnly value={outputPreview} />
-            </section>
-          </div>
-        ) : null}
+        <Dialog open={!!outputPreview} onOpenChange={(open) => { if (!open) closeCopyModal() }}>
+          <DialogContent className='flex flex-col gap-3 p-4 max-h-[92vh] max-w-3xl'>
+            <DialogHeader>
+              <DialogTitle>{outputPreviewTitle}</DialogTitle>
+            </DialogHeader>
+            <p className='text-sm text-taupe'>Select any part manually, or tap Copy full text.</p>
+            <div className='flex gap-2 flex-wrap'>
+              {canUseWebShare ? (
+                <Button variant='secondary' onClick={() => void sharePreviewText()}>Share</Button>
+              ) : null}
+              <Button variant='secondary' onClick={() => void copyPreviewToClipboard()}>Copy full text</Button>
+              <Button variant='destructive' onClick={closeCopyModal}>Close</Button>
+            </div>
+            <ScrollArea className='flex-1'>
+              <textarea
+                className='w-full min-h-64 font-mono bg-white resize-none p-2 rounded border border-taupe text-sm'
+                aria-label='Generated text preview'
+                readOnly
+                value={outputPreview}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
       </main>
-      <footer className='app-footer'>
+      <footer className='mt-6 border-t border-taupe/40 pt-3 text-sm text-taupe'>
         Version: v{__APP_VERSION__} ({__GIT_SHA__})
       </footer>
     </div>

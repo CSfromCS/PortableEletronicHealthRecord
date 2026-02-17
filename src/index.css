@@ -1,6 +1,83 @@
+@import "tailwindcss";
+
+@theme {
+  /* PUHRR brand palette */
+  --color-burnt-peach: #b85b43;
+  --color-cherry-blossom: #f2d6d9;
+  --color-pale-oak: #f2e8dd;
+  --color-pale-oak-2: #eadaca;
+  --color-taupe: #8c7468;
+  --color-mauve-shadow: #3f2c35;
+
+  /* Semantic action tokens */
+  --color-action-primary: #b85b43;
+  --color-action-primary-hover: #9f4d39;
+  --color-action-secondary: #6a5c59;
+  --color-action-secondary-hover: #574c49;
+  --color-action-edit: #2f5f9b;
+  --color-action-edit-hover: #254d7e;
+  --color-action-danger: #ad2e2e;
+  --color-action-danger-hover: #902727;
+
+  /* shadcn semantic aliases (Tailwind v4) */
+  --color-background: var(--color-pale-oak);
+  --color-foreground: var(--color-mauve-shadow);
+  --color-card: var(--color-cherry-blossom);
+  --color-card-foreground: var(--color-mauve-shadow);
+  --color-popover: var(--color-pale-oak);
+  --color-popover-foreground: var(--color-mauve-shadow);
+  --color-primary: var(--color-action-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--color-action-secondary);
+  --color-secondary-foreground: #ffffff;
+  --color-muted: var(--color-pale-oak-2);
+  --color-muted-foreground: var(--color-taupe);
+  --color-accent: var(--color-cherry-blossom);
+  --color-accent-foreground: var(--color-mauve-shadow);
+  --color-destructive: var(--color-action-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-taupe);
+  --color-input: var(--color-taupe);
+  --color-ring: var(--color-action-primary);
+
+  /* Typography */
+  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: var(--color-pale-oak);
+    --foreground: var(--color-mauve-shadow);
+    --card: var(--color-cherry-blossom);
+    --card-foreground: var(--color-mauve-shadow);
+    --popover: var(--color-pale-oak);
+    --popover-foreground: var(--color-mauve-shadow);
+    --primary: var(--color-action-primary);
+    --primary-foreground: #ffffff;
+    --secondary: var(--color-pale-oak-2);
+    --secondary-foreground: var(--color-mauve-shadow);
+    --muted: var(--color-pale-oak-2);
+    --muted-foreground: var(--color-taupe);
+    --accent: var(--color-cherry-blossom);
+    --accent-foreground: var(--color-mauve-shadow);
+    --destructive: var(--color-action-danger);
+    --destructive-foreground: #ffffff;
+    --border: var(--color-taupe);
+    --input: var(--color-taupe);
+    --ring: var(--color-action-primary);
+    --radius: 0.5rem;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
-  background: var(--pale-oak);
-  color: var(--mauve-shadow);
+  background-color: var(--color-pale-oak);
+  color: var(--color-mauve-shadow);
+}
+
+#root {
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 2rem 1rem;
 }
