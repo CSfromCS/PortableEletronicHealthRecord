@@ -194,6 +194,7 @@ function App() {
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
+  const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [medicationForm, setMedicationForm] = useState<MedicationFormState>(() => initialMedicationForm())
   const [editingMedicationId, setEditingMedicationId] = useState<number | null>(null)
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
@@ -411,6 +412,8 @@ function App() {
     setSelectedPatientId(patient.id ?? null)
     setMedicationForm(initialMedicationForm())
     setEditingMedicationId(null)
+    setVitalForm(initialVitalForm())
+    setEditingVitalId(null)
     setOrderForm(initialOrderForm())
     setLabForm(initialLabForm())
     setEditingLabId(null)
@@ -615,18 +618,32 @@ function App() {
   }
 
   const formatVitalEntry = (entry: VitalEntry) => {
+    const [hourText, minuteText = '00'] = entry.time.split(':')
+    const parsedHour = Number.parseInt(hourText, 10)
+    const parsedMinute = Number.parseInt(minuteText, 10)
+
+    const formattedTime = Number.isNaN(parsedHour) || Number.isNaN(parsedMinute)
+      ? entry.time
+      : (() => {
+          const suffix = parsedHour >= 12 ? 'PM' : 'AM'
+          const hour12 = parsedHour % 12 === 0 ? 12 : parsedHour % 12
+          if (parsedMinute === 0) {
+            return `${hour12}${suffix}`
+          }
+          return `${hour12}:${parsedMinute.toString().padStart(2, '0')}${suffix}`
+        })()
+
     const values = [
-      entry.bp ? `BP ${entry.bp}` : '',
-      entry.hr ? `HR ${entry.hr}` : '',
-      entry.rr ? `RR ${entry.rr}` : '',
-      entry.temp ? `T ${entry.temp}` : '',
-      entry.spo2 ? `O2 ${entry.spo2}` : '',
-      entry.note,
+      entry.bp.trim(),
+      entry.hr.trim(),
+      entry.rr.trim(),
+      entry.temp.trim(),
+      entry.spo2.trim(),
     ]
       .filter(Boolean)
       .join(' ')
 
-    return `${entry.time} ${values}`.trim()
+    return [formattedTime, values].filter(Boolean).join(' ')
   }
 
   const toDailySummary = (
@@ -735,7 +752,48 @@ function App() {
   const deleteStructuredVital = async (vitalId?: number) => {
     if (vitalId === undefined) return
     await db.vitals.delete(vitalId)
+    if (editingVitalId === vitalId) {
+      setEditingVitalId(null)
+      setVitalForm(initialVitalForm())
+    }
     setNotice('Vital removed.')
+  }
+
+  const startEditingVital = (entry: VitalEntry) => {
+    if (entry.id === undefined) return
+    setEditingVitalId(entry.id)
+    setVitalForm({
+      time: entry.time,
+      bp: entry.bp,
+      hr: entry.hr,
+      rr: entry.rr,
+      temp: entry.temp,
+      spo2: entry.spo2,
+      note: entry.note,
+    })
+  }
+
+  const saveEditingVital = async () => {
+    if (editingVitalId === null || !vitalForm.time) return
+
+    await db.vitals.update(editingVitalId, {
+      time: vitalForm.time,
+      bp: vitalForm.bp.trim(),
+      hr: vitalForm.hr.trim(),
+      rr: vitalForm.rr.trim(),
+      temp: vitalForm.temp.trim(),
+      spo2: vitalForm.spo2.trim(),
+      note: vitalForm.note.trim(),
+    })
+
+    setEditingVitalId(null)
+    setVitalForm(initialVitalForm())
+    setNotice('Vital updated.')
+  }
+
+  const cancelEditingVital = () => {
+    setEditingVitalId(null)
+    setVitalForm(initialVitalForm())
   }
 
   const addStructuredMedication = async () => {
@@ -962,6 +1020,7 @@ function App() {
       setDailyUpdateId(undefined)
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
+      setEditingVitalId(null)
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
@@ -1002,6 +1061,7 @@ function App() {
       setSelectedPatientId(null)
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
+      setEditingVitalId(null)
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
@@ -1740,6 +1800,7 @@ function App() {
                             void loadDailyUpdate(selectedPatient.id, nextDate)
                           }
                           setVitalForm(initialVitalForm())
+                          setEditingVitalId(null)
                         }}
                       />
                     </label>
@@ -1788,21 +1849,45 @@ function App() {
                           value={vitalForm.note}
                           onChange={(event) => setVitalForm({ ...vitalForm, note: event.target.value })}
                         />
-                        <button type='button' onClick={() => void addStructuredVital()}>
-                          Add vital
-                        </button>
+                        <div className='vitals-form-actions'>
+                          {editingVitalId === null ? (
+                            <button type='button' onClick={() => void addStructuredVital()}>
+                              Add vital
+                            </button>
+                          ) : (
+                            <>
+                              <button type='button' onClick={() => void saveEditingVital()}>
+                                Save
+                              </button>
+                              <button type='button' onClick={() => void deleteStructuredVital(editingVitalId)}>
+                                Remove
+                              </button>
+                              <button type='button' onClick={cancelEditingVital}>
+                                Cancel
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                       {dailyVitals && dailyVitals.length > 0 ? (
                         <ul className='vitals-list'>
                           {dailyVitals.map((entry) => (
                             <li key={entry.id} className='vitals-item'>
-                              <span>
-                                {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
-                                {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
-                              </span>
-                              <button type='button' onClick={() => void deleteStructuredVital(entry.id)}>
-                                Remove
-                              </button>
+                              {editingVitalId === entry.id ? (
+                                <span className='editing-indicator'>(Editing above...)</span>
+                              ) : (
+                                <>
+                                  <span>
+                                    {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
+                                    {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
+                                  </span>
+                                  <div className='actions'>
+                                    <button type='button' onClick={() => startEditingVital(entry)}>
+                                      Edit
+                                    </button>
+                                  </div>
+                                </>
+                              )}
                             </li>
                           ))}
                         </ul>
@@ -2080,7 +2165,7 @@ function App() {
               <div className='app-guide-block'>
                 <h4>Quick tips</h4>
                 <ul>
-                  <li>Structured medications and labs use simple labels with a flexible layout for easier mobile entry.</li>
+                  <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Copy all census for one-shot census output for active patients.</li>
                   <li>Share uses Web Share when available, with clipboard fallback.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>

@@ -214,6 +214,17 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
 }
 
+.vitals-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.vitals-form-actions button {
+  align-self: center;
+}
+
 .vitals-list {
   display: grid;
   gap: 0.4rem;
