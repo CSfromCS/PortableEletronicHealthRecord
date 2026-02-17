@@ -1,4 +1,4 @@
-# PortableElectronicHealthRecord
+# Portable Unofficial Health Record - Really (PUHRR)
 A simple app for an electronic health record for doing hospital rounds and patient history for medical clerks to use on their phones primarily offline.
 
 ## Run locally
@@ -53,6 +53,7 @@ npm run build
 
 Then do a quick manual check:
 1. Open the app in browser.
-2. Confirm the page loads with the title **Portable Electronic Health Record**.
-3. Confirm no errors in browser console.
-4. (Optional PWA check) Install app from browser menu and verify it opens in standalone mode.
+2. Confirm the page loads with the title **Portable Unofficial Health Record - Really (PUHRR)**.
+3. Confirm text output actions open a large popup where you can select partial text or tap **Copy full text**.
+4. Confirm no errors in browser console.
+5. (Optional PWA check) Install app from browser menu and verify it opens in standalone mode.

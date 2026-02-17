@@ -28,8 +28,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['vite.svg'],
       manifest: {
-        name: 'Portable Electronic Health Record',
-        short_name: 'PEHR',
+        name: 'Portable Unofficial Health Record - Really',
+        short_name: 'Puhrr',
         description: 'Offline-first patient tracking for hospital rounds',
         start_url: './',
         display: 'standalone',

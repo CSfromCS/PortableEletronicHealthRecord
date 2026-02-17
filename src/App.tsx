@@ -195,18 +195,24 @@ function App() {
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
+  const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
+  const [vitalDirty, setVitalDirty] = useState(false)
   const [medicationForm, setMedicationForm] = useState<MedicationFormState>(() => initialMedicationForm())
   const [editingMedicationId, setEditingMedicationId] = useState<number | null>(null)
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
+  const [orderDraftId, setOrderDraftId] = useState<number | null>(null)
+  const [orderDirty, setOrderDirty] = useState(false)
   const [labForm, setLabForm] = useState<LabFormState>(() => initialLabForm())
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
   const [profileDirty, setProfileDirty] = useState(false)
-  const [profileSaving, setProfileSaving] = useState(false)
-  const [profileLastSavedAt, setProfileLastSavedAt] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'vitals' | 'orders'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
+  const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
+  const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
@@ -400,8 +406,8 @@ function App() {
       const age = Number.parseInt(profileForm.age, 10)
       const ageIsValid = Number.isFinite(age)
 
-      setProfileSaving(true)
-      setNotice('Saving profile...')
+      setIsSaving(true)
+      setNotice('Saving...')
 
       try {
         await db.patients.update(selectedPatientId, {
@@ -419,21 +425,21 @@ function App() {
           clerkNotes: profileForm.clerkNotes,
         })
 
-        setProfileLastSavedAt(new Date().toISOString())
+        setLastSavedAt(new Date().toISOString())
         setProfileDirty(false)
         if (!ageIsValid) {
-          setNotice('Profile saved. Age not saved until valid.')
+          setNotice('Saved. Age not saved until valid.')
         } else if (manual) {
-          setNotice('Profile saved.')
+          setNotice('Saved.')
         } else {
-          setNotice('Profile auto-saved.')
+          setNotice('Auto-saved.')
         }
         return true
       } catch {
-        setNotice('Unable to save profile. Please try again.')
+        setNotice('Unable to save. Please try again.')
         return false
       } finally {
-        setProfileSaving(false)
+        setIsSaving(false)
       }
     },
     [profileForm, selectedPatientId],
@@ -465,7 +471,7 @@ function App() {
       pendings: patient.pendings,
       clerkNotes: patient.clerkNotes,
     })
-    setProfileLastSavedAt(null)
+    setLastSavedAt(null)
     setProfileDirty(false)
     void loadDailyUpdate(patientId, dailyDate)
     setView('patients')
@@ -474,7 +480,11 @@ function App() {
     setEditingMedicationId(null)
     setVitalForm(initialVitalForm())
     setEditingVitalId(null)
+    setVitalDraftId(null)
+    setVitalDirty(false)
     setOrderForm(initialOrderForm())
+    setOrderDraftId(null)
+    setOrderDirty(false)
     setLabForm(initialLabForm())
     setEditingLabId(null)
     setSelectedTab('profile')
@@ -490,39 +500,67 @@ function App() {
   }
 
   useEffect(() => {
-    if (selectedPatientId === null || !profileDirty || profileSaving) return
+    if (selectedPatientId === null || !profileDirty || isSaving) return
 
     const timeoutId = window.setTimeout(() => {
       void saveProfile(false)
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
-  }, [profileDirty, profileSaving, saveProfile, selectedPatientId])
+  }, [isSaving, profileDirty, saveProfile, selectedPatientId])
 
   const updateProfileField = useCallback(<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => {
     setProfileForm((previous) => ({ ...previous, [field]: value }))
     setProfileDirty(true)
-    if (!profileSaving) {
-      setNotice('Unsaved profile changes.')
+    if (!isSaving) {
+      setNotice('Unsaved changes.')
     }
-  }, [profileSaving])
+  }, [isSaving])
+
+  const updateVitalField = useCallback(<K extends keyof VitalFormState>(field: K, value: VitalFormState[K]) => {
+    setVitalForm((previous) => ({ ...previous, [field]: value }))
+    setVitalDirty(true)
+    if (!isSaving) {
+      setNotice('Unsaved changes.')
+    }
+  }, [isSaving])
+
+  const updateOrderField = useCallback(<K extends keyof OrderFormState>(field: K, value: OrderFormState[K]) => {
+    setOrderForm((previous) => ({ ...previous, [field]: value }))
+    setOrderDirty(true)
+    if (!isSaving) {
+      setNotice('Unsaved changes.')
+    }
+  }, [isSaving])
+
+  const hasUnsavedChanges = profileDirty || dailyDirty || vitalDirty || orderDirty
 
   const saveDailyUpdate = useCallback(
     async (manual = true) => {
-      if (selectedPatientId === null) return
+      if (selectedPatientId === null) return false
 
-      const nextId = await db.dailyUpdates.put({
-        id: dailyUpdateId,
-        patientId: selectedPatientId,
-        date: dailyDate,
-        ...dailyUpdateForm,
-        lastUpdated: new Date().toISOString(),
-      })
+      setIsSaving(true)
+      setNotice('Saving...')
 
-      setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
-      setDailyDirty(false)
-      if (manual) {
-        setNotice('Daily update saved.')
+      try {
+        const nextId = await db.dailyUpdates.put({
+          id: dailyUpdateId,
+          patientId: selectedPatientId,
+          date: dailyDate,
+          ...dailyUpdateForm,
+          lastUpdated: new Date().toISOString(),
+        })
+
+        setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
+        setDailyDirty(false)
+        setLastSavedAt(new Date().toISOString())
+        setNotice(manual ? 'Saved.' : 'Auto-saved.')
+        return true
+      } catch {
+        setNotice('Unable to save. Please try again.')
+        return false
+      } finally {
+        setIsSaving(false)
       }
     },
     [dailyDate, dailyUpdateForm, dailyUpdateId, selectedPatientId],
@@ -757,49 +795,53 @@ function App() {
     return lines.filter(Boolean).join('\n')
   }
 
-  const copyText = async (text: string) => {
+  const openCopyModal = (text: string, title: string) => {
     setOutputPreview(text)
-    if (!navigator.clipboard?.writeText) {
-      setNotice('Clipboard is unavailable. Copy from the preview box.')
-      return
-    }
-    await navigator.clipboard.writeText(text)
-    setNotice('Copied to clipboard.')
+    setOutputPreviewTitle(title)
+    setNotice('Text ready. Select any section or copy everything.')
   }
 
-  const shareText = async (text: string, title: string) => {
-    setOutputPreview(text)
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, text })
-        setNotice('Shared.')
-        return
-      } catch (error) {
-        const name = error instanceof DOMException ? error.name : ''
-        if (name === 'AbortError') return
-      }
+  const copyPreviewToClipboard = async () => {
+    if (!outputPreview) return
+    if (!navigator.clipboard?.writeText) {
+      setNotice('Clipboard is unavailable. Select and copy from the popup.')
+      return
+    }
+    await navigator.clipboard.writeText(outputPreview)
+    setNotice('Copied full text to clipboard.')
+  }
+
+  const sharePreviewText = async () => {
+    if (!outputPreview) return
+    if (!canUseWebShare) {
+      setNotice('Web Share is unavailable on this device/browser.')
+      return
     }
 
-    await copyText(text)
+    try {
+      await navigator.share({ title: outputPreviewTitle, text: outputPreview })
+      setNotice('Shared.')
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : ''
+      if (name === 'AbortError') return
+      setNotice('Unable to share text.')
+    }
+  }
+
+  const closeCopyModal = () => {
+    setOutputPreview('')
+    setOutputPreviewTitle('Generated text')
   }
 
   const addStructuredVital = async () => {
     if (selectedPatientId === null || !vitalForm.time) return
 
-    await db.vitals.add({
-      patientId: selectedPatientId,
-      date: dailyDate,
-      time: vitalForm.time,
-      bp: vitalForm.bp.trim(),
-      hr: vitalForm.hr.trim(),
-      rr: vitalForm.rr.trim(),
-      temp: vitalForm.temp.trim(),
-      spo2: vitalForm.spo2.trim(),
-      note: vitalForm.note.trim(),
-      createdAt: new Date().toISOString(),
-    })
-
+    const saved = await saveVitalDraft(true)
+    if (!saved) return
     setVitalForm(initialVitalForm())
+    setVitalDraftId(null)
+    setVitalDirty(false)
+    setEditingVitalId(null)
     setNotice('Vital added.')
   }
 
@@ -809,6 +851,11 @@ function App() {
     if (editingVitalId === vitalId) {
       setEditingVitalId(null)
       setVitalForm(initialVitalForm())
+      setVitalDirty(false)
+    }
+    if (vitalDraftId === vitalId) {
+      setVitalDraftId(null)
+      setVitalDirty(false)
     }
     setNotice('Vital removed.')
   }
@@ -816,6 +863,8 @@ function App() {
   const startEditingVital = (entry: VitalEntry) => {
     if (entry.id === undefined) return
     setEditingVitalId(entry.id)
+    setVitalDraftId(null)
+    setVitalDirty(false)
     setVitalForm({
       time: entry.time,
       bp: entry.bp,
@@ -830,23 +879,18 @@ function App() {
   const saveEditingVital = async () => {
     if (editingVitalId === null || !vitalForm.time) return
 
-    await db.vitals.update(editingVitalId, {
-      time: vitalForm.time,
-      bp: vitalForm.bp.trim(),
-      hr: vitalForm.hr.trim(),
-      rr: vitalForm.rr.trim(),
-      temp: vitalForm.temp.trim(),
-      spo2: vitalForm.spo2.trim(),
-      note: vitalForm.note.trim(),
-    })
+    const saved = await saveVitalDraft(true)
+    if (!saved) return
 
     setEditingVitalId(null)
+    setVitalDirty(false)
     setVitalForm(initialVitalForm())
     setNotice('Vital updated.')
   }
 
   const cancelEditingVital = () => {
     setEditingVitalId(null)
+    setVitalDirty(false)
     setVitalForm(initialVitalForm())
   }
 
@@ -871,15 +915,11 @@ function App() {
   const addOrder = async () => {
     if (selectedPatientId === null || !orderForm.orderText.trim()) return
 
-    await db.orders.add({
-      patientId: selectedPatientId,
-      orderText: orderForm.orderText.trim(),
-      note: orderForm.note.trim(),
-      status: orderForm.status,
-      createdAt: new Date().toISOString(),
-    })
-
+    const saved = await saveOrderDraft(true)
+    if (!saved) return
     setOrderForm(initialOrderForm())
+    setOrderDraftId(null)
+    setOrderDirty(false)
     setNotice('Order added.')
   }
 
@@ -898,8 +938,165 @@ function App() {
   const deleteOrder = async (orderId?: number) => {
     if (orderId === undefined) return
     await db.orders.delete(orderId)
+    if (orderDraftId === orderId) {
+      setOrderDraftId(null)
+      setOrderDirty(false)
+    }
     setNotice('Order removed.')
   }
+
+  const saveVitalDraft = useCallback(
+    async (manual = true) => {
+      if (selectedPatientId === null || !vitalForm.time) return false
+
+      setIsSaving(true)
+      setNotice('Saving...')
+
+      const payload = {
+        time: vitalForm.time,
+        bp: vitalForm.bp.trim(),
+        hr: vitalForm.hr.trim(),
+        rr: vitalForm.rr.trim(),
+        temp: vitalForm.temp.trim(),
+        spo2: vitalForm.spo2.trim(),
+        note: vitalForm.note.trim(),
+      }
+
+      try {
+        if (editingVitalId !== null) {
+          await db.vitals.update(editingVitalId, payload)
+        } else if (vitalDraftId !== null) {
+          const updatedCount = await db.vitals.update(vitalDraftId, payload)
+          if (updatedCount === 0) {
+            const nextId = await db.vitals.add({
+              patientId: selectedPatientId,
+              date: dailyDate,
+              ...payload,
+              createdAt: new Date().toISOString(),
+            })
+            setVitalDraftId(typeof nextId === 'number' ? nextId : null)
+          }
+        } else {
+          const nextId = await db.vitals.add({
+            patientId: selectedPatientId,
+            date: dailyDate,
+            ...payload,
+            createdAt: new Date().toISOString(),
+          })
+          setVitalDraftId(typeof nextId === 'number' ? nextId : null)
+        }
+
+        setVitalDirty(false)
+        setLastSavedAt(new Date().toISOString())
+        setNotice(manual ? 'Saved.' : 'Auto-saved.')
+        return true
+      } catch {
+        setNotice('Unable to save. Please try again.')
+        return false
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [dailyDate, editingVitalId, selectedPatientId, vitalDraftId, vitalForm],
+  )
+
+  const saveOrderDraft = useCallback(
+    async (manual = true) => {
+      if (selectedPatientId === null || !orderForm.orderText.trim()) return false
+
+      setIsSaving(true)
+      setNotice('Saving...')
+
+      const payload = {
+        orderText: orderForm.orderText.trim(),
+        note: orderForm.note.trim(),
+        status: orderForm.status,
+      }
+
+      try {
+        if (orderDraftId !== null) {
+          const updatedCount = await db.orders.update(orderDraftId, payload)
+          if (updatedCount === 0) {
+            const nextId = await db.orders.add({
+              patientId: selectedPatientId,
+              ...payload,
+              createdAt: new Date().toISOString(),
+            })
+            setOrderDraftId(typeof nextId === 'number' ? nextId : null)
+          }
+        } else {
+          const nextId = await db.orders.add({
+            patientId: selectedPatientId,
+            ...payload,
+            createdAt: new Date().toISOString(),
+          })
+          setOrderDraftId(typeof nextId === 'number' ? nextId : null)
+        }
+
+        setOrderDirty(false)
+        setLastSavedAt(new Date().toISOString())
+        setNotice(manual ? 'Saved.' : 'Auto-saved.')
+        return true
+      } catch {
+        setNotice('Unable to save. Please try again.')
+        return false
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [orderDraftId, orderForm, selectedPatientId],
+  )
+
+  const saveAllChanges = useCallback(async () => {
+    if (selectedPatientId === null || isSaving) return
+    if (!hasUnsavedChanges) {
+      setNotice('No unsaved changes.')
+      return
+    }
+
+    let hasFailure = false
+
+    if (profileDirty) {
+      const saved = await saveProfile(true)
+      if (!saved) hasFailure = true
+    }
+    if (dailyDirty) {
+      const saved = await saveDailyUpdate(true)
+      if (!saved) hasFailure = true
+    }
+    if (vitalDirty) {
+      const saved = await saveVitalDraft(true)
+      if (!saved) hasFailure = true
+    }
+    if (orderDirty) {
+      const saved = await saveOrderDraft(true)
+      if (!saved) hasFailure = true
+    }
+
+    if (!hasFailure) {
+      setNotice('All pending changes saved.')
+    }
+  }, [dailyDirty, hasUnsavedChanges, isSaving, orderDirty, profileDirty, saveDailyUpdate, saveOrderDraft, saveProfile, saveVitalDraft, selectedPatientId, vitalDirty])
+
+  useEffect(() => {
+    if (selectedPatientId === null || !vitalDirty || isSaving) return
+
+    const timeoutId = window.setTimeout(() => {
+      void saveVitalDraft(false)
+    }, 800)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isSaving, saveVitalDraft, selectedPatientId, vitalDirty])
+
+  useEffect(() => {
+    if (selectedPatientId === null || !orderDirty || isSaving || !orderForm.orderText.trim()) return
+
+    const timeoutId = window.setTimeout(() => {
+      void saveOrderDraft(false)
+    }, 800)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isSaving, orderDirty, orderForm.orderText, saveOrderDraft, selectedPatientId])
 
   const deleteStructuredMedication = async (medicationId?: number) => {
     if (medicationId === undefined) return
@@ -1020,7 +1217,7 @@ function App() {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `rounding-app-backup-${toLocalISODate()}.json`
+    anchor.download = `puhrr-backup-${toLocalISODate()}.json`
     anchor.click()
     URL.revokeObjectURL(url)
     setNotice('Backup exported.')
@@ -1075,12 +1272,17 @@ function App() {
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setEditingVitalId(null)
+      setVitalDraftId(null)
+      setVitalDirty(false)
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
+      setOrderDraftId(null)
+      setOrderDirty(false)
       setLabForm(initialLabForm())
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
+      setLastSavedAt(null)
       setNotice('Backup imported.')
     } catch {
       setNotice('Unable to import backup.')
@@ -1116,13 +1318,18 @@ function App() {
       setDailyUpdateForm(initialDailyUpdateForm)
       setVitalForm(initialVitalForm())
       setEditingVitalId(null)
+      setVitalDraftId(null)
+      setVitalDirty(false)
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
+      setOrderDraftId(null)
+      setOrderDirty(false)
       setLabForm(initialLabForm())
       setEditingLabId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
+      setLastSavedAt(null)
     }
 
     setNotice('Cleared discharged patients.')
@@ -1260,14 +1467,30 @@ function App() {
   return (
     <div className='min-h-screen'>
       <main>
-        <h1>Portable Electronic Health Record</h1>
+        <h1>Portable Unofficial Health Record - Really (PUHRR)</h1>
         <p>DevPlan MVP: patient list, profile notes, daily update notes, and text generators.</p>
         {notice ? <p className='notice'>{notice}</p> : null}
+        {selectedPatientId !== null ? (
+          <div className='actions'>
+            <p className='inline-note'>
+              Last saved:{' '}
+              {lastSavedAt
+                ? new Date(lastSavedAt).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })
+                : '—'}
+            </p>
+            <button type='button' className='btn-secondary' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
+              Save now
+            </button>
+          </div>
+        ) : null}
         <div className='actions top-nav'>
           <button type='button' onClick={() => setView('patients')}>
             Patients
           </button>
-          <button type='button' onClick={() => setView('settings')}>
+          <button type='button' className='btn-secondary' onClick={() => setView('settings')}>
             Settings
           </button>
         </div>
@@ -1382,7 +1605,7 @@ function App() {
                 type='button'
                 className='full-census-button'
                 onClick={() =>
-                  void copyText(
+                  openCopyModal(
                     activePatients
                       .map((patient) =>
                         toCensusEntry(
@@ -1393,31 +1616,11 @@ function App() {
                         ),
                       )
                       .join('\n\n'),
+                    'All census',
                   )
                 }
               >
-                Copy all census
-              </button>
-              <button
-                type='button'
-                className='full-census-button'
-                onClick={() =>
-                  void shareText(
-                    activePatients
-                      .map((patient) =>
-                        toCensusEntry(
-                          patient,
-                          structuredMedsByPatient.get(patient.id ?? -1) ?? [],
-                          structuredLabsByPatient.get(patient.id ?? -1) ?? [],
-                          structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
-                        ),
-                      )
-                      .join('\n\n'),
-                    'Full census',
-                  )
-                }
-              >
-                Share all census
+                Open all census text
               </button>
             </div>
 
@@ -1427,13 +1630,25 @@ function App() {
                   {selectedPatient.lastName}, {selectedPatient.firstName} ({selectedPatient.roomNumber})
                 </h2>
                 <div className='actions'>
-                  <button type='button' onClick={() => setSelectedTab('profile')}>
+                  <button
+                    type='button'
+                    className={selectedTab === 'profile' ? '' : 'btn-secondary'}
+                    onClick={() => setSelectedTab('profile')}
+                  >
                     Profile
                   </button>
-                  <button type='button' onClick={() => setSelectedTab('vitals')}>
+                  <button
+                    type='button'
+                    className={selectedTab === 'vitals' ? '' : 'btn-secondary'}
+                    onClick={() => setSelectedTab('vitals')}
+                  >
                     Vital Signs
                   </button>
-                  <button type='button' onClick={() => setSelectedTab('orders')}>
+                  <button
+                    type='button'
+                    className={selectedTab === 'orders' ? '' : 'btn-secondary'}
+                    onClick={() => setSelectedTab('orders')}
+                  >
                     Orders
                   </button>
                 </div>
@@ -1585,10 +1800,10 @@ function App() {
                               <button type='button' onClick={() => void saveEditingLab()}>
                                 Save
                               </button>
-                              <button type='button' onClick={cancelEditingLab}>
+                              <button type='button' className='btn-secondary' onClick={cancelEditingLab}>
                                 Cancel
                               </button>
-                              <button type='button' onClick={() => void deleteStructuredLab(editingLabId)}>
+                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredLab(editingLabId)}>
                                 Remove
                               </button>
                             </>
@@ -1607,7 +1822,7 @@ function App() {
                                   <>
                                     <span>{line}</span>
                                     <div className='actions'>
-                                      <button type='button' onClick={() => startEditingLab(entry)}>
+                                      <button type='button' className='btn-edit' onClick={() => startEditingLab(entry)}>
                                         Edit
                                       </button>
                                     </div>
@@ -1707,10 +1922,10 @@ function App() {
                               <button type='button' onClick={() => void saveEditingMedication()}>
                                 Save
                               </button>
-                              <button type='button' onClick={cancelEditingMedication}>
+                              <button type='button' className='btn-secondary' onClick={cancelEditingMedication}>
                                 Cancel
                               </button>
-                              <button type='button' onClick={() => void deleteStructuredMedication(editingMedicationId)}>
+                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredMedication(editingMedicationId)}>
                                 Remove
                               </button>
                             </>
@@ -1730,7 +1945,7 @@ function App() {
                                     {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
                                   </span>
                                   <div className='actions'>
-                                    <button type='button' onClick={() => startEditingMedication(entry)}>
+                                    <button type='button' className='btn-edit' onClick={() => startEditingMedication(entry)}>
                                       Edit
                                     </button>
                                   </div>
@@ -1762,38 +1977,10 @@ function App() {
                       <label htmlFor='profile-clerknotes'>Clerk notes</label>
                     </div>
                     <div className='actions'>
-                      <p className='inline-note'>
-                        Last saved:{' '}
-                        {profileLastSavedAt
-                          ? new Date(profileLastSavedAt).toLocaleTimeString([], {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })
-                          : '—'}
-                      </p>
-                      <button type='button' disabled={profileSaving || !profileDirty} onClick={() => void saveProfile(true)}>
-                        Save now
-                      </button>
                       <button
                         type='button'
                         onClick={() =>
-                          void copyText(
-                            toProfileSummary(
-                              selectedPatient,
-                              profileForm,
-                              selectedPatientStructuredMeds,
-                              selectedPatientStructuredLabs,
-                              selectedPatientOrders,
-                            ),
-                          )
-                        }
-                      >
-                        Copy profile as text
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          void shareText(
+                          openCopyModal(
                             toProfileSummary(
                               selectedPatient,
                               profileForm,
@@ -1805,27 +1992,12 @@ function App() {
                           )
                         }
                       >
-                        Share profile as text
+                        Open profile text
                       </button>
                       <button
                         type='button'
                         onClick={() =>
-                          void copyText(
-                            toCensusEntry(
-                              selectedPatient,
-                              selectedPatientStructuredMeds,
-                              selectedPatientStructuredLabs,
-                              selectedPatientOrders,
-                            ),
-                          )
-                        }
-                      >
-                        Copy census entry
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          void shareText(
+                          openCopyModal(
                             toCensusEntry(
                               selectedPatient,
                               selectedPatientStructuredMeds,
@@ -1836,10 +2008,11 @@ function App() {
                           )
                         }
                       >
-                        Share census entry
+                        Open census entry text
                       </button>
                       <button
                         type='button'
+                        className={selectedPatient.status === 'active' ? 'btn-danger' : 'btn-secondary'}
                         onClick={() => void toggleDischarge(selectedPatient)}
                       >
                         {selectedPatient.status === 'active' ? 'Discharge' : 'Re-activate'}
@@ -1864,6 +2037,8 @@ function App() {
                           }
                           setVitalForm(initialVitalForm())
                           setEditingVitalId(null)
+                          setVitalDraftId(null)
+                          setVitalDirty(false)
                         }}
                       />
                     </label>
@@ -1874,43 +2049,43 @@ function App() {
                           aria-label='Vital time'
                           type='time'
                           value={vitalForm.time}
-                          onChange={(event) => setVitalForm({ ...vitalForm, time: event.target.value })}
+                          onChange={(event) => updateVitalField('time', event.target.value)}
                         />
                         <input
                           aria-label='Vital blood pressure'
                           placeholder='BP'
                           value={vitalForm.bp}
-                          onChange={(event) => setVitalForm({ ...vitalForm, bp: event.target.value })}
+                          onChange={(event) => updateVitalField('bp', event.target.value)}
                         />
                         <input
                           aria-label='Vital heart rate'
                           placeholder='HR'
                           value={vitalForm.hr}
-                          onChange={(event) => setVitalForm({ ...vitalForm, hr: event.target.value })}
+                          onChange={(event) => updateVitalField('hr', event.target.value)}
                         />
                         <input
                           aria-label='Vital respiratory rate'
                           placeholder='RR'
                           value={vitalForm.rr}
-                          onChange={(event) => setVitalForm({ ...vitalForm, rr: event.target.value })}
+                          onChange={(event) => updateVitalField('rr', event.target.value)}
                         />
                         <input
                           aria-label='Vital temperature'
                           placeholder='Temp'
                           value={vitalForm.temp}
-                          onChange={(event) => setVitalForm({ ...vitalForm, temp: event.target.value })}
+                          onChange={(event) => updateVitalField('temp', event.target.value)}
                         />
                         <input
                           aria-label='Vital oxygen saturation'
                           placeholder='SpO2'
                           value={vitalForm.spo2}
-                          onChange={(event) => setVitalForm({ ...vitalForm, spo2: event.target.value })}
+                          onChange={(event) => updateVitalField('spo2', event.target.value)}
                         />
                         <input
                           aria-label='Vital note'
                           placeholder='Note'
                           value={vitalForm.note}
-                          onChange={(event) => setVitalForm({ ...vitalForm, note: event.target.value })}
+                          onChange={(event) => updateVitalField('note', event.target.value)}
                         />
                         <div className='vitals-form-actions'>
                           {editingVitalId === null ? (
@@ -1922,10 +2097,10 @@ function App() {
                               <button type='button' onClick={() => void saveEditingVital()}>
                                 Save
                               </button>
-                              <button type='button' onClick={() => void deleteStructuredVital(editingVitalId)}>
+                              <button type='button' className='btn-danger' onClick={() => void deleteStructuredVital(editingVitalId)}>
                                 Remove
                               </button>
-                              <button type='button' onClick={cancelEditingVital}>
+                              <button type='button' className='btn-secondary' onClick={cancelEditingVital}>
                                 Cancel
                               </button>
                             </>
@@ -1945,7 +2120,7 @@ function App() {
                                     {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
                                   </span>
                                   <div className='actions'>
-                                    <button type='button' onClick={() => startEditingVital(entry)}>
+                                    <button type='button' className='btn-edit' onClick={() => startEditingVital(entry)}>
                                       Edit
                                     </button>
                                   </div>
@@ -2082,22 +2257,7 @@ function App() {
                       <button
                         type='button'
                         onClick={() =>
-                          void copyText(
-                            toDailySummary(
-                              selectedPatient,
-                              dailyUpdateForm,
-                              dailyVitals ?? [],
-                              selectedPatientOrders,
-                            ),
-                          )
-                        }
-                      >
-                        Copy daily summary
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          void shareText(
+                          openCopyModal(
                             toDailySummary(
                               selectedPatient,
                               dailyUpdateForm,
@@ -2108,7 +2268,7 @@ function App() {
                           )
                         }
                       >
-                        Share daily summary
+                        Open daily summary text
                       </button>
                     </div>
                   </div>
@@ -2121,22 +2281,19 @@ function App() {
                           aria-label='Order text'
                           placeholder='Order'
                           value={orderForm.orderText}
-                          onChange={(event) => setOrderForm({ ...orderForm, orderText: event.target.value })}
+                          onChange={(event) => updateOrderField('orderText', event.target.value)}
                         />
                         <input
                           aria-label='Order note'
                           placeholder='Note'
                           value={orderForm.note}
-                          onChange={(event) => setOrderForm({ ...orderForm, note: event.target.value })}
+                          onChange={(event) => updateOrderField('note', event.target.value)}
                         />
                         <select
                           aria-label='Order status'
                           value={orderForm.status}
                           onChange={(event) =>
-                            setOrderForm({
-                              ...orderForm,
-                              status: event.target.value as 'active' | 'carriedOut' | 'discontinued',
-                            })
+                            updateOrderField('status', event.target.value as 'active' | 'carriedOut' | 'discontinued')
                           }
                         >
                           <option value='active'>Active</option>
@@ -2156,7 +2313,7 @@ function App() {
                                 <button type='button' onClick={() => void toggleOrderStatus(entry)}>
                                   {getNextOrderActionLabel(entry.status)}
                                 </button>
-                                <button type='button' onClick={() => void deleteOrder(entry.id)}>
+                                <button type='button' className='btn-danger' onClick={() => void deleteOrder(entry.id)}>
                                   Remove
                                 </button>
                               </div>
@@ -2199,7 +2356,7 @@ function App() {
                 <ol>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>Open the patient card, then fill Profile, Vital Signs, and Orders.</li>
-                  <li>Use copy/share actions to generate handoff-ready text.</li>
+                  <li>Use Open text actions to review, select, and copy handoff-ready text.</li>
                   <li>Repeat daily using the date picker in Vital Signs.</li>
                 </ol>
               </div>
@@ -2219,9 +2376,9 @@ function App() {
                 <h4>Saving and persistence</h4>
                 <ul>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
-                  <li>Profile and daily update fields auto-save shortly after typing stops.</li>
-                  <li>The top status notice shows Unsaved, Saving, and Saved states for profile edits.</li>
-                  <li>Use Save now in Profile if you want to force an immediate save.</li>
+                  <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
+                  <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits.</li>
+                  <li>Use Save now near the top to force an immediate save for all pending edits.</li>
                   <li>App files are cached by the PWA service worker for offline loading.</li>
                   <li>Data remains after page refresh or browser restart on the same browser profile.</li>
                 </ul>
@@ -2231,8 +2388,9 @@ function App() {
                 <h4>Quick tips</h4>
                 <ul>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
-                  <li>Use Copy all census for one-shot census output for active patients.</li>
-                  <li>Share uses Web Share when available, with clipboard fallback.</li>
+                  <li>Use Open all census text for one-shot census output for active patients.</li>
+                  <li>The text popup is almost full-page so you can manually select only what you need.</li>
+                  <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
                 </ul>
               </div>
@@ -2241,10 +2399,28 @@ function App() {
         )}
 
         {outputPreview ? (
-          <section className='detail-panel'>
-            <h2>Generated text preview</h2>
-            <textarea aria-label='Generated text preview' readOnly value={outputPreview} />
-          </section>
+          <div className='copy-modal-backdrop' role='dialog' aria-modal='true' aria-label={outputPreviewTitle}>
+            <section className='copy-modal'>
+              <div className='copy-modal-header'>
+                <h2>{outputPreviewTitle}</h2>
+                <div className='actions'>
+                  {canUseWebShare ? (
+                    <button type='button' className='btn-secondary' onClick={() => void sharePreviewText()}>
+                      Share
+                    </button>
+                  ) : null}
+                  <button type='button' className='btn-secondary' onClick={() => void copyPreviewToClipboard()}>
+                    Copy full text
+                  </button>
+                  <button type='button' className='btn-danger' onClick={closeCopyModal}>
+                    Close
+                  </button>
+                </div>
+              </div>
+              <p className='inline-note'>Select any part manually, or tap Copy full text.</p>
+              <textarea className='copy-modal-textarea' aria-label='Generated text preview' readOnly value={outputPreview} />
+            </section>
+          </div>
         ) : null}
       </main>
       <footer className='app-footer'>

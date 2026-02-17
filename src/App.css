@@ -1,10 +1,19 @@
 :root {
-  --burnt-peach: #e17e65ff;
-  --cherry-blossom: #efaeb5ff;
-  --pale-oak: #d7c0aeff;
-  --pale-oak-2: #cabaa8ff;
-  --taupe: #85746fff;
-  --mauve-shadow: #48323bff;
+  --burnt-peach: #b85b43;
+  --cherry-blossom: #f2d6d9;
+  --pale-oak: #f2e8dd;
+  --pale-oak-2: #eadaca;
+  --taupe: #8c7468;
+  --mauve-shadow: #3f2c35;
+  --action-primary: #b85b43;
+  --action-primary-hover: #9f4d39;
+  --action-secondary: #6a5c59;
+  --action-secondary-hover: #574c49;
+  --action-edit: #2f5f9b;
+  --action-edit-hover: #254d7e;
+  --action-danger: #ad2e2e;
+  --action-danger-hover: #902727;
+  --overlay-bg: rgba(43, 33, 40, 0.65);
 }
 
 #root {
@@ -56,9 +65,48 @@ textarea {
 }
 
 button {
-  background: var(--burnt-peach);
+  background: var(--action-primary);
   color: #fff;
   cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+button:hover {
+  background: var(--action-primary-hover);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.btn-secondary {
+  background: var(--action-secondary);
+}
+
+button.btn-secondary:hover {
+  background: var(--action-secondary-hover);
+}
+
+button.btn-edit {
+  background: var(--action-edit);
+}
+
+button.btn-edit:hover {
+  background: var(--action-edit-hover);
+}
+
+button.btn-danger {
+  background: var(--action-danger);
+}
+
+button.btn-danger:hover {
+  background: var(--action-danger-hover);
 }
 
 .patient-list {
@@ -95,10 +143,6 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.actions button:last-child {
-  background: var(--taupe);
 }
 
 .top-nav {
@@ -444,4 +488,46 @@ button {
   font-size: 0.75rem;
   opacity: 0.7;
   text-align: center;
+}
+
+.copy-modal-backdrop {
+  align-items: center;
+  background: var(--overlay-bg);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 1000;
+}
+
+.copy-modal {
+  background: var(--pale-oak);
+  border: 1px solid var(--taupe);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  height: 92vh;
+  max-height: 92vh;
+  padding: 0.85rem;
+  width: min(960px, 96vw);
+}
+
+.copy-modal-header {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+
+.copy-modal-header h2 {
+  margin: 0;
+}
+
+.copy-modal-textarea {
+  background: #fff;
+  flex: 1 1 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 300px;
 }
