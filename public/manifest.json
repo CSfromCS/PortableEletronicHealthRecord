@@ -1,0 +1,17 @@
+{
+  "name": "Portable Electronic Health Record",
+  "short_name": "PEHR",
+  "description": "Offline-first patient tracking for hospital rounds",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

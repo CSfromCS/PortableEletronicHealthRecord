@@ -1,0 +1,17 @@
+#root {
+  margin: 0 auto;
+  max-width: 960px;
+  padding: 2rem 1rem;
+}
+
+main {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+h1 {
+  margin: 0 0 0.5rem;
+}
+
+p {
+  margin: 0;
+}
