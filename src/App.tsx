@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
 import type {
@@ -192,6 +203,262 @@ const compressImageFile = async (file: File) => {
     height: targetHeight,
     mimeType: 'image/jpeg',
   }
+}
+
+type MentionablePhoto = {
+  id: number
+  title: string
+  category: PhotoCategory
+  createdAt: string
+}
+
+type ActivePhotoMention = {
+  start: number
+  end: number
+  query: string
+}
+
+const PHOTO_MENTION_REGEX = /@([^\s@]+)/g
+
+const sanitizeMentionToken = (token: string) => token.trim().replace(/[.,!?;)]*$/g, '')
+
+const findActivePhotoMention = (value: string, caretPosition: number): ActivePhotoMention | null => {
+  if (caretPosition < 0 || caretPosition > value.length) return null
+
+  const beforeCaret = value.slice(0, caretPosition)
+  const atIndex = beforeCaret.lastIndexOf('@')
+  if (atIndex < 0) return null
+
+  const prefix = beforeCaret.slice(atIndex + 1)
+  if (/\s/.test(prefix)) return null
+
+  const charBeforeAt = atIndex > 0 ? value[atIndex - 1] : ''
+  if (charBeforeAt && /[\w]/.test(charBeforeAt)) return null
+
+  return {
+    start: atIndex,
+    end: caretPosition,
+    query: prefix,
+  }
+}
+
+const findMentionedPhotoIds = (text: string, attachmentByTitle: Map<string, MentionablePhoto>) => {
+  const mentionedIds = new Set<number>()
+
+  text.replaceAll(PHOTO_MENTION_REGEX, (_fullMatch, token: string) => {
+    const mentionedPhoto = attachmentByTitle.get(sanitizeMentionToken(token).toLowerCase())
+    if (mentionedPhoto) {
+      mentionedIds.add(mentionedPhoto.id)
+    }
+    return _fullMatch
+  })
+
+  return Array.from(mentionedIds)
+}
+
+type MentionTextProps = {
+  text: string
+  attachmentByTitle: Map<string, MentionablePhoto>
+  onOpenPhotoById: (attachmentId: number) => void
+}
+
+const MentionText = ({ text, attachmentByTitle, onOpenPhotoById }: MentionTextProps) => {
+  const nodes: ReactNode[] = []
+  let lastIndex = 0
+
+  for (const match of text.matchAll(PHOTO_MENTION_REGEX)) {
+    const fullMatch = match[0]
+    const token = match[1]
+    const index = match.index
+    if (index === undefined) continue
+
+    if (index > lastIndex) {
+      nodes.push(text.slice(lastIndex, index))
+    }
+
+    const attachment = attachmentByTitle.get(sanitizeMentionToken(token).toLowerCase())
+    if (attachment) {
+      nodes.push(
+        <button
+          key={`mention-${index}-${fullMatch}`}
+          type='button'
+          className='text-action-edit underline underline-offset-2 hover:text-action-edit/80'
+          onClick={() => onOpenPhotoById(attachment.id)}
+        >
+          {fullMatch}
+        </button>,
+      )
+    } else {
+      nodes.push(fullMatch)
+    }
+
+    lastIndex = index + fullMatch.length
+  }
+
+  if (lastIndex < text.length) {
+    nodes.push(text.slice(lastIndex))
+  }
+
+  return <>{nodes}</>
+}
+
+type PhotoMentionFieldProps = {
+  value: string
+  onChange: (nextValue: string) => void
+  ariaLabel: string
+  placeholder?: string
+  attachments: MentionablePhoto[]
+  attachmentByTitle: Map<string, MentionablePhoto>
+  onOpenPhotoById: (attachmentId: number) => void
+  multiline?: boolean
+}
+
+const PhotoMentionField = ({
+  value,
+  onChange,
+  ariaLabel,
+  placeholder,
+  attachments,
+  attachmentByTitle,
+  onOpenPhotoById,
+  multiline = true,
+}: PhotoMentionFieldProps) => {
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const [activeMention, setActiveMention] = useState<ActivePhotoMention | null>(null)
+
+  const filteredSuggestions = useMemo(() => {
+    if (!activeMention) return [] as MentionablePhoto[]
+    const query = activeMention.query.toLowerCase()
+
+    return attachments
+      .filter((entry) => entry.title.toLowerCase().includes(query))
+      .slice(0, 6)
+  }, [activeMention, attachments])
+
+  const mentionedPhotoIds = useMemo(
+    () => findMentionedPhotoIds(value, attachmentByTitle),
+    [attachmentByTitle, value],
+  )
+
+  const applyValueChange = (nextValue: string, target: HTMLInputElement | HTMLTextAreaElement) => {
+    onChange(nextValue)
+    const caretPosition = target.selectionStart ?? nextValue.length
+    setActiveMention(findActivePhotoMention(nextValue, caretPosition))
+  }
+
+  const selectSuggestion = (attachment: MentionablePhoto) => {
+    if (!activeMention) return
+
+    const before = value.slice(0, activeMention.start)
+    const after = value.slice(activeMention.end)
+    const needsTrailingSpace = after.length === 0 || /^\s/.test(after) ? '' : ' '
+    const nextValue = `${before}@${attachment.title}${needsTrailingSpace}${after}`
+    const nextCaretPosition = before.length + attachment.title.length + 1 + needsTrailingSpace.length
+
+    onChange(nextValue)
+    setActiveMention(null)
+
+    requestAnimationFrame(() => {
+      const field = multiline ? textareaRef.current : inputRef.current
+      field?.focus()
+      field?.setSelectionRange(nextCaretPosition, nextCaretPosition)
+    })
+  }
+
+  const handleBlur = () => {
+    window.setTimeout(() => setActiveMention(null), 120)
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.key === 'Escape') {
+      setActiveMention(null)
+    }
+    if (event.key === 'Enter' && filteredSuggestions.length > 0 && activeMention !== null) {
+      event.preventDefault()
+      selectSuggestion(filteredSuggestions[0])
+    }
+  }
+
+  const handleInputSelect = (event: SyntheticEvent<HTMLInputElement>) => {
+    const target = event.target as HTMLInputElement
+    const caretPosition = target.selectionStart ?? target.value.length
+    setActiveMention(findActivePhotoMention(target.value, caretPosition))
+  }
+
+  const handleTextareaSelect = (event: SyntheticEvent<HTMLTextAreaElement>) => {
+    const target = event.target as HTMLTextAreaElement
+    const caretPosition = target.selectionStart ?? target.value.length
+    setActiveMention(findActivePhotoMention(target.value, caretPosition))
+  }
+
+  return (
+    <div className='space-y-1'>
+      <div className='relative'>
+        {multiline ? (
+          <Textarea
+            ref={textareaRef}
+            aria-label={ariaLabel}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => applyValueChange(event.target.value, event.target)}
+            onSelect={handleTextareaSelect}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+          />
+        ) : (
+          <Input
+            ref={inputRef}
+            aria-label={ariaLabel}
+            placeholder={placeholder}
+            value={value}
+            onChange={(event) => applyValueChange(event.target.value, event.target)}
+            onSelect={handleInputSelect}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+          />
+        )}
+        {activeMention !== null && filteredSuggestions.length > 0 ? (
+          <div className='absolute left-0 right-0 z-20 mt-1 rounded-md border border-taupe/40 bg-white shadow-sm'>
+            <ul className='max-h-44 overflow-auto py-1'>
+              {filteredSuggestions.map((entry) => (
+                <li key={entry.id}>
+                  <button
+                    type='button'
+                    className='w-full px-3 py-1.5 text-left text-sm hover:bg-pale-oak'
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectSuggestion(entry)}
+                  >
+                    <span className='font-medium text-mauve-shadow'>{entry.title}</span>
+                    <span className='ml-2 text-xs text-taupe'>{formatPhotoCategory(entry.category)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+      {mentionedPhotoIds.length > 0 ? (
+        <div className='flex flex-wrap gap-2 text-xs'>
+          {mentionedPhotoIds.map((photoId) => {
+            const photo = attachments.find((entry) => entry.id === photoId)
+            if (!photo) return null
+
+            return (
+              <button
+                key={`linked-photo-${photoId}`}
+                type='button'
+                className='rounded border border-action-edit/30 bg-white px-2 py-0.5 text-action-edit hover:bg-action-edit/5'
+                onClick={() => onOpenPhotoById(photoId)}
+              >
+                @{photo.title}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
 
@@ -525,18 +792,55 @@ function App() {
     return structuredOrdersByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredOrdersByPatient])
 
-  const selectedPatientAttachments = useMemo(() => {
+  const selectedPatientAllAttachments = useMemo(() => {
     if (selectedPatientId === null) return [] as PhotoAttachment[]
 
     return (photoAttachments ?? [])
       .filter((entry) => entry.patientId === selectedPatientId)
-      .filter((entry) => (attachmentFilter === 'all' ? true : entry.category === attachmentFilter))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-  }, [attachmentFilter, photoAttachments, selectedPatientId])
+  }, [photoAttachments, selectedPatientId])
+
+  const selectedPatientAttachments = useMemo(() => {
+    return selectedPatientAllAttachments
+      .filter((entry) => (attachmentFilter === 'all' ? true : entry.category === attachmentFilter))
+  }, [attachmentFilter, selectedPatientAllAttachments])
+
+  const mentionableAttachments = useMemo(() => {
+    const mapped = selectedPatientAllAttachments
+      .filter((entry): entry is PhotoAttachment & { id: number } => entry.id !== undefined && entry.title.trim().length > 0)
+      .map((entry) => ({
+        id: entry.id,
+        title: entry.title.trim(),
+        category: entry.category,
+        createdAt: entry.createdAt,
+      }))
+
+    const uniqueByTitle = new Map<string, MentionablePhoto>()
+    mapped.forEach((entry) => {
+      const key = entry.title.toLowerCase()
+      if (!uniqueByTitle.has(key)) {
+        uniqueByTitle.set(key, entry)
+      }
+    })
+
+    return Array.from(uniqueByTitle.values())
+  }, [selectedPatientAllAttachments])
+
+  const mentionableAttachmentByTitle = useMemo(() => {
+    const byTitle = new Map<string, MentionablePhoto>()
+    mentionableAttachments.forEach((entry) => {
+      byTitle.set(entry.title.toLowerCase(), entry)
+    })
+    return byTitle
+  }, [mentionableAttachments])
+
+  const openPhotoById = useCallback((attachmentId: number) => {
+    setSelectedAttachmentId(attachmentId)
+  }, [])
 
   useEffect(() => {
     const urls: Record<number, string> = {}
-    selectedPatientAttachments.forEach((entry) => {
+    selectedPatientAllAttachments.forEach((entry) => {
       if (entry.id === undefined) return
       urls[entry.id] = URL.createObjectURL(entry.imageBlob)
     })
@@ -545,12 +849,12 @@ function App() {
     return () => {
       Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
     }
-  }, [selectedPatientAttachments])
+  }, [selectedPatientAllAttachments])
 
   const selectedAttachment = useMemo(() => {
     if (selectedAttachmentId === null) return null
-    return selectedPatientAttachments.find((entry) => entry.id === selectedAttachmentId) ?? null
-  }, [selectedAttachmentId, selectedPatientAttachments])
+    return selectedPatientAllAttachments.find((entry) => entry.id === selectedAttachmentId) ?? null
+  }, [selectedAttachmentId, selectedPatientAllAttachments])
 
   const visiblePatients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -2031,34 +2335,50 @@ function App() {
                     </div>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-service'>Service</Label>
-                      <Textarea
-                        id='profile-service'
+                      <PhotoMentionField
+                        ariaLabel='Service'
+                        placeholder='Service'
                         value={profileForm.service}
-                        onChange={(event) => updateProfileField('service', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('service', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-diagnosis'>Diagnosis</Label>
-                      <Textarea
-                        id='profile-diagnosis'
+                      <PhotoMentionField
+                        ariaLabel='Diagnosis'
+                        placeholder='Diagnosis'
                         value={profileForm.diagnosis}
-                        onChange={(event) => updateProfileField('diagnosis', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('diagnosis', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-plans'>Plans</Label>
-                      <Textarea
-                        id='profile-plans'
+                      <PhotoMentionField
+                        ariaLabel='Plans'
+                        placeholder='Plans'
                         value={profileForm.plans}
-                        onChange={(event) => updateProfileField('plans', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('plans', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-labs'>Labs</Label>
-                      <Textarea
-                        id='profile-labs'
+                      <PhotoMentionField
+                        ariaLabel='Labs'
+                        placeholder='Labs'
                         value={profileForm.labs}
-                        onChange={(event) => updateProfileField('labs', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('labs', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <Card className='bg-pale-oak-2 border-taupe'>
@@ -2115,11 +2435,14 @@ function App() {
                         </div>
                         <div className='space-y-1'>
                           <Label>Note</Label>
-                          <Textarea
-                            aria-label='Lab note'
+                          <PhotoMentionField
+                            ariaLabel='Lab note'
                             placeholder='Optional note for this lab run'
                             value={labTemplateNote}
-                            onChange={(event) => setLabTemplateNote(event.target.value)}
+                            onChange={(nextValue) => setLabTemplateNote(nextValue)}
+                            attachments={mentionableAttachments}
+                            attachmentByTitle={mentionableAttachmentByTitle}
+                            onOpenPhotoById={openPhotoById}
                           />
                         </div>
                         <div className='flex gap-2 flex-wrap'>
@@ -2143,7 +2466,13 @@ function App() {
                                     <span className='text-taupe italic'>(Editing above...)</span>
                                   ) : (
                                     <>
-                                      <span>{line}</span>
+                                      <span className='whitespace-pre-wrap'>
+                                        <MentionText
+                                          text={line}
+                                          attachmentByTitle={mentionableAttachmentByTitle}
+                                          onOpenPhotoById={openPhotoById}
+                                        />
+                                      </span>
                                       <Button size='sm' variant='edit' onClick={() => startEditingLab(entry)}>Edit</Button>
                                     </>
                                   )}
@@ -2158,10 +2487,14 @@ function App() {
                     </Card>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-medications'>Medications</Label>
-                      <Textarea
-                        id='profile-medications'
+                      <PhotoMentionField
+                        ariaLabel='Medications'
+                        placeholder='Medications'
                         value={profileForm.medications}
-                        onChange={(event) => updateProfileField('medications', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('medications', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <Card className='bg-pale-oak-2 border-taupe'>
@@ -2188,7 +2521,15 @@ function App() {
                           </div>
                           <div className='space-y-1 col-span-2'>
                             <Label>Note</Label>
-                            <Textarea aria-label='Medication note' placeholder='Note' value={medicationForm.note} onChange={(event) => setMedicationForm({ ...medicationForm, note: event.target.value })} />
+                            <PhotoMentionField
+                              ariaLabel='Medication note'
+                              placeholder='Note'
+                              value={medicationForm.note}
+                              onChange={(nextValue) => setMedicationForm({ ...medicationForm, note: nextValue })}
+                              attachments={mentionableAttachments}
+                              attachmentByTitle={mentionableAttachmentByTitle}
+                              onOpenPhotoById={openPhotoById}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>Status</Label>
@@ -2221,10 +2562,13 @@ function App() {
                                   <span className='text-taupe italic'>(Editing above...)</span>
                                 ) : (
                                   <>
-                                    <span>
-                                      {entry.medication} {entry.dose} {entry.route} {entry.frequency}
-                                      {entry.note ? ` — ${entry.note}` : ''} • {entry.status}
-                                    </span>
+                                      <span className='whitespace-pre-wrap'>
+                                        <MentionText
+                                          text={`${entry.medication} ${entry.dose} ${entry.route} ${entry.frequency}${entry.note ? ` — ${entry.note}` : ''} • ${entry.status}`}
+                                          attachmentByTitle={mentionableAttachmentByTitle}
+                                          onOpenPhotoById={openPhotoById}
+                                        />
+                                      </span>
                                     <Button size='sm' variant='edit' onClick={() => startEditingMedication(entry)}>Edit</Button>
                                   </>
                                 )}
@@ -2238,18 +2582,26 @@ function App() {
                     </Card>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-pendings'>Pendings</Label>
-                      <Textarea
-                        id='profile-pendings'
+                      <PhotoMentionField
+                        ariaLabel='Pendings'
+                        placeholder='Pendings'
                         value={profileForm.pendings}
-                        onChange={(event) => updateProfileField('pendings', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('pendings', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <div className='space-y-1'>
                       <Label htmlFor='profile-clerknotes'>Clerk notes</Label>
-                      <Textarea
-                        id='profile-clerknotes'
+                      <PhotoMentionField
+                        ariaLabel='Clerk notes'
+                        placeholder='Clerk notes'
                         value={profileForm.clerkNotes}
-                        onChange={(event) => updateProfileField('clerkNotes', event.target.value)}
+                        onChange={(nextValue) => updateProfileField('clerkNotes', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
                       />
                     </div>
                     <Card className='bg-pale-oak-2 border-taupe'>
@@ -2439,51 +2791,183 @@ function App() {
                     </div>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
-                      <Textarea aria-label='Fluid' placeholder='Fluid' value={dailyUpdateForm.fluid} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, fluid: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Fluid'
+                        placeholder='Fluid'
+                        value={dailyUpdateForm.fluid}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, fluid: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Respiratory</Label>
-                      <Textarea aria-label='Respiratory' placeholder='Respiratory' value={dailyUpdateForm.respiratory} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, respiratory: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Respiratory'
+                        placeholder='Respiratory'
+                        value={dailyUpdateForm.respiratory}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, respiratory: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Infectious</Label>
-                      <Textarea aria-label='Infectious' placeholder='Infectious' value={dailyUpdateForm.infectious} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, infectious: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Infectious'
+                        placeholder='Infectious'
+                        value={dailyUpdateForm.infectious}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, infectious: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Cardio</Label>
-                      <Textarea aria-label='Cardio' placeholder='Cardio' value={dailyUpdateForm.cardio} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, cardio: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Cardio'
+                        placeholder='Cardio'
+                        value={dailyUpdateForm.cardio}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, cardio: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Hema</Label>
-                      <Textarea aria-label='Hema' placeholder='Hema' value={dailyUpdateForm.hema} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, hema: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Hema'
+                        placeholder='Hema'
+                        value={dailyUpdateForm.hema}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, hema: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Metabolic</Label>
-                      <Textarea aria-label='Metabolic' placeholder='Metabolic' value={dailyUpdateForm.metabolic} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, metabolic: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Metabolic'
+                        placeholder='Metabolic'
+                        value={dailyUpdateForm.metabolic}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, metabolic: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Output</Label>
-                      <Textarea aria-label='Output' placeholder='Output' value={dailyUpdateForm.output} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, output: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Output'
+                        placeholder='Output'
+                        value={dailyUpdateForm.output}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, output: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Neuro</Label>
-                      <Textarea aria-label='Neuro' placeholder='Neuro' value={dailyUpdateForm.neuro} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, neuro: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Neuro'
+                        placeholder='Neuro'
+                        value={dailyUpdateForm.neuro}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, neuro: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Drugs</Label>
-                      <Textarea aria-label='Drugs' placeholder='Drugs' value={dailyUpdateForm.drugs} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, drugs: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Drugs'
+                        placeholder='Drugs'
+                        value={dailyUpdateForm.drugs}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, drugs: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Other</Label>
-                      <Textarea aria-label='Other' placeholder='Other' value={dailyUpdateForm.other} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, other: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Other'
+                        placeholder='Other'
+                        value={dailyUpdateForm.other}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, other: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Assessment</Label>
-                      <Textarea aria-label='Assessment' placeholder='Assessment' value={dailyUpdateForm.assessment} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, assessment: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Assessment'
+                        placeholder='Assessment'
+                        value={dailyUpdateForm.assessment}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, assessment: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='space-y-1'>
                       <Label>Plan</Label>
-                      <Textarea aria-label='Daily plan' placeholder='Plan' value={dailyUpdateForm.plans} onChange={(event) => { setDailyUpdateForm({ ...dailyUpdateForm, plans: event.target.value }); setDailyDirty(true) }} />
+                      <PhotoMentionField
+                        ariaLabel='Daily plan'
+                        placeholder='Plan'
+                        value={dailyUpdateForm.plans}
+                        onChange={(nextValue) => {
+                          setDailyUpdateForm({ ...dailyUpdateForm, plans: nextValue })
+                          setDailyDirty(true)
+                        }}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
                     </div>
                     <div className='flex gap-2 flex-wrap'>
                       <Button
@@ -2538,7 +3022,16 @@ function App() {
                           </div>
                           <div className='space-y-1 col-span-2'>
                             <Label>Note</Label>
-                            <Input aria-label='Vital note' placeholder='Note' value={vitalForm.note} onChange={(event) => updateVitalField('note', event.target.value)} />
+                            <PhotoMentionField
+                              ariaLabel='Vital note'
+                              placeholder='Note'
+                              value={vitalForm.note}
+                              onChange={(nextValue) => updateVitalField('note', nextValue)}
+                              attachments={mentionableAttachments}
+                              attachmentByTitle={mentionableAttachmentByTitle}
+                              onOpenPhotoById={openPhotoById}
+                              multiline={false}
+                            />
                           </div>
                         </div>
                         <div className='flex gap-2 flex-wrap'>
@@ -2560,9 +3053,12 @@ function App() {
                                   <span className='text-taupe italic'>(Editing above...)</span>
                                 ) : (
                                   <>
-                                    <span>
-                                      {entry.date} {entry.time} • BP {entry.bp || '-'} • HR {entry.hr || '-'} • RR {entry.rr || '-'} • T{' '}
-                                      {entry.temp || '-'} • O2 {entry.spo2 || '-'} {entry.note ? `• ${entry.note}` : ''}
+                                    <span className='whitespace-pre-wrap'>
+                                      <MentionText
+                                        text={`${entry.date} ${entry.time} • BP ${entry.bp || '-'} • HR ${entry.hr || '-'} • RR ${entry.rr || '-'} • T ${entry.temp || '-'} • O2 ${entry.spo2 || '-'}${entry.note ? ` • ${entry.note}` : ''}`}
+                                        attachmentByTitle={mentionableAttachmentByTitle}
+                                        onOpenPhotoById={openPhotoById}
+                                      />
                                     </span>
                                     <Button size='sm' variant='edit' onClick={() => startEditingVital(entry)}>Edit</Button>
                                   </>
@@ -2614,11 +3110,28 @@ function App() {
                           </div>
                           <div className='space-y-1 col-span-2'>
                             <Label>Order</Label>
-                            <Input aria-label='Order text' placeholder='Order' value={orderForm.orderText} onChange={(event) => updateOrderField('orderText', event.target.value)} />
+                            <PhotoMentionField
+                              ariaLabel='Order text'
+                              placeholder='Order'
+                              value={orderForm.orderText}
+                              onChange={(nextValue) => updateOrderField('orderText', nextValue)}
+                              attachments={mentionableAttachments}
+                              attachmentByTitle={mentionableAttachmentByTitle}
+                              onOpenPhotoById={openPhotoById}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>Note</Label>
-                            <Input aria-label='Order note' placeholder='Note' value={orderForm.note} onChange={(event) => updateOrderField('note', event.target.value)} />
+                            <PhotoMentionField
+                              ariaLabel='Order note'
+                              placeholder='Note'
+                              value={orderForm.note}
+                              onChange={(nextValue) => updateOrderField('note', nextValue)}
+                              attachments={mentionableAttachments}
+                              attachmentByTitle={mentionableAttachmentByTitle}
+                              onOpenPhotoById={openPhotoById}
+                              multiline={false}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>Status</Label>
@@ -2654,7 +3167,13 @@ function App() {
                           <ul className='space-y-1'>
                             {selectedPatientOrders.map((entry) => (
                               <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                <span>{formatOrderEntry(entry)}</span>
+                                <span className='whitespace-pre-wrap'>
+                                  <MentionText
+                                    text={formatOrderEntry(entry)}
+                                    attachmentByTitle={mentionableAttachmentByTitle}
+                                    onOpenPhotoById={openPhotoById}
+                                  />
+                                </span>
                                 <div className='flex gap-1'>
                                   <Button size='sm' variant='secondary' onClick={() => void toggleOrderStatus(entry)}>
                                     {getNextOrderActionLabel(entry.status)}
@@ -2716,7 +3235,7 @@ function App() {
                   <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes, structured lab templates, and categorized photo attachments.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals Log tab: structured vitals tracking across all dates, earliest entries first.</li>
-                  <li>Orders tab: doctor&apos;s orders with date, time, service, and status tracking.</li>
+                  <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
               </div>
@@ -2740,11 +3259,13 @@ function App() {
                   <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Orders tab has Open orders text for quick copy/paste handoff.</li>
+                  <li>Orders text box supports multi-line notes and @photo title linking.</li>
                   <li>Use Open all census text for one-shot census output for active patients.</li>
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
                   <li>In Profile &gt; Photo attachments, use Take photo for camera capture or Choose existing for gallery images.</li>
+                  <li>In notes/text fields, type @ to pick an uploaded photo title; tap the linked @title to open the same photo modal.</li>
                   <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
                 </ul>
               </div>

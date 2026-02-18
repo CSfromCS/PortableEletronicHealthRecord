@@ -93,6 +93,7 @@ When generating new UI for this app, follow these rules:
 8. **Modals:** Always use `<Dialog>` from shadcn/ui — never custom modal divs
 9. **Tab navigation:** Always use `<Tabs>` from shadcn/ui
 10. **Status text:** Always use `<Badge>` for patient/medication/order status strings
+11. **Long-form text fields:** For any new long-form clinical notes field in `src/App.tsx`, use the shared mention-enabled input (`PhotoMentionField`) instead of raw `<Textarea>` so `@photo-title` suggestions and link opening are available by default.
 
 ---
 
