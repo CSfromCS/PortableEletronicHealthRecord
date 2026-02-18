@@ -5,6 +5,7 @@ import type {
   MedicationEntry,
   OrderEntry,
   Patient,
+  PhotoAttachment,
   VitalEntry,
 } from './types'
 
@@ -15,6 +16,7 @@ const db = new Dexie('roundingAppDatabase') as Dexie & {
   medications: EntityTable<MedicationEntry, 'id'>
   labs: EntityTable<LabEntry, 'id'>
   orders: EntityTable<OrderEntry, 'id'>
+  photoAttachments: EntityTable<PhotoAttachment, 'id'>
 }
 
 db.version(1).stores({
@@ -66,5 +68,16 @@ db.version(6)
   .upgrade(async (tx) => {
     await tx.table('labs').clear()
   })
+
+db.version(7).stores({
+  patients: '++id, lastName, roomNumber, service, status, admitDate',
+  dailyUpdates: '++id, patientId, date, [patientId+date]',
+  vitals: '++id, patientId, date, [patientId+date], time',
+  medications: '++id, patientId, medication, status, [patientId+status], createdAt',
+  labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
+  orders: '++id, patientId, status, [patientId+status], createdAt',
+  medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
+  photoAttachments: '++id, patientId, category, [patientId+category], createdAt',
+})
 
 export { db }

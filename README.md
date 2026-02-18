@@ -1,6 +1,14 @@
 # Portable Unofficial Health Record - Really (PUHRR)
 A simple app for an electronic health record for doing hospital rounds and patient history for medical clerks to use on their phones primarily offline.
 
+## Photo attachments (MVP)
+
+- Photos can be attached per patient and organized by section category (Profile, FRICHMOND, Vitals, Medications, Labs, Orders).
+- In mobile workflow, use **Take photo** for direct camera capture or **Choose existing** to pick from gallery.
+- The app stores compressed photo copies in IndexedDB for offline viewing.
+- Current JSON backup/export is text-data only and excludes photo attachments.
+- Deleting a photo inside the app removes only the app copy and does not delete the original phone gallery file.
+
 ## Run locally
 
 ### 1) Install prerequisites

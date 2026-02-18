@@ -89,3 +89,24 @@ export interface OrderEntry {
   note: string
   createdAt: string
 }
+
+export type PhotoCategory =
+  | 'profile'
+  | 'frichmond'
+  | 'vitals'
+  | 'medications'
+  | 'labs'
+  | 'orders'
+
+export interface PhotoAttachment {
+  id?: number
+  patientId: number
+  category: PhotoCategory
+  caption: string
+  mimeType: string
+  width: number
+  height: number
+  byteSize: number
+  imageBlob: Blob
+  createdAt: string
+}

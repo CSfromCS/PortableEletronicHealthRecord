@@ -7,6 +7,8 @@ import type {
   MedicationEntry,
   OrderEntry,
   Patient,
+  PhotoAttachment,
+  PhotoCategory,
   VitalEntry,
 } from './types'
 import { Button } from '@/components/ui/button'
@@ -98,6 +100,87 @@ type OrderFormState = {
   orderText: string
   note: string
   status: 'active' | 'carriedOut' | 'discontinued'
+}
+
+const PHOTO_CATEGORY_OPTIONS: { value: PhotoCategory; label: string }[] = [
+  { value: 'profile', label: 'Profile' },
+  { value: 'frichmond', label: 'FRICHMOND' },
+  { value: 'vitals', label: 'Vitals' },
+  { value: 'medications', label: 'Medications' },
+  { value: 'labs', label: 'Labs' },
+  { value: 'orders', label: 'Orders' },
+]
+
+const PHOTO_MAX_DIMENSION = 1600
+const PHOTO_JPEG_QUALITY = 0.72
+
+const formatBytes = (value: number) => {
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  return `${(value / (1024 * 1024)).toFixed(2)} MB`
+}
+
+const formatPhotoCategory = (category: PhotoCategory) => {
+  const entry = PHOTO_CATEGORY_OPTIONS.find((option) => option.value === category)
+  return entry?.label ?? category
+}
+
+const loadImageElementFromFile = (file: File) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const image = new Image()
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+      resolve(image)
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Unable to decode image.'))
+    }
+
+    image.src = objectUrl
+  })
+
+const compressImageFile = async (file: File) => {
+  const image = await loadImageElementFromFile(file)
+  const sourceWidth = image.naturalWidth
+  const sourceHeight = image.naturalHeight
+  const scale = Math.min(1, PHOTO_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight))
+  const targetWidth = Math.max(1, Math.round(sourceWidth * scale))
+  const targetHeight = Math.max(1, Math.round(sourceHeight * scale))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = targetWidth
+  canvas.height = targetHeight
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Unable to prepare image.')
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight)
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (result) {
+          resolve(result)
+          return
+        }
+        reject(new Error('Unable to compress image.'))
+      },
+      'image/jpeg',
+      PHOTO_JPEG_QUALITY,
+    )
+  })
+
+  return {
+    blob,
+    width: targetWidth,
+    height: targetHeight,
+    mimeType: 'image/jpeg',
+  }
 }
 
 
@@ -260,6 +343,8 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
 
 function App() {
   const backupFileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraPhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const galleryPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const [form, setForm] = useState<PatientFormState>(initialForm)
   const [view, setView] = useState<'patients' | 'settings'>('patients')
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
@@ -292,11 +377,18 @@ function App() {
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
+  const [attachmentCategory, setAttachmentCategory] = useState<PhotoCategory>('profile')
+  const [attachmentFilter, setAttachmentFilter] = useState<PhotoCategory | 'all'>('all')
+  const [attachmentCaption, setAttachmentCaption] = useState('')
+  const [isPhotoSaving, setIsPhotoSaving] = useState(false)
+  const [selectedAttachmentId, setSelectedAttachmentId] = useState<number | null>(null)
+  const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
   const orders = useLiveQuery(() => db.orders.toArray(), [])
+  const photoAttachments = useLiveQuery(() => db.photoAttachments.toArray(), [])
   const patientVitals = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as VitalEntry[]
     const vitals = await db.vitals.where('patientId').equals(selectedPatientId).toArray()
@@ -421,6 +513,33 @@ function App() {
     if (selectedPatientId === null) return []
     return structuredOrdersByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredOrdersByPatient])
+
+  const selectedPatientAttachments = useMemo(() => {
+    if (selectedPatientId === null) return [] as PhotoAttachment[]
+
+    return (photoAttachments ?? [])
+      .filter((entry) => entry.patientId === selectedPatientId)
+      .filter((entry) => (attachmentFilter === 'all' ? true : entry.category === attachmentFilter))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }, [attachmentFilter, photoAttachments, selectedPatientId])
+
+  useEffect(() => {
+    const urls: Record<number, string> = {}
+    selectedPatientAttachments.forEach((entry) => {
+      if (entry.id === undefined) return
+      urls[entry.id] = URL.createObjectURL(entry.imageBlob)
+    })
+    setAttachmentPreviewUrls(urls)
+
+    return () => {
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [selectedPatientAttachments])
+
+  const selectedAttachment = useMemo(() => {
+    if (selectedAttachmentId === null) return null
+    return selectedPatientAttachments.find((entry) => entry.id === selectedAttachmentId) ?? null
+  }, [selectedAttachmentId, selectedPatientAttachments])
 
   const visiblePatients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -598,6 +717,10 @@ function App() {
     setLabTemplateValues({})
     setLabTemplateNote('')
     setEditingLabId(null)
+    setAttachmentCategory('profile')
+    setAttachmentFilter('all')
+    setAttachmentCaption('')
+    setSelectedAttachmentId(null)
     setSelectedTab('profile')
   }
 
@@ -647,6 +770,49 @@ function App() {
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
   }, [])
+
+  const addPhotoAttachment = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || selectedPatientId === null) {
+      event.target.value = ''
+      return
+    }
+
+    setIsPhotoSaving(true)
+    setNotice('Saving photo...')
+
+    try {
+      const compressed = await compressImageFile(file)
+      await db.photoAttachments.add({
+        patientId: selectedPatientId,
+        category: attachmentCategory,
+        caption: attachmentCaption.trim(),
+        mimeType: compressed.mimeType,
+        width: compressed.width,
+        height: compressed.height,
+        byteSize: compressed.blob.size,
+        imageBlob: compressed.blob,
+        createdAt: new Date().toISOString(),
+      })
+
+      setAttachmentCaption('')
+      setNotice('Photo attached.')
+    } catch {
+      setNotice('Unable to attach photo.')
+    } finally {
+      setIsPhotoSaving(false)
+      event.target.value = ''
+    }
+  }
+
+  const deletePhotoAttachment = async (attachmentId?: number) => {
+    if (attachmentId === undefined) return
+    await db.photoAttachments.delete(attachmentId)
+    if (selectedAttachmentId === attachmentId) {
+      setSelectedAttachmentId(null)
+    }
+    setNotice('Photo removed from app record.')
+  }
 
   const hasUnsavedChanges = profileDirty || dailyDirty || vitalDirty || orderDirty
 
@@ -1381,7 +1547,7 @@ function App() {
     anchor.download = `puhrr-backup-${toLocalISODate()}.json`
     anchor.click()
     URL.revokeObjectURL(url)
-    setNotice('Backup exported.')
+    setNotice('Backup exported (photos excluded).')
   }
 
   const importBackup = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1399,8 +1565,9 @@ function App() {
 
       await db.transaction(
         'rw',
-        [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders],
+        [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders, db.photoAttachments],
         async () => {
+        await db.photoAttachments.clear()
         await db.labs.clear()
         await db.medications.clear()
         await db.orders.clear()
@@ -1445,9 +1612,13 @@ function App() {
       setLabTemplateValues({})
       setLabTemplateNote('')
       setEditingLabId(null)
+      setAttachmentCategory('profile')
+      setAttachmentFilter('all')
+      setAttachmentCaption('')
+      setSelectedAttachmentId(null)
       setProfileForm(initialProfileForm)
       setLastSavedAt(null)
-      setNotice('Backup imported.')
+      setNotice('Backup imported. Photos were not included and were cleared.')
     } catch {
       setNotice('Unable to import backup.')
     } finally {
@@ -1466,7 +1637,7 @@ function App() {
 
     await db.transaction(
       'rw',
-      [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders],
+      [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders, db.photoAttachments],
       async () => {
       await db.patients.bulkDelete(dischargedIds)
       await db.dailyUpdates.where('patientId').anyOf(dischargedIds).delete()
@@ -1474,6 +1645,7 @@ function App() {
       await db.medications.where('patientId').anyOf(dischargedIds).delete()
       await db.labs.where('patientId').anyOf(dischargedIds).delete()
       await db.orders.where('patientId').anyOf(dischargedIds).delete()
+      await db.photoAttachments.where('patientId').anyOf(dischargedIds).delete()
     },
     )
 
@@ -1494,6 +1666,10 @@ function App() {
       setLabTemplateValues({})
       setLabTemplateNote('')
       setEditingLabId(null)
+      setAttachmentCategory('profile')
+      setAttachmentFilter('all')
+      setAttachmentCaption('')
+      setSelectedAttachmentId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
       setLastSavedAt(null)
@@ -2065,6 +2241,123 @@ function App() {
                         onChange={(event) => updateProfileField('clerkNotes', event.target.value)}
                       />
                     </div>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Photo attachments</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Category</Label>
+                            <Select value={attachmentCategory} onValueChange={(value) => setAttachmentCategory(value as PhotoCategory)}>
+                              <SelectTrigger aria-label='Photo category'>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PHOTO_CATEGORY_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className='space-y-1'>
+                            <Label htmlFor='attachment-caption'>Caption (optional)</Label>
+                            <Input
+                              id='attachment-caption'
+                              aria-label='Photo caption'
+                              placeholder='Short note about this photo'
+                              value={attachmentCaption}
+                              onChange={(event) => setAttachmentCaption(event.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          ref={cameraPhotoInputRef}
+                          type='file'
+                          accept='image/*'
+                          capture='environment'
+                          className='hidden'
+                          onChange={(event) => void addPhotoAttachment(event)}
+                        />
+                        <Input
+                          ref={galleryPhotoInputRef}
+                          type='file'
+                          accept='image/*'
+                          className='hidden'
+                          onChange={(event) => void addPhotoAttachment(event)}
+                        />
+                        <div className='flex gap-2 flex-wrap'>
+                          <Button size='sm' onClick={() => cameraPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
+                            {isPhotoSaving ? 'Saving photo...' : 'Take photo'}
+                          </Button>
+                          <Button size='sm' variant='secondary' onClick={() => galleryPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
+                            Choose existing
+                          </Button>
+                        </div>
+
+                        <div className='space-y-1 max-w-56'>
+                          <Label>Show photos</Label>
+                          <Select
+                            value={attachmentFilter}
+                            onValueChange={(value) => setAttachmentFilter(value as PhotoCategory | 'all')}
+                          >
+                            <SelectTrigger aria-label='Photo filter'>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value='all'>All categories</SelectItem>
+                              {PHOTO_CATEGORY_OPTIONS.map((option) => (
+                                <SelectItem key={`filter-${option.value}`} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {selectedPatientAttachments.length > 0 ? (
+                          <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+                            {selectedPatientAttachments.map((entry) => {
+                              const previewUrl = entry.id === undefined ? undefined : attachmentPreviewUrls[entry.id]
+                              const createdAt = new Date(entry.createdAt).toLocaleString()
+
+                              return (
+                                <div key={entry.id} className='rounded-md border border-taupe/40 bg-white p-1.5 space-y-1'>
+                                  <button
+                                    type='button'
+                                    className='w-full overflow-hidden rounded border border-taupe/30 bg-pale-oak'
+                                    onClick={() => setSelectedAttachmentId(entry.id ?? null)}
+                                  >
+                                    {previewUrl ? (
+                                      <img
+                                        src={previewUrl}
+                                        alt={entry.caption || `Attachment ${formatPhotoCategory(entry.category)}`}
+                                        className='h-28 w-full object-cover'
+                                        loading='lazy'
+                                      />
+                                    ) : (
+                                      <div className='h-28 flex items-center justify-center text-xs text-taupe'>No preview</div>
+                                    )}
+                                  </button>
+                                  <p className='text-xs text-mauve-shadow line-clamp-2'>
+                                    {entry.caption || '(No caption)'}
+                                  </p>
+                                  <p className='text-[11px] text-taupe'>
+                                    {formatPhotoCategory(entry.category)} • {createdAt}
+                                  </p>
+                                  <div className='flex justify-between items-center gap-2'>
+                                    <p className='text-[11px] text-taupe'>{formatBytes(entry.byteSize)}</p>
+                                    <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(entry.id)}>
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className='text-sm text-taupe'>No photos in this filter yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
                     <div className='flex gap-2 flex-wrap'>
                       <Button
                         onClick={() =>
@@ -2371,7 +2664,7 @@ function App() {
               <CardTitle className='text-base text-mauve-shadow'>Settings</CardTitle>
             </CardHeader>
             <CardContent className='px-4 pb-4 space-y-3'>
-              <p className='text-sm text-taupe'>Export/import backup JSON, add sample data, and clear discharged patients.</p>
+              <p className='text-sm text-taupe'>Export/import backup JSON, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
               <div className='flex flex-col gap-2'>
                 <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
                 <input
@@ -2402,7 +2695,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
-                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes, and structured lab templates.</li>
+                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes, structured lab templates, and categorized photo attachments.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals Log tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Orders tab: doctor&apos;s orders with date, time, service, and status tracking.</li>
@@ -2414,6 +2707,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Saving and persistence</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
+                  <li>Attached photos are stored as compressed copies inside the app database and remain available offline.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
                   <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits and auto-hides after a short delay.</li>
                   <li>Use Save now near the top to force an immediate save for all pending edits.</li>
@@ -2432,6 +2726,8 @@ function App() {
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
+                  <li>In Profile &gt; Photo attachments, use Take photo for camera capture or Choose existing for gallery images.</li>
+                  <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
                 </ul>
               </div>
             </section>
@@ -2460,6 +2756,43 @@ function App() {
                 value={outputPreview}
               />
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={selectedAttachment !== null} onOpenChange={(open) => { if (!open) setSelectedAttachmentId(null) }}>
+          <DialogContent className='flex flex-col gap-3 p-4 max-h-[92vh] max-w-3xl'>
+            <DialogHeader>
+              <DialogTitle>Photo attachment</DialogTitle>
+            </DialogHeader>
+            {selectedAttachment ? (
+              <>
+                {selectedAttachment.id !== undefined && attachmentPreviewUrls[selectedAttachment.id] ? (
+                  <ScrollArea className='max-h-[64vh] rounded border border-taupe/30 bg-pale-oak'>
+                    <img
+                      src={attachmentPreviewUrls[selectedAttachment.id]}
+                      alt={selectedAttachment.caption || 'Attachment preview'}
+                      className='w-full h-auto'
+                    />
+                  </ScrollArea>
+                ) : (
+                  <p className='text-sm text-taupe'>Preview unavailable.</p>
+                )}
+                <div className='text-sm text-mauve-shadow space-y-1'>
+                  <p><strong>Category:</strong> {formatPhotoCategory(selectedAttachment.category)}</p>
+                  <p><strong>Size:</strong> {formatBytes(selectedAttachment.byteSize)} ({selectedAttachment.width}×{selectedAttachment.height})</p>
+                  <p><strong>Added:</strong> {new Date(selectedAttachment.createdAt).toLocaleString()}</p>
+                  <p><strong>Caption:</strong> {selectedAttachment.caption || '-'}</p>
+                </div>
+                <div className='flex gap-2 flex-wrap'>
+                  <Button variant='destructive' onClick={() => void deletePhotoAttachment(selectedAttachment.id)}>
+                    Remove from app
+                  </Button>
+                  <Button variant='secondary' onClick={() => setSelectedAttachmentId(null)}>
+                    Close
+                  </Button>
+                </div>
+              </>
+            ) : null}
           </DialogContent>
         </Dialog>
       </main>
