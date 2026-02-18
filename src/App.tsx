@@ -125,6 +125,17 @@ const formatPhotoCategory = (category: PhotoCategory) => {
   return entry?.label ?? category
 }
 
+const buildDefaultPhotoTitle = (category: PhotoCategory, date = new Date()) => {
+  const label = formatPhotoCategory(category)
+  const year = date.getFullYear()
+  const month = (date.getMonth() + 1).toString().padStart(2, '0')
+  const day = date.getDate().toString().padStart(2, '0')
+  const hours = date.getHours().toString().padStart(2, '0')
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  const seconds = date.getSeconds().toString().padStart(2, '0')
+  return `${label}-${year}-${month}-${day}-${hours}:${minutes}:${seconds}`
+}
+
 const loadImageElementFromFile = (file: File) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file)
@@ -379,7 +390,7 @@ function App() {
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
   const [attachmentCategory, setAttachmentCategory] = useState<PhotoCategory>('profile')
   const [attachmentFilter, setAttachmentFilter] = useState<PhotoCategory | 'all'>('all')
-  const [attachmentCaption, setAttachmentCaption] = useState('')
+  const [attachmentTitle, setAttachmentTitle] = useState(() => buildDefaultPhotoTitle('profile'))
   const [isPhotoSaving, setIsPhotoSaving] = useState(false)
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<number | null>(null)
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
@@ -719,7 +730,7 @@ function App() {
     setEditingLabId(null)
     setAttachmentCategory('profile')
     setAttachmentFilter('all')
-    setAttachmentCaption('')
+    setAttachmentTitle(buildDefaultPhotoTitle('profile'))
     setSelectedAttachmentId(null)
     setSelectedTab('profile')
   }
@@ -786,7 +797,7 @@ function App() {
       await db.photoAttachments.add({
         patientId: selectedPatientId,
         category: attachmentCategory,
-        caption: attachmentCaption.trim(),
+        title: attachmentTitle.trim() || buildDefaultPhotoTitle(attachmentCategory),
         mimeType: compressed.mimeType,
         width: compressed.width,
         height: compressed.height,
@@ -795,7 +806,7 @@ function App() {
         createdAt: new Date().toISOString(),
       })
 
-      setAttachmentCaption('')
+      setAttachmentTitle(buildDefaultPhotoTitle(attachmentCategory))
       setNotice('Photo attached.')
     } catch {
       setNotice('Unable to attach photo.')
@@ -1614,7 +1625,7 @@ function App() {
       setEditingLabId(null)
       setAttachmentCategory('profile')
       setAttachmentFilter('all')
-      setAttachmentCaption('')
+      setAttachmentTitle(buildDefaultPhotoTitle('profile'))
       setSelectedAttachmentId(null)
       setProfileForm(initialProfileForm)
       setLastSavedAt(null)
@@ -1668,7 +1679,7 @@ function App() {
       setEditingLabId(null)
       setAttachmentCategory('profile')
       setAttachmentFilter('all')
-      setAttachmentCaption('')
+      setAttachmentTitle(buildDefaultPhotoTitle('profile'))
       setSelectedAttachmentId(null)
       setProfileForm(initialProfileForm)
       setDailyUpdateId(undefined)
@@ -2249,7 +2260,14 @@ function App() {
                         <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                           <div className='space-y-1'>
                             <Label>Category</Label>
-                            <Select value={attachmentCategory} onValueChange={(value) => setAttachmentCategory(value as PhotoCategory)}>
+                            <Select
+                              value={attachmentCategory}
+                              onValueChange={(value) => {
+                                const nextCategory = value as PhotoCategory
+                                setAttachmentCategory(nextCategory)
+                                setAttachmentTitle(buildDefaultPhotoTitle(nextCategory))
+                              }}
+                            >
                               <SelectTrigger aria-label='Photo category'>
                                 <SelectValue />
                               </SelectTrigger>
@@ -2261,13 +2279,13 @@ function App() {
                             </Select>
                           </div>
                           <div className='space-y-1'>
-                            <Label htmlFor='attachment-caption'>Caption (optional)</Label>
+                            <Label htmlFor='attachment-title'>Title</Label>
                             <Input
-                              id='attachment-caption'
-                              aria-label='Photo caption'
-                              placeholder='Short note about this photo'
-                              value={attachmentCaption}
-                              onChange={(event) => setAttachmentCaption(event.target.value)}
+                              id='attachment-title'
+                              aria-label='Photo title'
+                              placeholder='Photo title'
+                              value={attachmentTitle}
+                              onChange={(event) => setAttachmentTitle(event.target.value)}
                             />
                           </div>
                         </div>
@@ -2329,7 +2347,7 @@ function App() {
                                     {previewUrl ? (
                                       <img
                                         src={previewUrl}
-                                        alt={entry.caption || `Attachment ${formatPhotoCategory(entry.category)}`}
+                                        alt={entry.title || `Attachment ${formatPhotoCategory(entry.category)}`}
                                         className='h-28 w-full object-cover'
                                         loading='lazy'
                                       />
@@ -2338,7 +2356,7 @@ function App() {
                                     )}
                                   </button>
                                   <p className='text-xs text-mauve-shadow line-clamp-2'>
-                                    {entry.caption || '(No caption)'}
+                                    {entry.title || '(No title)'}
                                   </p>
                                   <p className='text-[11px] text-taupe'>
                                     {formatPhotoCategory(entry.category)} • {createdAt}
@@ -2770,7 +2788,7 @@ function App() {
                   <ScrollArea className='max-h-[64vh] rounded border border-taupe/30 bg-pale-oak'>
                     <img
                       src={attachmentPreviewUrls[selectedAttachment.id]}
-                      alt={selectedAttachment.caption || 'Attachment preview'}
+                      alt={selectedAttachment.title || 'Attachment preview'}
                       className='w-full h-auto'
                     />
                   </ScrollArea>
@@ -2781,7 +2799,7 @@ function App() {
                   <p><strong>Category:</strong> {formatPhotoCategory(selectedAttachment.category)}</p>
                   <p><strong>Size:</strong> {formatBytes(selectedAttachment.byteSize)} ({selectedAttachment.width}×{selectedAttachment.height})</p>
                   <p><strong>Added:</strong> {new Date(selectedAttachment.createdAt).toLocaleString()}</p>
-                  <p><strong>Caption:</strong> {selectedAttachment.caption || '-'}</p>
+                  <p><strong>Title:</strong> {selectedAttachment.title || '-'}</p>
                 </div>
                 <div className='flex gap-2 flex-wrap'>
                   <Button variant='destructive' onClick={() => void deletePhotoAttachment(selectedAttachment.id)}>

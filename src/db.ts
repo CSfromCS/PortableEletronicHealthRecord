@@ -80,4 +80,27 @@ db.version(7).stores({
   photoAttachments: '++id, patientId, category, [patientId+category], createdAt',
 })
 
+db.version(8)
+  .stores({
+    patients: '++id, lastName, roomNumber, service, status, admitDate',
+    dailyUpdates: '++id, patientId, date, [patientId+date]',
+    vitals: '++id, patientId, date, [patientId+date], time',
+    medications: '++id, patientId, medication, status, [patientId+status], createdAt',
+    labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
+    orders: '++id, patientId, status, [patientId+status], createdAt',
+    medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
+    photoAttachments: '++id, patientId, category, [patientId+category], createdAt',
+  })
+  .upgrade(async (tx) => {
+    await tx
+      .table('photoAttachments')
+      .toCollection()
+      .modify((attachment: { title?: string; caption?: string }) => {
+        if (typeof attachment.title !== 'string') {
+          attachment.title = typeof attachment.caption === 'string' ? attachment.caption : ''
+        }
+        delete attachment.caption
+      })
+  })
+
 export { db }

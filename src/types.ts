@@ -102,7 +102,7 @@ export interface PhotoAttachment {
   id?: number
   patientId: number
   category: PhotoCategory
-  caption: string
+  title: string
   mimeType: string
   width: number
   height: number
