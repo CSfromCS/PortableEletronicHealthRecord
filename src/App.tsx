@@ -3167,7 +3167,7 @@ function App() {
                           <ul className='space-y-1'>
                             {selectedPatientOrders.map((entry) => (
                               <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                <span className='whitespace-pre-wrap'>
+                                <span className='min-w-0 flex-1 whitespace-pre-wrap text-left'>
                                   <MentionText
                                     text={formatOrderEntry(entry)}
                                     attachmentByTitle={mentionableAttachmentByTitle}
