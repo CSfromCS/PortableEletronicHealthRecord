@@ -9,7 +9,9 @@ import type {
   VitalEntry,
 } from './types'
 
-const db = new Dexie('roundingAppDatabase') as Dexie & {
+void Dexie.delete('roundingAppDatabase').catch(() => undefined)
+
+const db = new Dexie('roundingAppDatabase_v1') as Dexie & {
   patients: EntityTable<Patient, 'id'>
   dailyUpdates: EntityTable<DailyUpdate, 'id'>
   vitals: EntityTable<VitalEntry, 'id'>
@@ -22,85 +24,11 @@ const db = new Dexie('roundingAppDatabase') as Dexie & {
 db.version(1).stores({
   patients: '++id, lastName, roomNumber, service, status, admitDate',
   dailyUpdates: '++id, patientId, date, [patientId+date]',
-})
-
-db.version(2).stores({
-  patients: '++id, lastName, roomNumber, service, status, admitDate',
-  dailyUpdates: '++id, patientId, date, [patientId+date]',
-  vitals: '++id, patientId, date, [patientId+date], time',
-})
-
-db.version(3).stores({
-  patients: '++id, lastName, roomNumber, service, status, admitDate',
-  dailyUpdates: '++id, patientId, date, [patientId+date]',
-  vitals: '++id, patientId, date, [patientId+date], time',
-  medications: '++id, patientId, medication, status, [patientId+status], createdAt',
-})
-
-db.version(4).stores({
-  patients: '++id, lastName, roomNumber, service, status, admitDate',
-  dailyUpdates: '++id, patientId, date, [patientId+date]',
-  vitals: '++id, patientId, date, [patientId+date], time',
-  medications: '++id, patientId, medication, status, [patientId+status], createdAt',
-  labs: '++id, patientId, date, testName, [patientId+testName], createdAt',
-})
-
-db.version(5).stores({
-  patients: '++id, lastName, roomNumber, service, status, admitDate',
-  dailyUpdates: '++id, patientId, date, [patientId+date]',
-  vitals: '++id, patientId, date, [patientId+date], time',
-  medications: '++id, patientId, medication, status, [patientId+status], createdAt',
-  labs: '++id, patientId, date, testName, [patientId+testName], createdAt',
-  orders: '++id, patientId, status, [patientId+status], createdAt',
-  medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
-})
-
-db.version(6)
-  .stores({
-    patients: '++id, lastName, roomNumber, service, status, admitDate',
-    dailyUpdates: '++id, patientId, date, [patientId+date]',
-    vitals: '++id, patientId, date, [patientId+date], time',
-    medications: '++id, patientId, medication, status, [patientId+status], createdAt',
-    labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
-    orders: '++id, patientId, status, [patientId+status], createdAt',
-    medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
-  })
-  .upgrade(async (tx) => {
-    await tx.table('labs').clear()
-  })
-
-db.version(7).stores({
-  patients: '++id, lastName, roomNumber, service, status, admitDate',
-  dailyUpdates: '++id, patientId, date, [patientId+date]',
   vitals: '++id, patientId, date, [patientId+date], time',
   medications: '++id, patientId, medication, status, [patientId+status], createdAt',
   labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
   orders: '++id, patientId, status, [patientId+status], createdAt',
-  medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
   photoAttachments: '++id, patientId, category, [patientId+category], createdAt',
 })
-
-db.version(8)
-  .stores({
-    patients: '++id, lastName, roomNumber, service, status, admitDate',
-    dailyUpdates: '++id, patientId, date, [patientId+date]',
-    vitals: '++id, patientId, date, [patientId+date], time',
-    medications: '++id, patientId, medication, status, [patientId+status], createdAt',
-    labs: '++id, patientId, date, templateId, [patientId+date], [patientId+templateId], createdAt',
-    orders: '++id, patientId, status, [patientId+status], createdAt',
-    medicationDoses: '++id, patientId, medicationId, date, [patientId+date], [patientId+medicationId], createdAt',
-    photoAttachments: '++id, patientId, category, [patientId+category], createdAt',
-  })
-  .upgrade(async (tx) => {
-    await tx
-      .table('photoAttachments')
-      .toCollection()
-      .modify((attachment: { title?: string; caption?: string }) => {
-        if (typeof attachment.title !== 'string') {
-          attachment.title = typeof attachment.caption === 'string' ? attachment.caption : ''
-        }
-        delete attachment.caption
-      })
-  })
 
 export { db }

@@ -13,6 +13,12 @@ In the **Orders** tab, use **Edit** on an entry to update its status or remove i
 - Current JSON backup/export is text-data only and excludes photo attachments.
 - Deleting a photo inside the app removes only the app copy and does not delete the original phone gallery file.
 
+## Dexie schema compatibility note
+
+- Version `1.0.0` resets local app data to a clean-slate schema baseline.
+- The app now initializes a fresh IndexedDB database (`roundingAppDatabase_v1`) with only actively used stores.
+- Legacy stores and migration chains from pre-1.0 prototypes are intentionally dropped for new installs.
+
 ## Run locally
 
 ### 1) Install prerequisites
