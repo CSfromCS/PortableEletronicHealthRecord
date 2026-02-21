@@ -3,6 +3,7 @@ A simple app for an electronic health record for doing hospital rounds and patie
 
 Patient tabs now separate key workflows into **Profile, FRICHMOND, Vitals, Labs, Medications, Orders, Photos, and Reporting** for faster focused updates.
 Top-level navigation includes **Patients**, **Focused patient**, and **Settings**; on mobile this is a sticky bottom bar (**Patients / Patient / Settings**), while desktop keeps top navigation with focused patient label (**Room - Last name**). Tap **Open** on a patient card to jump directly into the focused patient view.
+When **Patient** is open on mobile, the Profile/FRICHMOND/Vitals/Labs/Medications/Orders/Photos/Reporting tab row stays sticky just above the bottom nav and still wraps to multiple rows when needed.
 Use the **Reporting** tab for all text exporting and formatting actions (profile, census, daily summary, vitals log, orders, and all-census output).
 In **All patient exports**, choose exactly which active patients are included and reorder them before generating all-census text.
 In the **Orders** tab, use **Edit** on an entry to update its status or remove it from the same edit controls.

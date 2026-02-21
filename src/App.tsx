@@ -2668,9 +2668,9 @@ function App() {
                     </SelectContent>
                   </Select>
                 </CardHeader>
-                <CardContent className='px-4 pb-4'>
+                <CardContent className='px-4 pb-40 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
-                  <TabsList className='mb-4 mt-2 h-auto w-full flex flex-wrap justify-center sm:grid sm:grid-cols-4 lg:grid-cols-8'>
+                  <TabsList className='fixed inset-x-2 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)] z-30 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8'>
                     <TabsTrigger className='sm:w-full' value='profile'>Profile</TabsTrigger>
                     <TabsTrigger className='sm:w-full' value='frichmond'>FRICHMOND</TabsTrigger>
                     <TabsTrigger className='sm:w-full' value='vitals'>Vitals</TabsTrigger>
@@ -3729,6 +3729,7 @@ function App() {
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
+                  <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays sticky above the bottom bar and can wrap into multiple lines.</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
@@ -3852,7 +3853,7 @@ function App() {
         <div className='mx-auto flex w-full max-w-xl gap-2'>
           <Button
             size='sm'
-            className='flex-1'
+            className='shrink-0 whitespace-nowrap px-3'
             variant={view === 'patients' ? 'default' : 'secondary'}
             onClick={() => setView('patients')}
           >
@@ -3861,16 +3862,20 @@ function App() {
           {canShowFocusedPatientNavButton ? (
             <Button
               size='sm'
-              className='flex-1'
+              className='min-w-0 flex-1 truncate'
               variant={view === 'patient' ? 'default' : 'secondary'}
               onClick={() => setView('patient')}
             >
               {focusedPatientNavLabel}
             </Button>
-          ) : null}
+          ) : (
+            <Button size='sm' className='min-w-0 flex-1' variant='secondary' disabled>
+              PUHRR
+            </Button>
+          )}
           <Button
             size='sm'
-            className='flex-1'
+            className='shrink-0 whitespace-nowrap px-3'
             variant={view === 'settings' ? 'default' : 'secondary'}
             onClick={() => setView('settings')}
           >
