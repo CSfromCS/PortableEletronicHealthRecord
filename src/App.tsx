@@ -2687,7 +2687,7 @@ function App() {
                 </CardHeader>
                 <CardContent className='px-4 pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
-                  <TabsList className='mb-4 mt-2'>
+                  <TabsList className='mb-4 mt-2 h-auto w-full flex-wrap justify-center sm:justify-start'>
                     <TabsTrigger value='profile'>Profile</TabsTrigger>
                     <TabsTrigger value='frichmond'>FRICHMOND</TabsTrigger>
                     <TabsTrigger value='vitals'>Vitals</TabsTrigger>
