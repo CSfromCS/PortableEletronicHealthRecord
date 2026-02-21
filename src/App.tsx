@@ -640,6 +640,7 @@ function App() {
   const [medicationForm, setMedicationForm] = useState<MedicationFormState>(() => initialMedicationForm())
   const [editingMedicationId, setEditingMedicationId] = useState<number | null>(null)
   const [orderForm, setOrderForm] = useState<OrderFormState>(() => initialOrderForm())
+  const [editingOrderId, setEditingOrderId] = useState<number | null>(null)
   const [orderDraftId, setOrderDraftId] = useState<number | null>(null)
   const [orderDirty, setOrderDirty] = useState(false)
   const [selectedLabTemplateId, setSelectedLabTemplateId] = useState(DEFAULT_LAB_TEMPLATE_ID)
@@ -1025,6 +1026,7 @@ function App() {
     setVitalDraftId(null)
     setVitalDirty(false)
     setOrderForm(initialOrderForm())
+    setEditingOrderId(null)
     setOrderDraftId(null)
     setOrderDirty(false)
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
@@ -1187,12 +1189,6 @@ function App() {
   const formatOrderStatus = (status: OrderEntry['status']) => {
     if (status === 'carriedOut') return 'carried out'
     return status
-  }
-
-  const getNextOrderActionLabel = (status: OrderEntry['status']) => {
-    if (status === 'active') return 'Mark carried out'
-    if (status === 'carriedOut') return 'Mark discontinued'
-    return 'Mark active'
   }
 
   const formatOrderEntry = (entry: OrderEntry) => {
@@ -1522,27 +1518,54 @@ function App() {
 
     const saved = await saveOrderDraft(true)
     if (!saved) return
+    setEditingOrderId(null)
     setOrderForm(initialOrderForm())
     setOrderDraftId(null)
     setOrderDirty(false)
     setNotice('Order added.')
   }
 
-  const toggleOrderStatus = async (entry: OrderEntry) => {
+  const startEditingOrder = (entry: OrderEntry) => {
     if (entry.id === undefined) return
-    const nextStatus: OrderEntry['status'] =
-      entry.status === 'active'
-        ? 'carriedOut'
-        : entry.status === 'carriedOut'
-          ? 'discontinued'
-          : 'active'
-    await db.orders.update(entry.id, { status: nextStatus })
+    setEditingOrderId(entry.id)
+    setOrderDraftId(null)
+    setOrderDirty(false)
+    setOrderForm({
+      orderDate: entry.orderDate,
+      orderTime: entry.orderTime,
+      service: entry.service,
+      orderText: entry.orderText,
+      note: entry.note,
+      status: entry.status,
+    })
+  }
+
+  const saveEditingOrder = async () => {
+    if (editingOrderId === null || !orderForm.orderText.trim()) return
+
+    const saved = await saveOrderDraft(true)
+    if (!saved) return
+
+    setEditingOrderId(null)
+    setOrderDirty(false)
+    setOrderForm(initialOrderForm())
     setNotice('Order updated.')
+  }
+
+  const cancelEditingOrder = () => {
+    setEditingOrderId(null)
+    setOrderDirty(false)
+    setOrderForm(initialOrderForm())
   }
 
   const deleteOrder = async (orderId?: number) => {
     if (orderId === undefined) return
     await db.orders.delete(orderId)
+    if (editingOrderId === orderId) {
+      setEditingOrderId(null)
+      setOrderForm(initialOrderForm())
+      setOrderDirty(false)
+    }
     if (orderDraftId === orderId) {
       setOrderDraftId(null)
       setOrderDirty(false)
@@ -1622,7 +1645,9 @@ function App() {
       }
 
       try {
-        if (orderDraftId !== null) {
+        if (editingOrderId !== null) {
+          await db.orders.update(editingOrderId, payload)
+        } else if (orderDraftId !== null) {
           const updatedCount = await db.orders.update(orderDraftId, payload)
           if (updatedCount === 0) {
             const nextId = await db.orders.add({
@@ -1652,7 +1677,7 @@ function App() {
         setIsSaving(false)
       }
     },
-    [orderDraftId, orderForm, selectedPatientId],
+    [editingOrderId, orderDraftId, orderForm, selectedPatientId],
   )
 
   const saveAllChanges = useCallback(async () => {
@@ -1920,6 +1945,7 @@ function App() {
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
+      setEditingOrderId(null)
       setOrderDraftId(null)
       setOrderDirty(false)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
@@ -1974,6 +2000,7 @@ function App() {
       setMedicationForm(initialMedicationForm())
       setEditingMedicationId(null)
       setOrderForm(initialOrderForm())
+      setEditingOrderId(null)
       setOrderDraftId(null)
       setOrderDirty(false)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
@@ -3033,7 +3060,15 @@ function App() {
                           </div>
                         </div>
                         <div className='flex gap-2 flex-wrap'>
-                          <Button size='sm' onClick={() => void addOrder()}>Add order</Button>
+                          {editingOrderId === null ? (
+                            <Button size='sm' onClick={() => void addOrder()}>Add order</Button>
+                          ) : (
+                            <>
+                              <Button size='sm' onClick={() => void saveEditingOrder()}>Save</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteOrder(editingOrderId)}>Remove</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingOrder}>Cancel</Button>
+                            </>
+                          )}
                           <Button
                             size='sm'
                             variant='secondary'
@@ -3054,19 +3089,20 @@ function App() {
                           <ul className='space-y-1'>
                             {selectedPatientOrders.map((entry) => (
                               <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                <span className='min-w-0 flex-1 whitespace-pre-wrap text-left'>
-                                  <MentionText
-                                    text={formatOrderEntry(entry)}
-                                    attachmentByTitle={mentionableAttachmentByTitle}
-                                    onOpenPhotoById={openPhotoById}
-                                  />
-                                </span>
-                                <div className='flex gap-1'>
-                                  <Button size='sm' variant='secondary' onClick={() => void toggleOrderStatus(entry)}>
-                                    {getNextOrderActionLabel(entry.status)}
-                                  </Button>
-                                  <Button size='sm' variant='destructive' onClick={() => void deleteOrder(entry.id)}>Remove</Button>
-                                </div>
+                                {editingOrderId === entry.id ? (
+                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                    <span className='min-w-0 flex-1 whitespace-pre-wrap text-left'>
+                                      <MentionText
+                                        text={formatOrderEntry(entry)}
+                                        attachmentByTitle={mentionableAttachmentByTitle}
+                                        onOpenPhotoById={openPhotoById}
+                                      />
+                                    </span>
+                                    <Button size='sm' variant='edit' onClick={() => startEditingOrder(entry)}>Edit</Button>
+                                  </>
+                                )}
                               </li>
                             ))}
                           </ul>
@@ -3252,7 +3288,7 @@ function App() {
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
-                  <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking.</li>
+                  <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
@@ -3276,6 +3312,7 @@ function App() {
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
+                  <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
                   <li>Orders tab has Open orders text for quick copy/paste handoff.</li>
                   <li>Orders text box supports multi-line notes and @photo title linking.</li>
                   <li>Use Open all census text for one-shot census output for active patients.</li>

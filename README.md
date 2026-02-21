@@ -2,6 +2,7 @@
 A simple app for an electronic health record for doing hospital rounds and patient history for medical clerks to use on their phones primarily offline.
 
 Patient tabs now separate key workflows into **Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos** for faster focused updates.
+In the **Orders** tab, use **Edit** on an entry to update its status or remove it from the same edit controls.
 
 ## Photo attachments (MVP)
 
