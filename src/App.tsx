@@ -1001,6 +1001,18 @@ function App() {
       })
   }, [patients, searchQuery, sortBy, statusFilter])
 
+  const quickSwitchPatients = useMemo(() => {
+    const compareByRoom = (a: Patient, b: Patient) =>
+      a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })
+
+    return [...(patients ?? [])].sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'active' ? -1 : 1
+      }
+      return compareByRoom(a, b)
+    })
+  }, [patients])
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const age = Number.parseInt(form.age, 10)
@@ -2644,9 +2656,38 @@ function App() {
               selectedPatient ? (
               <Card className='bg-pale-oak border-taupe'>
                 <CardHeader className='py-3 px-4 pb-0'>
-                  <CardTitle className='text-base text-mauve-shadow'>
-                    {selectedPatient.roomNumber} - {selectedPatient.lastName}, {selectedPatient.firstName}
-                  </CardTitle>
+                  <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+                    <CardTitle className='text-base text-mauve-shadow'>
+                      {selectedPatient.roomNumber} - {selectedPatient.lastName}, {selectedPatient.firstName}
+                    </CardTitle>
+                    <div className='w-full sm:w-72'>
+                      <Select
+                        value={selectedPatient.id?.toString() ?? ''}
+                        onValueChange={(value) => {
+                          const nextId = Number.parseInt(value, 10)
+                          if (!Number.isFinite(nextId) || selectedPatient.id === nextId) return
+                          const nextPatient = quickSwitchPatients.find((patient) => patient.id === nextId)
+                          if (!nextPatient) return
+                          void selectPatient(nextPatient)
+                        }}
+                      >
+                        <SelectTrigger aria-label='Switch focused patient'>
+                          <SelectValue placeholder='Switch focused patient' />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {quickSwitchPatients.map((patient) => {
+                            if (patient.id === undefined) return null
+
+                            return (
+                              <SelectItem key={patient.id} value={patient.id.toString()}>
+                                {patient.roomNumber} - {patient.lastName}, {patient.firstName}
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent className='px-4 pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
@@ -3678,7 +3719,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
-                  <li>In Patients, tap Open, then use the top focused-patient button (Room - Last name) for Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
+                  <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
@@ -3688,7 +3729,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
-                  <li>Focused patient button (top): quick access to the currently opened patient by Room - Last name.</li>
+                  <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics, diagnosis, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
