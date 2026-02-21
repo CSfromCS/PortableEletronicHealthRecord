@@ -2542,17 +2542,27 @@ function App() {
         </div>
       ) : null}
       <main>
-        <h1 className='text-2xl font-semibold text-mauve-shadow'>Portable Unofficial Health Record - Really (PUHRR)</h1>
-        <p>The puhrfect tool for clerk admin work.</p>
-        <div className='hidden sm:flex justify-end gap-2 mb-4 flex-wrap'>
-          <div className='flex gap-2 flex-wrap justify-end'>
-            <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
-            {canShowFocusedPatientNavButton ? (
-              <Button variant={view === 'patient' ? 'default' : 'secondary'} onClick={() => setView('patient')}>
-                {focusedPatientNavLabel}
-              </Button>
-            ) : null}
-            <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
+        <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <div className='mb-0.5 grid grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 gap-y-0'>
+              <h1 className='row-span-2 text-3xl leading-none font-semibold text-mauve-shadow'>PUHRR</h1>
+              <p className='row-span-2 self-stretch text-sm leading-none text-taupe flex flex-col justify-center'>
+                <span className='block'>Portable Unofficial </span>
+                <span className='block'>Health Record, Really!</span>
+              </p>
+            </div>
+            <p className='text-sm italic text-taupe'>The puhrrfect tool for clerk admin work.</p>
+          </div>
+          <div className='hidden sm:flex justify-end gap-2 flex-wrap'>
+            <div className='flex gap-2 flex-wrap justify-end'>
+              <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
+              {canShowFocusedPatientNavButton ? (
+                <Button variant={view === 'patient' ? 'default' : 'secondary'} onClick={() => setView('patient')}>
+                  {focusedPatientNavLabel}
+                </Button>
+              ) : null}
+              <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
+            </div>
           </div>
         </div>
 

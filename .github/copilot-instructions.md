@@ -198,6 +198,3 @@ For every user-visible or behavior-changing update:
 - Always update the in-app Settings "How to use" section when workflow, field order, labels, or user-visible behavior changes.
 - Keep README accurate for setup/deployment instructions
 - Do not run `npm run build` unless explicitly asked by the user
-
-# Project Commit Guidelines
-If the package version is changed, start the commit message with `vX.Y.Z - <commit summary>` to indicate the new version. Do not include in the summary the version change itself. For example: `v1.0.34 - feat: Add photo attachments and update FRICHMOND workflow`. If the version is not changed, use a regular commit practice. 
