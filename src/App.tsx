@@ -666,7 +666,7 @@ function App() {
   const cameraPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const galleryPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const [form, setForm] = useState<PatientFormState>(initialForm)
-  const [view, setView] = useState<'patients' | 'settings'>('patients')
+  const [view, setView] = useState<'patients' | 'patient' | 'settings'>('patients')
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'active' | 'discharged' | 'all'>('active')
@@ -1134,7 +1134,7 @@ function App() {
     setLastSavedAt(null)
     setProfileDirty(false)
     void loadDailyUpdate(patientId, dailyDate)
-    setView('patients')
+    setView('patient')
     setSelectedPatientId(patient.id ?? null)
     setMedicationForm(initialMedicationForm())
     setEditingMedicationId(null)
@@ -2180,121 +2180,231 @@ function App() {
 
   const addSamplePatient = async () => {
     const today = toLocalISODate()
-    
-    // Add sample patient Juan Dela Cruz
-    const samplePatientId = await db.patients.add({
-      roomNumber: '301B',
-      lastName: 'Dela Cruz',
-      firstName: 'Juan',
-      middleName: 'Santos',
-      age: 45,
-      sex: 'M',
-      admitDate: today,
-      service: 'Medicine',
-      attendingPhysician: 'Dr. Maria Garcia',
-      diagnosis: 'Community-Acquired Pneumonia, Right Lower Lobe',
-      chiefComplaint: 'Cough with fever for 3 days',
-      hpiText: '45M presented with productive cough with yellowish sputum, fever (38.5°C), and difficulty breathing. Patient reports progressive dyspnea on exertion.',
-      pmhText: 'Hypertension x 5 years, Type 2 Diabetes Mellitus x 3 years',
-      peText: 'Awake, coherent, not in respiratory distress\nVS: BP 130/80, HR 88, RR 20, Temp 37.8°C, SpO2 95% on room air\nChest: decreased breath sounds right base, crackles noted',
-      plans: 'Maintain IV antibiotics\nMonitor vitals and O2 saturation\nRepeat chest x-ray in 3 days',
-      medications: '',
-      labs: '',
-      pendings: 'CBC, Chest X-ray PA/Lateral\nSputum culture pending',
-      clerkNotes: 'Patient improving, tolerating oral intake',
-      status: 'active',
-    }) as number
+    const now = new Date().toISOString()
+    let samplePatientId = 0
 
-    // Add sample medications
-    await db.medications.add({
-      patientId: samplePatientId,
-      medication: 'Ceftriaxone',
-      dose: '2g',
-      route: 'IV',
-      frequency: 'q12h',
-      note: 'For pneumonia coverage',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    })
+    await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders], async () => {
+      samplePatientId = await db.patients.add({
+        roomNumber: '512A',
+        lastName: 'Dela Cruz',
+        firstName: 'Juan',
+        middleName: 'Santos',
+        age: 57,
+        sex: 'M',
+        admitDate: today,
+        service: 'Internal Medicine',
+        attendingPhysician: 'Dr. Maria C. Garcia',
+        diagnosis: 'Community-acquired pneumonia (RLL), improving',
+        chiefComplaint: '5 days cough, fever, and dyspnea',
+        hpiText: '57-year-old male with productive cough and intermittent fever for 5 days, associated with mild dyspnea on exertion. No chest pain. Symptoms improved after IV antibiotics.',
+        pmhText: 'Hypertension (8 years), Type 2 Diabetes Mellitus (5 years), ex-smoker',
+        peText: 'Awake and coherent, speaks in full sentences.\nVS: BP 128/76, HR 84, RR 18, Temp 37.3°C, SpO2 96% room air.\nChest: bibasal crackles right greater than left, no retractions.\nCVS: adynamic precordium, regular rhythm.\nAbdomen: soft, non-tender.',
+        plans: 'Continue IV to oral antibiotic step-down tomorrow if afebrile.\nPulmonary hygiene and ambulation as tolerated.\nRepeat CBC and electrolytes in AM.',
+        medications: 'Nebulization PRN for dyspnea episodes.',
+        labs: 'Follow-up trends: CBC improving, renal panel stable.',
+        pendings: 'Sputum culture and sensitivity result.\nRepeat chest x-ray in 48-72 hours.',
+        clerkNotes: 'Patient reports better appetite and less cough overnight.',
+        status: 'active',
+      }) as number
 
-    await db.medications.add({
-      patientId: samplePatientId,
-      medication: 'Amlodipine',
-      dose: '10mg',
-      route: 'PO',
-      frequency: 'OD',
-      note: 'Maintenance for hypertension',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    })
+      await db.medications.bulkAdd([
+        {
+          patientId: samplePatientId,
+          medication: 'Ceftriaxone',
+          dose: '2 g',
+          route: 'IV',
+          frequency: 'q24h',
+          note: 'Empiric CAP coverage, day 3',
+          status: 'active',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          medication: 'Azithromycin',
+          dose: '500 mg',
+          route: 'PO',
+          frequency: 'OD',
+          note: 'Adjunct atypical coverage',
+          status: 'active',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          medication: 'Amlodipine',
+          dose: '10 mg',
+          route: 'PO',
+          frequency: 'OD',
+          note: 'Home antihypertensive',
+          status: 'active',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          medication: 'Metformin',
+          dose: '500 mg',
+          route: 'PO',
+          frequency: 'BID',
+          note: 'Home antidiabetic',
+          status: 'active',
+          createdAt: now,
+        },
+      ])
 
-    await db.medications.add({
-      patientId: samplePatientId,
-      medication: 'Metformin',
-      dose: '500mg',
-      route: 'PO',
-      frequency: 'BID',
-      note: 'Maintenance for diabetes',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    })
+      await db.vitals.bulkAdd([
+        {
+          patientId: samplePatientId,
+          date: today,
+          time: '06:00',
+          bp: '126/78',
+          hr: '86',
+          rr: '20',
+          temp: '37.6',
+          spo2: '95',
+          note: 'room air',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          date: today,
+          time: '14:00',
+          bp: '128/76',
+          hr: '84',
+          rr: '18',
+          temp: '37.3',
+          spo2: '96',
+          note: 'room air, ambulatory',
+          createdAt: now,
+        },
+      ])
 
-    // Add sample vitals for today
-    await db.vitals.add({
-      patientId: samplePatientId,
-      date: today,
-      time: '08:00',
-      bp: '130/80',
-      hr: '88',
-      rr: '20',
-      temp: '37.8',
-      spo2: '95',
-      note: 'on room air',
-      createdAt: new Date().toISOString(),
-    })
+      await db.dailyUpdates.add({
+        patientId: samplePatientId,
+        date: today,
+        fluid: 'D5 0.3 NaCl 1L over 8h + oral hydration encouraged.',
+        respiratory: 'Cough less frequent, no accessory muscle use, saturating well on room air.',
+        infectious: 'Afebrile for >24h. Continue antibiotics; monitor culture results.',
+        cardio: 'Hemodynamically stable. No chest pain or palpitations.',
+        hema: 'Leukocytosis downtrending. No bleeding manifestations.',
+        metabolic: 'Capillary glucose acceptable on current regimen.',
+        output: 'Urine output adequate; no bowel issues reported.',
+        neuro: 'Alert, oriented x3, no focal neurologic deficits.',
+        drugs: 'Ceftriaxone 2 g IV q24h, Azithromycin 500 mg PO OD, Amlodipine 10 mg PO OD, Metformin 500 mg PO BID.',
+        other: 'Ambulates with minimal assistance; tolerates soft diet.',
+        assessment: 'CAP, clinically improving with stable cardiorespiratory parameters.',
+        plans: 'Continue current antibiotics today then reassess de-escalation.\nRepeat CBC/electrolytes tomorrow.\nCoordinate discharge planning once clinically stable.',
+        lastUpdated: now,
+      })
 
-    // Add sample daily update for today
-    await db.dailyUpdates.add({
-      patientId: samplePatientId,
-      date: today,
-      fluid: 'D5LRS 1L q8h, taking clear liquids PO',
-      respiratory: 'Productive cough improved, breathing easier. No O2 requirement.',
-      infectious: 'Low-grade fever resolved. On IV Ceftriaxone day 2.',
-      cardio: 'Stable. No chest pain. BP controlled.',
-      hema: 'No active issues. CBC pending.',
-      metabolic: 'Blood sugar controlled on oral meds. Tolerating diet.',
-      output: 'Urinary output adequate. No dysuria.',
-      neuro: 'Alert and oriented. No complaints.',
-      drugs: 'Ceftriaxone 2g IV q12h, Amlodipine 10mg PO OD, Metformin 500mg PO BID',
-      other: 'Patient ambulatory. Family at bedside.',
-      assessment: 'Community-acquired pneumonia, improving',
-      plans: 'Continue IV antibiotics\nMonitor clinical response\nRepeat CXR in 3 days if improving',
-      lastUpdated: new Date().toISOString(),
-    })
+      await db.labs.bulkAdd([
+        {
+          patientId: samplePatientId,
+          date: today,
+          templateId: 'ust-cbc',
+          results: {
+            RBC: '4.58',
+            Hgb: '136',
+            Hct: '0.41',
+            MCV: '89.5',
+            MCH: '29.7',
+            MCHC: '33.2',
+            RDW: '13.4',
+            Plt: '302',
+            MPV: '9.8',
+            WBC: '11.2',
+            N: '0',
+            Metamyelocytes: '0',
+            Bands: '2',
+            S: '78',
+            L: '14',
+            M: '5',
+            E: '1',
+            B: '0',
+            Blasts: '0',
+            Myelocytes: '0',
+            MDW: '21.5',
+          },
+          note: 'Mild leukocytosis with neutrophilic predominance, downtrending.',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          date: today,
+          templateId: 'ust-urinalysis',
+          results: {
+            Color: 'yellow',
+            Transparency: 'slightly hazy',
+            pH: '6.0',
+            'Specific Gravity': '1.020',
+            Albumin: 'neg',
+            Sugar: 'neg',
+            Leukocytes: '1+',
+            Erythrocytes: 'neg',
+            Bilirubin: 'neg',
+            Nitrite: 'neg',
+            Ketone: 'neg',
+            Urobilinogen: 'normal',
+            RBC: '0-1/hpf',
+            Pus: '2-4/hpf',
+            Yeast: 'neg',
+            Squamous: 'few',
+            Renal: 'neg',
+            TEC: 'neg',
+            Bacteria: 'few',
+            Mucus: 'few',
+            'Amorphous Urates': 'neg',
+            'Uric Acid': 'neg',
+            'Calcium Oxalate': 'few',
+            'Amorphous Phosphates': 'neg',
+            'Triple Phosphate': 'neg',
+            Hyaline: '0-1/lpf',
+            Granular: 'neg',
+            Waxy: 'neg',
+            'RBC Cast': 'neg',
+            'WBC Cast': 'neg',
+          },
+          note: 'No significant proteinuria or glycosuria; minimal pyuria.',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          date: today,
+          templateId: 'ust-electrolytes',
+          results: {
+            Na: '138',
+            K: '4.1',
+            Cl: '102',
+            HCO3: '24',
+            BUN: '16',
+            Crea: '1.0',
+            eGFR: '86',
+          },
+          note: 'Renal function and electrolytes within acceptable range.',
+          createdAt: now,
+        },
+      ])
 
-    // Add sample lab results
-    await db.labs.add({
-      patientId: samplePatientId,
-      date: today,
-      templateId: 'ust-cbc',
-      results: {
-        WBC: '12.5',
-        Hgb: '130',
-      },
-      note: 'Elevated, consistent with infection',
-      createdAt: new Date().toISOString(),
-    })
-
-    // Add sample doctor's order
-    await db.orders.add({
-      patientId: samplePatientId,
-      orderDate: today,
-      orderTime: '09:00',
-      service: 'Medicine',
-      orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
-      note: 'To assess pneumonia improvement',
-      status: 'active',
-      createdAt: new Date().toISOString(),
+      await db.orders.bulkAdd([
+        {
+          patientId: samplePatientId,
+          orderDate: today,
+          orderTime: '09:00',
+          service: 'Internal Medicine',
+          orderText: 'Repeat chest x-ray PA/Lateral on hospital day 3',
+          note: 'Assess interval resolution of infiltrates',
+          status: 'active',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          orderDate: today,
+          orderTime: '11:00',
+          service: 'Internal Medicine',
+          orderText: 'CBC and electrolytes tomorrow 6 AM',
+          note: 'Monitor response to treatment',
+          status: 'active',
+          createdAt: now,
+        },
+      ])
     })
 
     setNotice('Sample patient "Juan Dela Cruz" added successfully.')
@@ -2426,14 +2536,21 @@ function App() {
               </>
             ) : null}
           </div>
-          <div className='flex gap-2'>
+          <div className='flex gap-2 flex-wrap justify-end'>
             <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
+            {selectedPatient ? (
+              <Button variant={view === 'patient' ? 'default' : 'secondary'} onClick={() => setView('patient')}>
+                {selectedPatient.roomNumber} - {selectedPatient.lastName}
+              </Button>
+            ) : null}
             <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
           </div>
         </div>
 
-        {view === 'patients' ? (
+        {view !== 'settings' ? (
           <>
+            {view === 'patients' ? (
+              <>
             <Card className='bg-pale-oak border-taupe mb-4'>
               <CardHeader className='py-2 px-3 pb-0'>
                 <CardTitle className='text-sm text-mauve-shadow'>Add patient</CardTitle>
@@ -2520,8 +2637,11 @@ function App() {
                 </Card>
               ))}
             </div>
+              </>
+            ) : null}
 
-            {selectedPatient ? (
+            {view === 'patient' ? (
+              selectedPatient ? (
               <Card className='bg-pale-oak border-taupe'>
                 <CardHeader className='py-3 px-4 pb-0'>
                   <CardTitle className='text-base text-mauve-shadow'>
@@ -3519,6 +3639,16 @@ function App() {
               </Tabs>
                 </CardContent>
               </Card>
+              ) : (
+                <Card className='bg-pale-oak border-taupe'>
+                  <CardHeader className='py-3 px-4 pb-0'>
+                    <CardTitle className='text-base text-mauve-shadow'>Focused patient</CardTitle>
+                  </CardHeader>
+                  <CardContent className='px-4 pb-4'>
+                    <p className='text-sm text-taupe'>No focused patient selected. Open one from Patients.</p>
+                  </CardContent>
+                </Card>
+              )
             ) : null}
           </>
         ) : (
@@ -3548,7 +3678,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
-                  <li>Open the patient card, then fill Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
+                  <li>In Patients, tap Open, then use the top focused-patient button (Room - Last name) for Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
@@ -3558,6 +3688,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
+                  <li>Focused patient button (top): quick access to the currently opened patient by Room - Last name.</li>
                   <li>Profile tab: demographics, diagnosis, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
