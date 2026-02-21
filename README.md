@@ -1,6 +1,8 @@
 # Portable Unofficial Health Record - Really (PUHRR)
 A simple app for an electronic health record for doing hospital rounds and patient history for medical clerks to use on their phones primarily offline.
 
+Patient tabs now separate key workflows into **Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos** for faster focused updates.
+
 ## Photo attachments (MVP)
 
 - Photos can be attached per patient and organized by section category (Profile, FRICHMOND, Vitals, Medications, Labs, Orders).

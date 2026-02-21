@@ -651,7 +651,7 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'orders'>('profile')
+  const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
@@ -2275,8 +2275,11 @@ function App() {
                   <TabsList className='mb-4 mt-2'>
                     <TabsTrigger value='profile'>Profile</TabsTrigger>
                     <TabsTrigger value='frichmond'>FRICHMOND</TabsTrigger>
-                    <TabsTrigger value='vitals'>Vitals Log</TabsTrigger>
+                    <TabsTrigger value='vitals'>Vitals</TabsTrigger>
+                    <TabsTrigger value='labs'>Labs</TabsTrigger>
+                    <TabsTrigger value='medications'>Medications</TabsTrigger>
                     <TabsTrigger value='orders'>Orders</TabsTrigger>
+                    <TabsTrigger value='photos'>Photos</TabsTrigger>
                   </TabsList>
 
                 <TabsContent value='profile'>
@@ -2370,217 +2373,6 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-labs'>Labs</Label>
-                      <PhotoMentionField
-                        ariaLabel='Labs'
-                        placeholder='Labs'
-                        value={profileForm.labs}
-                        onChange={(nextValue) => updateProfileField('labs', nextValue)}
-                        attachments={mentionableAttachments}
-                        attachmentByTitle={mentionableAttachmentByTitle}
-                        onOpenPhotoById={openPhotoById}
-                      />
-                    </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
-                      <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
-                      </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
-                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                          <div className='space-y-1'>
-                            <Label>Date</Label>
-                            <Input
-                              type='date'
-                              aria-label='Lab date'
-                              value={labTemplateDate}
-                              onChange={(event) => setLabTemplateDate(event.target.value)}
-                            />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Template</Label>
-                            <Select
-                              value={selectedLabTemplateId}
-                              onValueChange={(value) => {
-                                setSelectedLabTemplateId(value)
-                                setLabTemplateValues({})
-                              }}
-                            >
-                              <SelectTrigger aria-label='Lab template'>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {LAB_TEMPLATES.map((template) => (
-                                  <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className='space-y-2'>
-                          {selectedLabTemplate.tests.map((test) => (
-                            <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
-                              <p className='text-sm text-mauve-shadow font-medium'>
-                                {test.key}
-                                {test.fullName ? ` - ${test.fullName}` : ''}
-                                {test.unit ? ` (${test.unit})` : ''}
-                              </p>
-                              <Input
-                                aria-label={`${selectedLabTemplate.name} ${test.key} value`}
-                                placeholder='Value'
-                                value={labTemplateValues[test.key] ?? ''}
-                                onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <div className='space-y-1'>
-                          <Label>Note</Label>
-                          <PhotoMentionField
-                            ariaLabel='Lab note'
-                            placeholder='Optional note for this lab run'
-                            value={labTemplateNote}
-                            onChange={(nextValue) => setLabTemplateNote(nextValue)}
-                            attachments={mentionableAttachments}
-                            attachmentByTitle={mentionableAttachmentByTitle}
-                            onOpenPhotoById={openPhotoById}
-                          />
-                        </div>
-                        <div className='flex gap-2 flex-wrap'>
-                          {editingLabId === null ? (
-                            <Button size='sm' onClick={() => void addStructuredLab()}>Add lab</Button>
-                          ) : (
-                            <>
-                              <Button size='sm' onClick={() => void saveEditingLab()}>Save</Button>
-                              <Button size='sm' variant='secondary' onClick={cancelEditingLab}>Cancel</Button>
-                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredLab(editingLabId)}>Remove</Button>
-                            </>
-                          )}
-                        </div>
-                        {selectedPatientStructuredLabs.length > 0 ? (
-                          <ul className='space-y-1'>
-                            {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
-                              const entry = selectedPatientStructuredLabs[index]
-                              return (
-                                <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                  {editingLabId === entry.id ? (
-                                    <span className='text-taupe italic'>(Editing above...)</span>
-                                  ) : (
-                                    <>
-                                      <span className='whitespace-pre-wrap'>
-                                        <MentionText
-                                          text={line}
-                                          attachmentByTitle={mentionableAttachmentByTitle}
-                                          onOpenPhotoById={openPhotoById}
-                                        />
-                                      </span>
-                                      <Button size='sm' variant='edit' onClick={() => startEditingLab(entry)}>Edit</Button>
-                                    </>
-                                  )}
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        ) : (
-                          <p className='text-sm text-taupe'>No structured labs yet.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <div className='space-y-1'>
-                      <Label htmlFor='profile-medications'>Medications</Label>
-                      <PhotoMentionField
-                        ariaLabel='Medications'
-                        placeholder='Medications'
-                        value={profileForm.medications}
-                        onChange={(nextValue) => updateProfileField('medications', nextValue)}
-                        attachments={mentionableAttachments}
-                        attachmentByTitle={mentionableAttachmentByTitle}
-                        onOpenPhotoById={openPhotoById}
-                      />
-                    </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
-                      <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured medications</CardTitle>
-                      </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
-                        <div className='grid grid-cols-2 gap-2'>
-                          <div className='space-y-1'>
-                            <Label>Medication</Label>
-                            <Input aria-label='Medication name' placeholder='Medication' value={medicationForm.medication} onChange={(event) => setMedicationForm({ ...medicationForm, medication: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Dose</Label>
-                            <Input aria-label='Medication dose' placeholder='Dose' value={medicationForm.dose} onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Route</Label>
-                            <Input aria-label='Medication route' placeholder='Route' value={medicationForm.route} onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })} />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Frequency</Label>
-                            <Input aria-label='Medication frequency' placeholder='Frequency' value={medicationForm.frequency} onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })} />
-                          </div>
-                          <div className='space-y-1 col-span-2'>
-                            <Label>Note</Label>
-                            <PhotoMentionField
-                              ariaLabel='Medication note'
-                              placeholder='Note'
-                              value={medicationForm.note}
-                              onChange={(nextValue) => setMedicationForm({ ...medicationForm, note: nextValue })}
-                              attachments={mentionableAttachments}
-                              attachmentByTitle={mentionableAttachmentByTitle}
-                              onOpenPhotoById={openPhotoById}
-                            />
-                          </div>
-                          <div className='space-y-1'>
-                            <Label>Status</Label>
-                            <Select value={medicationForm.status} onValueChange={(v) => setMedicationForm({ ...medicationForm, status: v as 'active' | 'discontinued' | 'completed' })}>
-                              <SelectTrigger><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value='active'>Active</SelectItem>
-                                <SelectItem value='discontinued'>Discontinued</SelectItem>
-                                <SelectItem value='completed'>Completed</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className='flex gap-2 flex-wrap'>
-                          {editingMedicationId === null ? (
-                            <Button size='sm' onClick={() => void addStructuredMedication()}>Add medication</Button>
-                          ) : (
-                            <>
-                              <Button size='sm' onClick={() => void saveEditingMedication()}>Save</Button>
-                              <Button size='sm' variant='secondary' onClick={cancelEditingMedication}>Cancel</Button>
-                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredMedication(editingMedicationId)}>Remove</Button>
-                            </>
-                          )}
-                        </div>
-                        {selectedPatientStructuredMeds.length > 0 ? (
-                          <ul className='space-y-1'>
-                            {selectedPatientStructuredMeds.map((entry) => (
-                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
-                                {editingMedicationId === entry.id ? (
-                                  <span className='text-taupe italic'>(Editing above...)</span>
-                                ) : (
-                                  <>
-                                      <span className='whitespace-pre-wrap'>
-                                        <MentionText
-                                          text={`${entry.medication} ${entry.dose} ${entry.route} ${entry.frequency}${entry.note ? ` — ${entry.note}` : ''} • ${entry.status}`}
-                                          attachmentByTitle={mentionableAttachmentByTitle}
-                                          onOpenPhotoById={openPhotoById}
-                                        />
-                                      </span>
-                                    <Button size='sm' variant='edit' onClick={() => startEditingMedication(entry)}>Edit</Button>
-                                  </>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className='text-sm text-taupe'>No structured medications yet.</p>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <div className='space-y-1'>
                       <Label htmlFor='profile-pendings'>Pendings</Label>
                       <PhotoMentionField
                         ariaLabel='Pendings'
@@ -2604,130 +2396,6 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
-                      <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Photo attachments</CardTitle>
-                      </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
-                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
-                          <div className='space-y-1'>
-                            <Label>Category</Label>
-                            <Select
-                              value={attachmentCategory}
-                              onValueChange={(value) => {
-                                const nextCategory = value as PhotoCategory
-                                setAttachmentCategory(nextCategory)
-                                setAttachmentTitle(buildDefaultPhotoTitle(nextCategory))
-                              }}
-                            >
-                              <SelectTrigger aria-label='Photo category'>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {PHOTO_CATEGORY_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className='space-y-1'>
-                            <Label htmlFor='attachment-title'>Title</Label>
-                            <Input
-                              id='attachment-title'
-                              aria-label='Photo title'
-                              placeholder='Photo title'
-                              value={attachmentTitle}
-                              onChange={(event) => setAttachmentTitle(event.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <Input
-                          ref={cameraPhotoInputRef}
-                          type='file'
-                          accept='image/*'
-                          capture='environment'
-                          className='hidden'
-                          onChange={(event) => void addPhotoAttachment(event)}
-                        />
-                        <Input
-                          ref={galleryPhotoInputRef}
-                          type='file'
-                          accept='image/*'
-                          className='hidden'
-                          onChange={(event) => void addPhotoAttachment(event)}
-                        />
-                        <div className='flex gap-2 flex-wrap'>
-                          <Button size='sm' onClick={() => cameraPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
-                            {isPhotoSaving ? 'Saving photo...' : 'Take photo'}
-                          </Button>
-                          <Button size='sm' variant='secondary' onClick={() => galleryPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
-                            Choose existing
-                          </Button>
-                        </div>
-
-                        <div className='space-y-1 max-w-56'>
-                          <Label>Show photos</Label>
-                          <Select
-                            value={attachmentFilter}
-                            onValueChange={(value) => setAttachmentFilter(value as PhotoCategory | 'all')}
-                          >
-                            <SelectTrigger aria-label='Photo filter'>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value='all'>All categories</SelectItem>
-                              {PHOTO_CATEGORY_OPTIONS.map((option) => (
-                                <SelectItem key={`filter-${option.value}`} value={option.value}>{option.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {selectedPatientAttachments.length > 0 ? (
-                          <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
-                            {selectedPatientAttachments.map((entry) => {
-                              const previewUrl = entry.id === undefined ? undefined : attachmentPreviewUrls[entry.id]
-                              const createdAt = new Date(entry.createdAt).toLocaleString()
-
-                              return (
-                                <div key={entry.id} className='rounded-md border border-taupe/40 bg-white p-1.5 space-y-1'>
-                                  <button
-                                    type='button'
-                                    className='w-full overflow-hidden rounded border border-taupe/30 bg-pale-oak'
-                                    onClick={() => setSelectedAttachmentId(entry.id ?? null)}
-                                  >
-                                    {previewUrl ? (
-                                      <img
-                                        src={previewUrl}
-                                        alt={entry.title || `Attachment ${formatPhotoCategory(entry.category)}`}
-                                        className='h-28 w-full object-cover'
-                                        loading='lazy'
-                                      />
-                                    ) : (
-                                      <div className='h-28 flex items-center justify-center text-xs text-taupe'>No preview</div>
-                                    )}
-                                  </button>
-                                  <p className='text-xs text-mauve-shadow line-clamp-2'>
-                                    {entry.title || '(No title)'}
-                                  </p>
-                                  <p className='text-[11px] text-taupe'>
-                                    {formatPhotoCategory(entry.category)} • {createdAt}
-                                  </p>
-                                  <div className='flex justify-between items-center gap-2'>
-                                    <p className='text-[11px] text-taupe'>{formatBytes(entry.byteSize)}</p>
-                                    <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(entry.id)}>
-                                      Remove
-                                    </Button>
-                                  </div>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <p className='text-sm text-taupe'>No photos in this filter yet.</p>
-                        )}
-                      </CardContent>
-                    </Card>
                     <div className='flex gap-2 flex-wrap'>
                       <Button
                         onClick={() =>
@@ -3088,6 +2756,225 @@ function App() {
                     </Card>
                   </div>
                 </TabsContent>
+                <TabsContent value='medications'>
+                  <div className='space-y-3'>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-medications'>Medications</Label>
+                      <PhotoMentionField
+                        ariaLabel='Medications'
+                        placeholder='Medications'
+                        value={profileForm.medications}
+                        onChange={(nextValue) => updateProfileField('medications', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured medications</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Medication</Label>
+                            <Input aria-label='Medication name' placeholder='Medication' value={medicationForm.medication} onChange={(event) => setMedicationForm({ ...medicationForm, medication: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Dose</Label>
+                            <Input aria-label='Medication dose' placeholder='Dose' value={medicationForm.dose} onChange={(event) => setMedicationForm({ ...medicationForm, dose: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Route</Label>
+                            <Input aria-label='Medication route' placeholder='Route' value={medicationForm.route} onChange={(event) => setMedicationForm({ ...medicationForm, route: event.target.value })} />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Frequency</Label>
+                            <Input aria-label='Medication frequency' placeholder='Frequency' value={medicationForm.frequency} onChange={(event) => setMedicationForm({ ...medicationForm, frequency: event.target.value })} />
+                          </div>
+                          <div className='space-y-1 col-span-2'>
+                            <Label>Note</Label>
+                            <PhotoMentionField
+                              ariaLabel='Medication note'
+                              placeholder='Note'
+                              value={medicationForm.note}
+                              onChange={(nextValue) => setMedicationForm({ ...medicationForm, note: nextValue })}
+                              attachments={mentionableAttachments}
+                              attachmentByTitle={mentionableAttachmentByTitle}
+                              onOpenPhotoById={openPhotoById}
+                            />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Status</Label>
+                            <Select value={medicationForm.status} onValueChange={(v) => setMedicationForm({ ...medicationForm, status: v as 'active' | 'discontinued' | 'completed' })}>
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value='active'>Active</SelectItem>
+                                <SelectItem value='discontinued'>Discontinued</SelectItem>
+                                <SelectItem value='completed'>Completed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className='flex gap-2 flex-wrap'>
+                          {editingMedicationId === null ? (
+                            <Button size='sm' onClick={() => void addStructuredMedication()}>Add medication</Button>
+                          ) : (
+                            <>
+                              <Button size='sm' onClick={() => void saveEditingMedication()}>Save</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingMedication}>Cancel</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredMedication(editingMedicationId)}>Remove</Button>
+                            </>
+                          )}
+                        </div>
+                        {selectedPatientStructuredMeds.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {selectedPatientStructuredMeds.map((entry) => (
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                {editingMedicationId === entry.id ? (
+                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                ) : (
+                                  <>
+                                      <span className='whitespace-pre-wrap'>
+                                        <MentionText
+                                          text={`${entry.medication} ${entry.dose} ${entry.route} ${entry.frequency}${entry.note ? ` — ${entry.note}` : ''} • ${entry.status}`}
+                                          attachmentByTitle={mentionableAttachmentByTitle}
+                                          onOpenPhotoById={openPhotoById}
+                                        />
+                                      </span>
+                                    <Button size='sm' variant='edit' onClick={() => startEditingMedication(entry)}>Edit</Button>
+                                  </>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured medications yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+                <TabsContent value='labs'>
+                  <div className='space-y-3'>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-labs'>Labs</Label>
+                      <PhotoMentionField
+                        ariaLabel='Labs'
+                        placeholder='Labs'
+                        value={profileForm.labs}
+                        onChange={(nextValue) => updateProfileField('labs', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Date</Label>
+                            <Input
+                              type='date'
+                              aria-label='Lab date'
+                              value={labTemplateDate}
+                              onChange={(event) => setLabTemplateDate(event.target.value)}
+                            />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Template</Label>
+                            <Select
+                              value={selectedLabTemplateId}
+                              onValueChange={(value) => {
+                                setSelectedLabTemplateId(value)
+                                setLabTemplateValues({})
+                              }}
+                            >
+                              <SelectTrigger aria-label='Lab template'>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {LAB_TEMPLATES.map((template) => (
+                                  <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className='space-y-2'>
+                          {selectedLabTemplate.tests.map((test) => (
+                            <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                              <p className='text-sm text-mauve-shadow font-medium'>
+                                {test.key}
+                                {test.fullName ? ` - ${test.fullName}` : ''}
+                                {test.unit ? ` (${test.unit})` : ''}
+                              </p>
+                              <Input
+                                aria-label={`${selectedLabTemplate.name} ${test.key} value`}
+                                placeholder='Value'
+                                value={labTemplateValues[test.key] ?? ''}
+                                onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className='space-y-1'>
+                          <Label>Note</Label>
+                          <PhotoMentionField
+                            ariaLabel='Lab note'
+                            placeholder='Optional note for this lab run'
+                            value={labTemplateNote}
+                            onChange={(nextValue) => setLabTemplateNote(nextValue)}
+                            attachments={mentionableAttachments}
+                            attachmentByTitle={mentionableAttachmentByTitle}
+                            onOpenPhotoById={openPhotoById}
+                          />
+                        </div>
+                        <div className='flex gap-2 flex-wrap'>
+                          {editingLabId === null ? (
+                            <Button size='sm' onClick={() => void addStructuredLab()}>Add lab</Button>
+                          ) : (
+                            <>
+                              <Button size='sm' onClick={() => void saveEditingLab()}>Save</Button>
+                              <Button size='sm' variant='secondary' onClick={cancelEditingLab}>Cancel</Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deleteStructuredLab(editingLabId)}>Remove</Button>
+                            </>
+                          )}
+                        </div>
+                        {selectedPatientStructuredLabs.length > 0 ? (
+                          <ul className='space-y-1'>
+                            {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
+                              const entry = selectedPatientStructuredLabs[index]
+                              return (
+                                <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                  {editingLabId === entry.id ? (
+                                    <span className='text-taupe italic'>(Editing above...)</span>
+                                  ) : (
+                                    <>
+                                      <span className='whitespace-pre-wrap'>
+                                        <MentionText
+                                          text={line}
+                                          attachmentByTitle={mentionableAttachmentByTitle}
+                                          onOpenPhotoById={openPhotoById}
+                                        />
+                                      </span>
+                                      <Button size='sm' variant='edit' onClick={() => startEditingLab(entry)}>Edit</Button>
+                                    </>
+                                  )}
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        ) : (
+                          <p className='text-sm text-taupe'>No structured labs yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
                 <TabsContent value='orders'>
                   <div className='space-y-3'>
                     <Card className='bg-pale-oak-2 border-taupe'>
@@ -3190,6 +3077,134 @@ function App() {
                     </Card>
                   </div>
                 </TabsContent>
+                <TabsContent value='photos'>
+                  <div className='space-y-3'>
+                    <Card className='bg-pale-oak-2 border-taupe'>
+                      <CardHeader className='py-2 px-3 pb-0'>
+                        <CardTitle className='text-sm text-mauve-shadow'>Photo attachments</CardTitle>
+                      </CardHeader>
+                      <CardContent className='px-3 pb-3 space-y-3'>
+                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                          <div className='space-y-1'>
+                            <Label>Category</Label>
+                            <Select
+                              value={attachmentCategory}
+                              onValueChange={(value) => {
+                                const nextCategory = value as PhotoCategory
+                                setAttachmentCategory(nextCategory)
+                                setAttachmentTitle(buildDefaultPhotoTitle(nextCategory))
+                              }}
+                            >
+                              <SelectTrigger aria-label='Photo category'>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PHOTO_CATEGORY_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className='space-y-1'>
+                            <Label htmlFor='attachment-title'>Title</Label>
+                            <Input
+                              id='attachment-title'
+                              aria-label='Photo title'
+                              placeholder='Photo title'
+                              value={attachmentTitle}
+                              onChange={(event) => setAttachmentTitle(event.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          ref={cameraPhotoInputRef}
+                          type='file'
+                          accept='image/*'
+                          capture='environment'
+                          className='hidden'
+                          onChange={(event) => void addPhotoAttachment(event)}
+                        />
+                        <Input
+                          ref={galleryPhotoInputRef}
+                          type='file'
+                          accept='image/*'
+                          className='hidden'
+                          onChange={(event) => void addPhotoAttachment(event)}
+                        />
+                        <div className='flex gap-2 flex-wrap'>
+                          <Button size='sm' onClick={() => cameraPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
+                            {isPhotoSaving ? 'Saving photo...' : 'Take photo'}
+                          </Button>
+                          <Button size='sm' variant='secondary' onClick={() => galleryPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
+                            Choose existing
+                          </Button>
+                        </div>
+
+                        <div className='space-y-1 max-w-56'>
+                          <Label>Show photos</Label>
+                          <Select
+                            value={attachmentFilter}
+                            onValueChange={(value) => setAttachmentFilter(value as PhotoCategory | 'all')}
+                          >
+                            <SelectTrigger aria-label='Photo filter'>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value='all'>All categories</SelectItem>
+                              {PHOTO_CATEGORY_OPTIONS.map((option) => (
+                                <SelectItem key={`filter-${option.value}`} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {selectedPatientAttachments.length > 0 ? (
+                          <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
+                            {selectedPatientAttachments.map((entry) => {
+                              const previewUrl = entry.id === undefined ? undefined : attachmentPreviewUrls[entry.id]
+                              const createdAt = new Date(entry.createdAt).toLocaleString()
+
+                              return (
+                                <div key={entry.id} className='rounded-md border border-taupe/40 bg-white p-1.5 space-y-1'>
+                                  <button
+                                    type='button'
+                                    className='w-full overflow-hidden rounded border border-taupe/30 bg-pale-oak'
+                                    onClick={() => setSelectedAttachmentId(entry.id ?? null)}
+                                  >
+                                    {previewUrl ? (
+                                      <img
+                                        src={previewUrl}
+                                        alt={entry.title || `Attachment ${formatPhotoCategory(entry.category)}`}
+                                        className='h-28 w-full object-cover'
+                                        loading='lazy'
+                                      />
+                                    ) : (
+                                      <div className='h-28 flex items-center justify-center text-xs text-taupe'>No preview</div>
+                                    )}
+                                  </button>
+                                  <p className='text-xs text-mauve-shadow line-clamp-2'>
+                                    {entry.title || '(No title)'}
+                                  </p>
+                                  <p className='text-[11px] text-taupe'>
+                                    {formatPhotoCategory(entry.category)} • {createdAt}
+                                  </p>
+                                  <div className='flex justify-between items-center gap-2'>
+                                    <p className='text-[11px] text-taupe'>{formatBytes(entry.byteSize)}</p>
+                                    <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(entry.id)}>
+                                      Remove
+                                    </Button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className='text-sm text-taupe'>No photos in this filter yet.</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
               </Tabs>
                 </CardContent>
               </Card>
@@ -3222,7 +3237,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
-                  <li>Open the patient card, then fill Profile, FRICHMOND, Vitals Log, and Orders.</li>
+                  <li>Open the patient card, then fill Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Use Open text actions to review, select, and copy handoff-ready text.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
@@ -3232,10 +3247,13 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
                 <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
-                  <li>Profile tab: diagnosis, plans, labs, meds, pendings, notes, structured lab templates, and categorized photo attachments.</li>
+                  <li>Profile tab: demographics, diagnosis, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
-                  <li>Vitals Log tab: structured vitals tracking across all dates, earliest entries first.</li>
+                  <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
+                  <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
+                  <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking.</li>
+                  <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
               </div>
@@ -3264,7 +3282,7 @@ function App() {
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
-                  <li>In Profile &gt; Photo attachments, use Take photo for camera capture or Choose existing for gallery images.</li>
+                  <li>In Photos tab, use Take photo for camera capture or Choose existing for gallery images.</li>
                   <li>In notes/text fields, type @ to pick an uploaded photo title; tap the linked @title to open the same photo modal.</li>
                   <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
                 </ul>
