@@ -696,6 +696,7 @@ function App() {
   const [dailyDirty, setDailyDirty] = useState(false)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos' | 'reporting'>('profile')
   const [notice, setNotice] = useState('')
+  const [noticeIsDecaying, setNoticeIsDecaying] = useState(false)
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
   const [attachmentCategory, setAttachmentCategory] = useState<PhotoCategory>('profile')
@@ -733,14 +734,27 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!notice || isSaving || notice === 'Saving...') return
+    if (!notice) {
+      setNoticeIsDecaying(false)
+      return
+    }
 
-    const timeoutId = window.setTimeout(() => {
+    setNoticeIsDecaying(false)
+
+    const decayTimeoutId = window.setTimeout(() => {
+      setNoticeIsDecaying(true)
+    }, 5000)
+
+    const clearTimeoutId = window.setTimeout(() => {
       setNotice('')
-    }, 3000)
+      setNoticeIsDecaying(false)
+    }, 10000)
 
-    return () => window.clearTimeout(timeoutId)
-  }, [isSaving, notice])
+    return () => {
+      window.clearTimeout(decayTimeoutId)
+      window.clearTimeout(clearTimeoutId)
+    }
+  }, [notice])
 
   const selectedPatient = useMemo(
     () => (patients ?? []).find((patient) => patient.id === selectedPatientId),
@@ -1072,14 +1086,13 @@ function App() {
   }
 
   const saveProfile = useCallback(
-    async (manual = true) => {
+    async () => {
       if (selectedPatientId === null) return false
 
       const age = Number.parseInt(profileForm.age, 10)
       const ageIsValid = Number.isFinite(age)
 
       setIsSaving(true)
-      setNotice('Saving...')
 
       try {
         await db.patients.update(selectedPatientId, {
@@ -1100,11 +1113,7 @@ function App() {
         setLastSavedAt(new Date().toISOString())
         setProfileDirty(false)
         if (!ageIsValid) {
-          setNotice('Saved. Age not saved until valid.')
-        } else if (manual) {
-          setNotice('Saved.')
-        } else {
-          setNotice('Auto-saved.')
+          setNotice('Age not saved until valid.')
         }
         return true
       } catch {
@@ -1122,7 +1131,7 @@ function App() {
     if (patientId === null) return
 
     if (profileDirty && selectedPatientId !== null && selectedPatientId !== patientId) {
-      const saved = await saveProfile(false)
+      const saved = await saveProfile()
       if (!saved) {
         setNotice('Fix profile save issue before switching patients.')
         return
@@ -1183,7 +1192,7 @@ function App() {
     if (selectedPatientId === null || !profileDirty || isSaving) return
 
     const timeoutId = window.setTimeout(() => {
-      void saveProfile(false)
+      void saveProfile()
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
@@ -1192,26 +1201,17 @@ function App() {
   const updateProfileField = useCallback(<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) => {
     setProfileForm((previous) => ({ ...previous, [field]: value }))
     setProfileDirty(true)
-    if (!isSaving) {
-      setNotice('Unsaved changes.')
-    }
-  }, [isSaving])
+  }, [])
 
   const updateVitalField = useCallback(<K extends keyof VitalFormState>(field: K, value: VitalFormState[K]) => {
     setVitalForm((previous) => ({ ...previous, [field]: value }))
     setVitalDirty(true)
-    if (!isSaving) {
-      setNotice('Unsaved changes.')
-    }
-  }, [isSaving])
+  }, [])
 
   const updateOrderField = useCallback(<K extends keyof OrderFormState>(field: K, value: OrderFormState[K]) => {
     setOrderForm((previous) => ({ ...previous, [field]: value }))
     setOrderDirty(true)
-    if (!isSaving) {
-      setNotice('Unsaved changes.')
-    }
-  }, [isSaving])
+  }, [])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -1263,11 +1263,10 @@ function App() {
   const hasUnsavedChanges = profileDirty || dailyDirty || vitalDirty || orderDirty
 
   const saveDailyUpdate = useCallback(
-    async (manual = true) => {
+    async () => {
       if (selectedPatientId === null) return false
 
       setIsSaving(true)
-      setNotice('Saving...')
 
       try {
         const nextId = await db.dailyUpdates.put({
@@ -1281,7 +1280,6 @@ function App() {
         setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
         setDailyDirty(false)
         setLastSavedAt(new Date().toISOString())
-        setNotice(manual ? 'Saved.' : 'Auto-saved.')
         return true
       } catch {
         setNotice('Unable to save. Please try again.')
@@ -1297,7 +1295,7 @@ function App() {
     if (selectedPatientId === null || !dailyDirty) return
 
     const timeoutId = window.setTimeout(() => {
-      void saveDailyUpdate(false)
+      void saveDailyUpdate()
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
@@ -1607,7 +1605,7 @@ function App() {
   const addStructuredVital = async () => {
     if (selectedPatientId === null || !vitalForm.time) return
 
-    const saved = await saveVitalDraft(true)
+    const saved = await saveVitalDraft()
     if (!saved) return
     setVitalForm(initialVitalForm())
     setVitalDraftId(null)
@@ -1650,7 +1648,7 @@ function App() {
   const saveEditingVital = async () => {
     if (editingVitalId === null || !vitalForm.time) return
 
-    const saved = await saveVitalDraft(true)
+    const saved = await saveVitalDraft()
     if (!saved) return
 
     setEditingVitalId(null)
@@ -1686,7 +1684,7 @@ function App() {
   const addOrder = async () => {
     if (selectedPatientId === null || !orderForm.orderText.trim()) return
 
-    const saved = await saveOrderDraft(true)
+    const saved = await saveOrderDraft()
     if (!saved) return
     setEditingOrderId(null)
     setOrderForm(initialOrderForm())
@@ -1713,7 +1711,7 @@ function App() {
   const saveEditingOrder = async () => {
     if (editingOrderId === null || !orderForm.orderText.trim()) return
 
-    const saved = await saveOrderDraft(true)
+    const saved = await saveOrderDraft()
     if (!saved) return
 
     setEditingOrderId(null)
@@ -1744,11 +1742,10 @@ function App() {
   }
 
   const saveVitalDraft = useCallback(
-    async (manual = true) => {
+    async () => {
       if (selectedPatientId === null || !vitalForm.time) return false
 
       setIsSaving(true)
-      setNotice('Saving...')
 
       const payload = {
         time: vitalForm.time,
@@ -1786,7 +1783,6 @@ function App() {
 
         setVitalDirty(false)
         setLastSavedAt(new Date().toISOString())
-        setNotice(manual ? 'Saved.' : 'Auto-saved.')
         return true
       } catch {
         setNotice('Unable to save. Please try again.')
@@ -1799,11 +1795,10 @@ function App() {
   )
 
   const saveOrderDraft = useCallback(
-    async (manual = true) => {
+    async () => {
       if (selectedPatientId === null || !orderForm.orderText.trim()) return false
 
       setIsSaving(true)
-      setNotice('Saving...')
 
       const payload = {
         orderDate: orderForm.orderDate,
@@ -1838,7 +1833,6 @@ function App() {
 
         setOrderDirty(false)
         setLastSavedAt(new Date().toISOString())
-        setNotice(manual ? 'Saved.' : 'Auto-saved.')
         return true
       } catch {
         setNotice('Unable to save. Please try again.')
@@ -1852,40 +1846,35 @@ function App() {
 
   const saveAllChanges = useCallback(async () => {
     if (selectedPatientId === null || isSaving) return
-    if (!hasUnsavedChanges) {
-      setNotice('No unsaved changes.')
-      return
-    }
+    if (!hasUnsavedChanges) return
 
     let hasFailure = false
 
     if (profileDirty) {
-      const saved = await saveProfile(true)
+      const saved = await saveProfile()
       if (!saved) hasFailure = true
     }
     if (dailyDirty) {
-      const saved = await saveDailyUpdate(true)
+      const saved = await saveDailyUpdate()
       if (!saved) hasFailure = true
     }
     if (vitalDirty) {
-      const saved = await saveVitalDraft(true)
+      const saved = await saveVitalDraft()
       if (!saved) hasFailure = true
     }
     if (orderDirty) {
-      const saved = await saveOrderDraft(true)
+      const saved = await saveOrderDraft()
       if (!saved) hasFailure = true
     }
 
-    if (!hasFailure) {
-      setNotice('All pending changes saved.')
-    }
+    if (!hasFailure) return
   }, [dailyDirty, hasUnsavedChanges, isSaving, orderDirty, profileDirty, saveDailyUpdate, saveOrderDraft, saveProfile, saveVitalDraft, selectedPatientId, vitalDirty])
 
   useEffect(() => {
     if (selectedPatientId === null || !vitalDirty || isSaving) return
 
     const timeoutId = window.setTimeout(() => {
-      void saveVitalDraft(false)
+      void saveVitalDraft()
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
@@ -1895,7 +1884,7 @@ function App() {
     if (selectedPatientId === null || !orderDirty || isSaving || !orderForm.orderText.trim()) return
 
     const timeoutId = window.setTimeout(() => {
-      void saveOrderDraft(false)
+      void saveOrderDraft()
     }, 800)
 
     return () => window.clearTimeout(timeoutId)
@@ -2519,40 +2508,34 @@ function App() {
       ]
     : []
 
+  const focusedPatientNavLabel = selectedPatient
+    ? `${selectedPatient.roomNumber} - ${selectedPatient.lastName}`
+    : 'Patient'
+  const canShowFocusedPatientNavButton = selectedPatient?.status === 'active'
+
   return (
-    <div className='min-h-screen'>
+    <div className='min-h-screen pb-20 sm:pb-0'>
+      {notice ? (
+        <div className='fixed top-2 left-1/2 z-50 w-[min(92vw,40rem)] -translate-x-1/2 px-1 pointer-events-none'>
+          <Alert
+            className={cn(
+              'border-action-primary/30 bg-cherry-blossom/95 pointer-events-auto transition-opacity duration-5000 ease-linear',
+              noticeIsDecaying ? 'opacity-0' : 'opacity-100',
+            )}
+          >
+            <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
+          </Alert>
+        </div>
+      ) : null}
       <main>
         <h1 className='text-2xl font-semibold text-mauve-shadow'>Portable Unofficial Health Record - Really (PUHRR)</h1>
         <p>The puhrfect tool for clerk admin work.</p>
-        {notice ? (
-          <Alert className='border-action-primary/30 bg-cherry-blossom/50 mb-2'>
-            <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
-          </Alert>
-        ) : null}
-        <div className='flex items-center justify-between gap-2 mb-4 flex-wrap'>
-          <div className='flex items-center gap-2 flex-wrap min-h-9'>
-            {selectedPatientId !== null ? (
-              <>
-                <p className='text-sm text-taupe'>
-                  Last saved:{' '}
-                  {lastSavedAt
-                    ? new Date(lastSavedAt).toLocaleTimeString([], {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })
-                    : '—'}
-                </p>
-                <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
-                  {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save now' : 'Saved'}
-                </Button>
-              </>
-            ) : null}
-          </div>
+        <div className='hidden sm:flex justify-end gap-2 mb-4 flex-wrap'>
           <div className='flex gap-2 flex-wrap justify-end'>
             <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
-            {selectedPatient ? (
+            {canShowFocusedPatientNavButton ? (
               <Button variant={view === 'patient' ? 'default' : 'secondary'} onClick={() => setView('patient')}>
-                {selectedPatient.roomNumber} - {selectedPatient.lastName}
+                {focusedPatientNavLabel}
               </Button>
             ) : null}
             <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
@@ -2687,15 +2670,15 @@ function App() {
                 </CardHeader>
                 <CardContent className='px-4 pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
-                  <TabsList className='mb-4 mt-2 h-auto w-full flex-wrap justify-center sm:justify-start'>
-                    <TabsTrigger value='profile'>Profile</TabsTrigger>
-                    <TabsTrigger value='frichmond'>FRICHMOND</TabsTrigger>
-                    <TabsTrigger value='vitals'>Vitals</TabsTrigger>
-                    <TabsTrigger value='labs'>Labs</TabsTrigger>
-                    <TabsTrigger value='medications'>Medications</TabsTrigger>
-                    <TabsTrigger value='orders'>Orders</TabsTrigger>
-                    <TabsTrigger value='photos'>Photos</TabsTrigger>
-                    <TabsTrigger value='reporting'>Reporting</TabsTrigger>
+                  <TabsList className='mb-4 mt-2 h-auto w-full flex flex-wrap justify-center sm:grid sm:grid-cols-4 lg:grid-cols-8'>
+                    <TabsTrigger className='sm:w-full' value='profile'>Profile</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='frichmond'>FRICHMOND</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='vitals'>Vitals</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='labs'>Labs</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='medications'>Medications</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='orders'>Orders</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='photos'>Photos</TabsTrigger>
+                    <TabsTrigger className='sm:w-full' value='reporting'>Reporting</TabsTrigger>
                   </TabsList>
 
                 <TabsContent value='profile'>
@@ -2833,7 +2816,7 @@ function App() {
                         onChange={(event) => {
                           const nextDate = event.target.value
                           if (dailyDirty) {
-                            void saveDailyUpdate(false)
+                            void saveDailyUpdate()
                           }
                           setDailyDate(nextDate)
                           if (selectedPatient?.id) {
@@ -3038,23 +3021,53 @@ function App() {
                           </div>
                           <div className='space-y-1'>
                             <Label>BP</Label>
-                            <Input aria-label='Vital blood pressure' placeholder='120/80' value={vitalForm.bp} onChange={(event) => updateVitalField('bp', event.target.value)} />
+                            <Input
+                              className='placeholder:text-taupe/60'
+                              aria-label='Vital blood pressure'
+                              placeholder='120/80'
+                              value={vitalForm.bp}
+                              onChange={(event) => updateVitalField('bp', event.target.value)}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>HR</Label>
-                            <Input aria-label='Vital heart rate' placeholder='80' value={vitalForm.hr} onChange={(event) => updateVitalField('hr', event.target.value)} />
+                            <Input
+                              className='placeholder:text-taupe/60'
+                              aria-label='Vital heart rate'
+                              placeholder='80'
+                              value={vitalForm.hr}
+                              onChange={(event) => updateVitalField('hr', event.target.value)}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>RR</Label>
-                            <Input aria-label='Vital respiratory rate' placeholder='18' value={vitalForm.rr} onChange={(event) => updateVitalField('rr', event.target.value)} />
+                            <Input
+                              className='placeholder:text-taupe/60'
+                              aria-label='Vital respiratory rate'
+                              placeholder='18'
+                              value={vitalForm.rr}
+                              onChange={(event) => updateVitalField('rr', event.target.value)}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>Temp</Label>
-                            <Input aria-label='Vital temperature' placeholder='37.0' value={vitalForm.temp} onChange={(event) => updateVitalField('temp', event.target.value)} />
+                            <Input
+                              className='placeholder:text-taupe/60'
+                              aria-label='Vital temperature'
+                              placeholder='37.0'
+                              value={vitalForm.temp}
+                              onChange={(event) => updateVitalField('temp', event.target.value)}
+                            />
                           </div>
                           <div className='space-y-1'>
                             <Label>SpO2</Label>
-                            <Input aria-label='Vital oxygen saturation' placeholder='99%' value={vitalForm.spo2} onChange={(event) => updateVitalField('spo2', event.target.value)} />
+                            <Input
+                              className='placeholder:text-taupe/60'
+                              aria-label='Vital oxygen saturation'
+                              placeholder='99'
+                              value={vitalForm.spo2}
+                              onChange={(event) => updateVitalField('spo2', event.target.value)}
+                            />
                           </div>
                           <div className='space-y-1 col-span-2'>
                             <Label>Note</Label>
@@ -3715,6 +3728,7 @@ function App() {
                 <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
+                  <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
@@ -3744,7 +3758,7 @@ function App() {
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
                   <li>Attached photos are stored as compressed copies inside the app database and remain available offline.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
-                  <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits and auto-hides after a short delay.</li>
+                  <li>The top sticky alert is used for meaningful action/error feedback and fades out automatically.</li>
                   <li>Use Save now near the top to force an immediate save for all pending edits; it changes to Saved when no edits are pending.</li>
                   <li>App files are cached by the PWA service worker for offline loading.</li>
                   <li>Data remains after page refresh or browser restart on the same browser profile.</li>
@@ -3834,8 +3848,58 @@ function App() {
           </DialogContent>
         </Dialog>
       </main>
+      <nav className='fixed inset-x-0 bottom-0 z-40 border-t border-taupe bg-pale-oak/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden'>
+        <div className='mx-auto flex w-full max-w-xl gap-2'>
+          <Button
+            size='sm'
+            className='flex-1'
+            variant={view === 'patients' ? 'default' : 'secondary'}
+            onClick={() => setView('patients')}
+          >
+            Patients
+          </Button>
+          {canShowFocusedPatientNavButton ? (
+            <Button
+              size='sm'
+              className='flex-1'
+              variant={view === 'patient' ? 'default' : 'secondary'}
+              onClick={() => setView('patient')}
+            >
+              {focusedPatientNavLabel}
+            </Button>
+          ) : null}
+          <Button
+            size='sm'
+            className='flex-1'
+            variant={view === 'settings' ? 'default' : 'secondary'}
+            onClick={() => setView('settings')}
+          >
+            Settings
+          </Button>
+        </div>
+      </nav>
       <footer className='mt-6 border-t border-taupe/40 pt-3 text-sm text-taupe'>
-        Version: v{__APP_VERSION__} ({__GIT_SHA__})
+        <div className='flex items-center justify-between gap-2 flex-wrap'>
+          <div className='flex items-center gap-2 flex-wrap min-h-9'>
+            {selectedPatientId !== null ? (
+              <>
+                <p className='text-sm text-taupe'>
+                  Last saved:{' '}
+                  {lastSavedAt
+                    ? new Date(lastSavedAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })
+                    : '—'}
+                </p>
+                <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
+                  {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save now' : 'Saved'}
+                </Button>
+              </>
+            ) : null}
+          </div>
+          <p className='ml-auto'>Version: v{__APP_VERSION__} ({__GIT_SHA__})</p>
+        </div>
       </footer>
     </div>
   )
