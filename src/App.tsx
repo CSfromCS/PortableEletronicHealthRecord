@@ -1521,6 +1521,39 @@ function App() {
     return lines.join('\n')
   }
 
+  const toMedicationsSummary = (patient: Patient, medicationEntries: MedicationEntry[]) => {
+    const lines = [`MEDICATIONS — ${patient.lastName} (${patient.roomNumber})`]
+    const active = medicationEntries.filter((m) => m.status === 'active')
+    const inactive = medicationEntries.filter((m) => m.status !== 'active')
+
+    if (active.length > 0) {
+      lines.push('Active:')
+      active.forEach((m) => lines.push(`  ${formatStructuredMedication(m)}`))
+    }
+    if (inactive.length > 0) {
+      lines.push('Inactive/discontinued:')
+      inactive.forEach((m) => lines.push(`  ${formatStructuredMedication(m)}`))
+    }
+    if (medicationEntries.length === 0) {
+      lines.push('No medications yet.')
+    }
+
+    return lines.join('\n')
+  }
+
+  const toLabsSummary = (patient: Patient, labEntries: LabEntry[]) => {
+    const lines = [
+      `LABS — ${patient.lastName} (${patient.roomNumber})`,
+      ...buildStructuredLabLines(labEntries),
+    ]
+
+    if (labEntries.length === 0) {
+      lines.push('No labs yet.')
+    }
+
+    return lines.join('\n')
+  }
+
   const openCopyModal = (text: string, title: string) => {
     setOutputPreview(text)
     setOutputPreviewTitle(title)
@@ -2289,18 +2322,6 @@ function App() {
                 ),
             },
             {
-              id: 'census-entry',
-              label: 'Census',
-              outputTitle: 'Census entry',
-              buildText: () =>
-                toCensusEntry(
-                  selectedPatient,
-                  selectedPatientStructuredMeds,
-                  selectedPatientStructuredLabs,
-                  selectedPatientOrders,
-                ),
-            },
-            {
               id: 'daily-summary',
               label: 'FRICHMOND',
               outputTitle: 'FRICHMOND',
@@ -2319,10 +2340,34 @@ function App() {
               buildText: () => toVitalsLogSummary(selectedPatient, patientVitals ?? []),
             },
             {
+              id: 'labs-summary',
+              label: 'Labs',
+              outputTitle: 'Labs',
+              buildText: () => toLabsSummary(selectedPatient, selectedPatientStructuredLabs),
+            },
+            {
+              id: 'medications-summary',
+              label: 'Medications',
+              outputTitle: 'Medications',
+              buildText: () => toMedicationsSummary(selectedPatient, selectedPatientStructuredMeds),
+            },
+            {
               id: 'orders-summary',
               label: 'Orders',
               outputTitle: 'Orders',
               buildText: () => toOrdersSummary(selectedPatient, selectedPatientOrders),
+            },
+            {
+              id: 'census-entry',
+              label: 'Census',
+              outputTitle: 'Census entry',
+              buildText: () =>
+                toCensusEntry(
+                  selectedPatient,
+                  selectedPatientStructuredMeds,
+                  selectedPatientStructuredLabs,
+                  selectedPatientOrders,
+                ),
             },
           ],
         },
