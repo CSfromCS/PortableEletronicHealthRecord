@@ -59,6 +59,7 @@ Before it works, enable GitHub Pages in repository settings:
 
 What to know:
 - The app now uses relative asset paths so the same build works on GitHub Pages and other static hosts.
+- PWA manifest metadata is authored in `vite.config.ts` (`VitePWA.manifest`), and `public/manifest.json` is kept in sync as a mirror for static-host compatibility.
 - The deployment URL appears in the workflow run after the `deploy` job finishes.
 
 ## Test/validate directly

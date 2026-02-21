@@ -34,6 +34,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['vite.svg'],
+      // Source of truth for PWA metadata. Keep `public/manifest.json` mirrored.
       manifest: {
         name: 'Portable Unofficial Health Record - Really',
         short_name: 'Puhrr',

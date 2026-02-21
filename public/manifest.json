@@ -2,7 +2,7 @@
   "name": "Portable Unofficial Health Record - Really",
   "short_name": "Puhrr",
   "description": "Offline-first patient tracking for hospital rounds",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#d7c0aeff",
   "theme_color": "#e17e65ff",
