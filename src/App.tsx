@@ -2656,38 +2656,34 @@ function App() {
               selectedPatient ? (
               <Card className='bg-pale-oak border-taupe'>
                 <CardHeader className='py-3 px-4 pb-0'>
-                  <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-                    <CardTitle className='text-base text-mauve-shadow'>
-                      {selectedPatient.roomNumber} - {selectedPatient.lastName}, {selectedPatient.firstName}
-                    </CardTitle>
-                    <div className='w-full sm:w-72'>
-                      <Select
-                        value={selectedPatient.id?.toString() ?? ''}
-                        onValueChange={(value) => {
-                          const nextId = Number.parseInt(value, 10)
-                          if (!Number.isFinite(nextId) || selectedPatient.id === nextId) return
-                          const nextPatient = quickSwitchPatients.find((patient) => patient.id === nextId)
-                          if (!nextPatient) return
-                          void selectPatient(nextPatient)
-                        }}
-                      >
-                        <SelectTrigger aria-label='Switch focused patient'>
-                          <SelectValue placeholder='Switch focused patient' />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {quickSwitchPatients.map((patient) => {
-                            if (patient.id === undefined) return null
+                  <Select
+                    value={selectedPatient.id?.toString() ?? ''}
+                    onValueChange={(value) => {
+                      const nextId = Number.parseInt(value, 10)
+                      if (!Number.isFinite(nextId) || selectedPatient.id === nextId) return
+                      const nextPatient = quickSwitchPatients.find((patient) => patient.id === nextId)
+                      if (!nextPatient) return
+                      void selectPatient(nextPatient)
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label='Switch focused patient'
+                      className='h-auto w-full sm:w-fit max-w-full border-0 bg-transparent px-0 py-0 text-base font-semibold tracking-tight text-mauve-shadow shadow-none ring-0 focus:ring-0 focus:ring-offset-0 [&>svg]:text-mauve-shadow/70'
+                    >
+                      <SelectValue placeholder='Switch focused patient' />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quickSwitchPatients.map((patient) => {
+                        if (patient.id === undefined) return null
 
-                            return (
-                              <SelectItem key={patient.id} value={patient.id.toString()}>
-                                {patient.roomNumber} - {patient.lastName}, {patient.firstName}
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                        return (
+                          <SelectItem key={patient.id} value={patient.id.toString()}>
+                            {patient.roomNumber} - {patient.lastName}, {patient.firstName}
+                          </SelectItem>
+                        )
+                      })}
+                    </SelectContent>
+                  </Select>
                 </CardHeader>
                 <CardContent className='px-4 pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
