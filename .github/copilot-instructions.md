@@ -8,6 +8,17 @@
 
 **Not:** A shared EHR, team tool, or full EMR. This is a personal clerk's notebook.
 
+## Source of Truth & Drift Control
+
+- Prefer current code behavior over stale prose when they differ.
+- Keep these files aligned whenever behavior changes:
+  - `src/App.tsx` (workflow and UI behavior)
+  - `src/db.ts` (Dexie schema and migrations)
+  - `src/types.ts` (domain model)
+  - `README.md` (run/deploy/usage notes)
+- If a change updates workflow, field labels/order, or copy/share behavior, also update the in-app Settings **How to use** section in the same task.
+- Avoid hard-coding static "current version" statements in docs; they become stale quickly.
+
 ---
 
 ## Design Principles
@@ -22,7 +33,7 @@
 ## Tech Stack
 
 - **React 19 + TypeScript** + Vite 7 + vite-plugin-pwa
-- **Dexie.js v4+** for IndexedDB (stores: `patients`, `dailyUpdates`, `vitals`, `medications`, `labs`, `orders`)
+- **Dexie.js v4+** for IndexedDB (stores include `patients`, `dailyUpdates`, `vitals`, `medications`, `labs`, `orders`, `photoAttachments`)
 - **React Hook Form + Zod** for structured forms
 - **Tailwind CSS v4** for all styling — configured via CSS `@theme` block in `src/index.css`
   - No `tailwind.config.js` — v4 uses CSS-only config
@@ -133,8 +144,14 @@ Standard medical daily progress note format used in Philippine medical schools:
 ### Version Bumping (Required)
 For every user-visible or behavior-changing update:
 1. Bump `package.json` version in the same task.
-2. Verify footer displays new version after build/run.
+2. Verify footer displays new version after run/preview.
 3. Mention the new version in final response.
+
+### Safety Gates (Required)
+- Default to backward-compatible data changes.
+- Treat destructive schema/data changes as high-risk; only do them when explicitly requested.
+- For backup/import changes, validate payload shape before writes and fail with user-readable errors.
+- Avoid broad refactors unless specifically requested; prefer minimal, localized edits.
 
 ### Code Quality
 - Prefer focused, minimal edits. Keep style consistent.
@@ -143,8 +160,8 @@ For every user-visible or behavior-changing update:
 - Keep Dexie schema simple unless explicitly asked to add structure.
 
 ### Data Constraints
-- **No backward compatibility required yet:** No real patient data exists. Schema, UI, and text formats can change freely.
 - **Privacy-first:** All data stays on device. No telemetry, no analytics, no external calls (except optional Web Share API).
+- Preserve existing user data by default. If a migration may alter/drop data, clearly call it out before implementing.
 
 ---
 
@@ -158,7 +175,7 @@ For every user-visible or behavior-changing update:
 
 ---
 
-## Current State (v0.7.27)
+## Current State (Living)
 
 - ✅ MVP foundation: Patient add/edit, list with search/filter/sort, Profile tab, Vital Signs tab, Orders tab
 - ✅ FRICHMOND note-taking with autosave
@@ -166,6 +183,7 @@ For every user-visible or behavior-changing update:
 - ✅ Text generation: Census entry, daily summary, profile copy/share
 - ✅ Settings: Backup export/import (JSON), clear discharged patients, built-in usage guide
 - ✅ Demo data: Sample patient "Juan Dela Cruz" auto-initialized on first launch
+- ✅ Photo attachments by category with mention linking (`@photo-title`) in long-form notes
 - ✅ **Tailwind CSS v4 + shadcn/ui** — full UI migration complete
 - ✅ All styling uses Tailwind utilities — `src/App.css` deleted
 
@@ -179,4 +197,4 @@ For every user-visible or behavior-changing update:
 - Check that generated text is readable and copy-paste-ready
 - Always update the in-app Settings "How to use" section when workflow, field order, labels, or user-visible behavior changes.
 - Keep README accurate for setup/deployment instructions
-- do not try to build
+- Do not run `npm run build` unless explicitly asked by the user
