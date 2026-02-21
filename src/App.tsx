@@ -34,6 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
+import { formatUrinalysis } from './labFormatters'
 
 type PatientFormState = {
   roomNumber: string
@@ -476,12 +477,16 @@ type LabTemplateTest = {
   key: string
   fullName?: string
   unit?: string
+  section?: string
 }
 
 type LabTemplate = {
   id: string
   name: string
   tests: LabTemplateTest[]
+  /** Optional custom report formatter. When present, `buildStructuredLabLines`
+   *  delegates to this instead of the default "key: value" concatenation. */
+  formatReport?: (results: Record<string, string>) => string
 }
 
 type ReportingAction = {
@@ -529,20 +534,43 @@ const LAB_TEMPLATES: LabTemplate[] = [
   {
     id: 'ust-urinalysis',
     name: 'UST - Urinalysis',
+    formatReport: formatUrinalysis,
     tests: [
-      { key: 'Color' },
-      { key: 'Transparency' },
-      { key: 'Specific Gravity' },
-      { key: 'pH' },
-      { key: 'Protein' },
-      { key: 'Glucose' },
-      { key: 'Ketones' },
-      { key: 'Blood' },
-      { key: 'Leukocyte Esterase' },
-      { key: 'Nitrite' },
-      { key: 'WBC /HPF' },
-      { key: 'RBC /HPF' },
-      { key: 'Bacteria' },
+      // Physical
+      { key: 'Color', section: 'Physical' },
+      { key: 'Transparency', section: 'Physical' },
+      // Chemical
+      { key: 'pH', section: 'Chemical' },
+      { key: 'Specific Gravity', section: 'Chemical' },
+      { key: 'Albumin', section: 'Chemical' },
+      { key: 'Sugar', section: 'Chemical' },
+      { key: 'Leukocytes', section: 'Chemical' },
+      { key: 'Erythrocytes', section: 'Chemical' },
+      { key: 'Bilirubin', section: 'Chemical' },
+      { key: 'Nitrite', section: 'Chemical' },
+      { key: 'Ketone', section: 'Chemical' },
+      { key: 'Urobilinogen', section: 'Chemical' },
+      // Microscopic
+      { key: 'RBC', section: 'Microscopic' },
+      { key: 'Pus', section: 'Microscopic' },
+      { key: 'Yeast', section: 'Microscopic' },
+      { key: 'Squamous', section: 'Microscopic' },
+      { key: 'Renal', section: 'Microscopic' },
+      { key: 'TEC', section: 'Microscopic' },
+      { key: 'Bacteria', section: 'Microscopic' },
+      { key: 'Mucus', section: 'Microscopic' },
+      // Crystals
+      { key: 'Amorphous Urates', section: 'Crystals' },
+      { key: 'Uric Acid', section: 'Crystals' },
+      { key: 'Calcium Oxalate', section: 'Crystals' },
+      { key: 'Amorphous Phosphates', section: 'Crystals' },
+      { key: 'Triple Phosphate', section: 'Crystals' },
+      // Casts
+      { key: 'Hyaline', section: 'Casts' },
+      { key: 'Granular', section: 'Casts' },
+      { key: 'Waxy', section: 'Casts' },
+      { key: 'RBC Cast', section: 'Casts' },
+      { key: 'WBC Cast', section: 'Casts' },
     ],
   },
   {
@@ -1291,6 +1319,16 @@ function App() {
   const buildStructuredLabLines = (entries: LabEntry[]) => {
     return entries.map((entry) => {
       const template = labTemplatesById.get(entry.templateId)
+      const label = template?.name ?? entry.templateId
+      const note = entry.note ? ` — ${entry.note}` : ''
+
+      // Use custom formatter when available
+      if (template?.formatReport) {
+        const formatted = template.formatReport(entry.results ?? {})
+        return `${entry.date} ${label}: ${formatted}${note}`
+      }
+
+      // Default: key: value concatenation
       const resultTexts = (template?.tests ?? [])
         .map((test) => {
           const value = (entry.results?.[test.key] ?? '').trim()
@@ -1299,9 +1337,7 @@ function App() {
         })
         .filter((text): text is string => text !== null)
 
-      const label = template?.name ?? entry.templateId
       const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
-      const note = entry.note ? ` — ${entry.note}` : ''
       return `${entry.date} ${label}: ${details}${note}`
     })
   }
@@ -3020,21 +3056,33 @@ function App() {
                           </div>
                         </div>
                         <div className='space-y-2'>
-                          {selectedLabTemplate.tests.map((test) => (
-                            <div key={test.key} className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
-                              <p className='text-sm text-mauve-shadow font-medium'>
-                                {test.key}
-                                {test.fullName ? ` - ${test.fullName}` : ''}
-                                {test.unit ? ` (${test.unit})` : ''}
-                              </p>
-                              <Input
-                                aria-label={`${selectedLabTemplate.name} ${test.key} value`}
-                                placeholder='Value'
-                                value={labTemplateValues[test.key] ?? ''}
-                                onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
-                              />
-                            </div>
-                          ))}
+                          {(() => {
+                            let lastSection: string | undefined
+                            return selectedLabTemplate.tests.map((test) => {
+                              const showSection = test.section && test.section !== lastSection
+                              lastSection = test.section
+                              return (
+                                <div key={test.key}>
+                                  {showSection && (
+                                    <p className='text-xs font-semibold text-taupe uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
+                                  )}
+                                  <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                                    <p className='text-sm text-mauve-shadow font-medium'>
+                                      {test.key}
+                                      {test.fullName ? ` - ${test.fullName}` : ''}
+                                      {test.unit ? ` (${test.unit})` : ''}
+                                    </p>
+                                    <Input
+                                      aria-label={`${selectedLabTemplate.name} ${test.key} value`}
+                                      placeholder='Value'
+                                      value={labTemplateValues[test.key] ?? ''}
+                                      onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              )
+                            })
+                          })()}
                         </div>
                         <div className='space-y-1'>
                           <Label>Note</Label>
