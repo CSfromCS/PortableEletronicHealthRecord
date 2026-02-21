@@ -2685,7 +2685,7 @@ function App() {
                 <CardContent className='px-4 pb-36 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
                   <TabsList className={cn(
-                    'fixed inset-x-2 z-50 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8',
+                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8',
                     isStandaloneDisplayMode
                       ? 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]'
                       : 'bottom-11',
