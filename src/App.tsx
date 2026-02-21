@@ -2167,7 +2167,7 @@ function App() {
                     : '—'}
                 </p>
                 <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
-                  Save now
+                  {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save now' : 'Saved'}
                 </Button>
               </>
             ) : null}
@@ -3301,7 +3301,7 @@ function App() {
                   <li>Attached photos are stored as compressed copies inside the app database and remain available offline.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
                   <li>The top status notice shows a single Unsaved, Saving, and Saved state for all edits and auto-hides after a short delay.</li>
-                  <li>Use Save now near the top to force an immediate save for all pending edits.</li>
+                  <li>Use Save now near the top to force an immediate save for all pending edits; it changes to Saved when no edits are pending.</li>
                   <li>App files are cached by the PWA service worker for offline loading.</li>
                   <li>Data remains after page refresh or browser restart on the same browser profile.</li>
                 </ul>
