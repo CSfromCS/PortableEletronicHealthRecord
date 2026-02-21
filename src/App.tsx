@@ -647,6 +647,10 @@ const initialOrderForm = (): OrderFormState => ({
 declare const __APP_VERSION__: string;
 declare const __GIT_SHA__: string;
 
+type NavigatorWithStandalone = Navigator & {
+  standalone?: boolean
+}
+
 const isBackupPayload = (value: unknown): value is BackupPayload => {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -708,6 +712,16 @@ function App() {
   const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
   const censusSelectionInitializedRef = useRef(false)
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  const isStandaloneDisplayMode = useMemo(() => {
+    if (typeof window === 'undefined') return false
+
+    const navigatorWithStandalone = window.navigator as NavigatorWithStandalone
+    return (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      navigatorWithStandalone.standalone === true
+    )
+  }, [])
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
@@ -2668,9 +2682,14 @@ function App() {
                     </SelectContent>
                   </Select>
                 </CardHeader>
-                <CardContent className='px-4 pb-40 sm:pb-4'>
+                <CardContent className='px-4 pb-36 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
-                  <TabsList className='fixed inset-x-2 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)] z-30 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8'>
+                  <TabsList className={cn(
+                    'fixed inset-x-2 z-50 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8',
+                    isStandaloneDisplayMode
+                      ? 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]'
+                      : 'bottom-11',
+                  )}>
                     <TabsTrigger className='sm:w-full' value='profile'>Profile</TabsTrigger>
                     <TabsTrigger className='sm:w-full' value='frichmond'>FRICHMOND</TabsTrigger>
                     <TabsTrigger className='sm:w-full' value='vitals'>Vitals</TabsTrigger>
@@ -3729,7 +3748,7 @@ function App() {
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
-                  <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays sticky above the bottom bar and can wrap into multiple lines.</li>
+                  <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
@@ -3849,7 +3868,10 @@ function App() {
           </DialogContent>
         </Dialog>
       </main>
-      <nav className='fixed inset-x-0 bottom-0 z-40 border-t border-taupe bg-pale-oak/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] backdrop-blur sm:hidden'>
+      <nav className={cn(
+        'fixed inset-x-0 bottom-0 z-40 border-t border-taupe bg-pale-oak/95 px-2 pt-2 backdrop-blur sm:hidden',
+        isStandaloneDisplayMode ? 'pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : 'pb-0',
+      )}>
         <div className='mx-auto flex w-full max-w-xl gap-2'>
           <Button
             size='sm'
