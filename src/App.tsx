@@ -484,6 +484,20 @@ type LabTemplate = {
   tests: LabTemplateTest[]
 }
 
+type ReportingAction = {
+  id: string
+  label: string
+  outputTitle: string
+  buildText: () => string
+}
+
+type ReportingSection = {
+  id: string
+  title: string
+  description: string
+  actions: ReportingAction[]
+}
+
 const LAB_TEMPLATES: LabTemplate[] = [
   {
     id: 'ust-cbc',
@@ -652,7 +666,7 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos'>('profile')
+  const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos' | 'reporting'>('profile')
   const [notice, setNotice] = useState('')
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
@@ -662,6 +676,8 @@ function App() {
   const [isPhotoSaving, setIsPhotoSaving] = useState(false)
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<number | null>(null)
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
+  const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
+  const censusSelectionInitializedRef = useRef(false)
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
@@ -704,6 +720,79 @@ function App() {
   )
 
   const activePatients = useMemo(() => (patients ?? []).filter((patient) => patient.status === 'active'), [patients])
+
+  const activePatientIds = useMemo(
+    () => activePatients.map((patient) => patient.id).filter((id): id is number => id !== undefined),
+    [activePatients],
+  )
+
+  const reportingSelectablePatients = useMemo(() => {
+    return [...activePatients].sort((a, b) => {
+      const byRoom = a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })
+      if (byRoom !== 0) return byRoom
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+    })
+  }, [activePatients])
+
+  useEffect(() => {
+    if (activePatientIds.length === 0) {
+      setSelectedCensusPatientIds([])
+      censusSelectionInitializedRef.current = false
+      return
+    }
+
+    setSelectedCensusPatientIds((previous) => {
+      if (!censusSelectionInitializedRef.current) {
+        censusSelectionInitializedRef.current = true
+        return activePatientIds
+      }
+
+      const activeIdSet = new Set(activePatientIds)
+      return previous.filter((id) => activeIdSet.has(id))
+    })
+  }, [activePatientIds])
+
+  const selectedCensusPatients = useMemo(() => {
+    const patientsById = new Map<number, Patient>()
+    reportingSelectablePatients.forEach((patient) => {
+      if (patient.id === undefined) return
+      patientsById.set(patient.id, patient)
+    })
+
+    return selectedCensusPatientIds
+      .map((id) => patientsById.get(id))
+      .filter((patient): patient is Patient => patient !== undefined)
+  }, [reportingSelectablePatients, selectedCensusPatientIds])
+
+  const toggleCensusPatientSelection = (patientId: number) => {
+    setSelectedCensusPatientIds((previous) =>
+      previous.includes(patientId)
+        ? previous.filter((id) => id !== patientId)
+        : [...previous, patientId],
+    )
+  }
+
+  const selectAllCensusPatients = () => {
+    setSelectedCensusPatientIds(activePatientIds)
+  }
+
+  const clearCensusPatientsSelection = () => {
+    setSelectedCensusPatientIds([])
+  }
+
+  const moveCensusPatientSelection = (patientId: number, direction: 'up' | 'down') => {
+    setSelectedCensusPatientIds((previous) => {
+      const index = previous.indexOf(patientId)
+      if (index < 0) return previous
+
+      const targetIndex = direction === 'up' ? index - 1 : index + 1
+      if (targetIndex < 0 || targetIndex >= previous.length) return previous
+
+      const next = [...previous]
+      ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
+      return next
+    })
+  }
 
   const structuredMedsByPatient = useMemo(() => {
     const grouped = new Map<number, MedicationEntry[]>()
@@ -2143,6 +2232,90 @@ function App() {
     setSelectedPatientId(samplePatientId)
   }
 
+  const reportingSections: ReportingSection[] = selectedPatient
+    ? [
+        {
+          id: 'patient-reporting',
+          title: 'Current patient exports',
+          description: 'Generate and format text output for the currently opened patient.',
+          actions: [
+            {
+              id: 'profile-summary',
+              label: 'Profile',
+              outputTitle: 'Profile summary',
+              buildText: () =>
+                toProfileSummary(
+                  selectedPatient,
+                  profileForm,
+                  selectedPatientStructuredMeds,
+                  selectedPatientStructuredLabs,
+                  selectedPatientOrders,
+                ),
+            },
+            {
+              id: 'census-entry',
+              label: 'Census',
+              outputTitle: 'Census entry',
+              buildText: () =>
+                toCensusEntry(
+                  selectedPatient,
+                  selectedPatientStructuredMeds,
+                  selectedPatientStructuredLabs,
+                  selectedPatientOrders,
+                ),
+            },
+            {
+              id: 'daily-summary',
+              label: 'FRICHMOND',
+              outputTitle: 'FRICHMOND',
+              buildText: () =>
+                toDailySummary(
+                  selectedPatient,
+                  dailyUpdateForm,
+                  patientVitals ?? [],
+                  selectedPatientOrders,
+                ),
+            },
+            {
+              id: 'vitals-log',
+              label: 'Vitals',
+              outputTitle: 'Vitals log',
+              buildText: () => toVitalsLogSummary(selectedPatient, patientVitals ?? []),
+            },
+            {
+              id: 'orders-summary',
+              label: 'Orders',
+              outputTitle: 'Orders',
+              buildText: () => toOrdersSummary(selectedPatient, selectedPatientOrders),
+            },
+          ],
+        },
+        {
+          id: 'census-reporting',
+          title: 'All patient exports',
+          description: 'Generate census text for selected active patients in your chosen order.',
+          actions: [
+            {
+              id: 'all-census',
+              label: 'Selected Census',
+              outputTitle: 'Selected Census',
+              buildText: () =>
+                selectedCensusPatients
+                  .map((patient) =>
+                    toCensusEntry(
+                      patient,
+                      structuredMedsByPatient.get(patient.id ?? -1) ?? [],
+                      structuredLabsByPatient.get(patient.id ?? -1) ?? [],
+                      structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
+                    ),
+                  )
+                  .join('\n\n'),
+            },
+          ],
+        },
+      ]
+    : []
+
   return (
     <div className='min-h-screen'>
       <main>
@@ -2267,29 +2440,6 @@ function App() {
               ))}
             </div>
 
-            <div className='flex justify-end mt-2 mb-2'>
-              <Button
-                variant='secondary'
-                onClick={() =>
-                  openCopyModal(
-                    activePatients
-                      .map((patient) =>
-                        toCensusEntry(
-                          patient,
-                          structuredMedsByPatient.get(patient.id ?? -1) ?? [],
-                          structuredLabsByPatient.get(patient.id ?? -1) ?? [],
-                          structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
-                        ),
-                      )
-                      .join('\n\n'),
-                    'All census',
-                  )
-                }
-              >
-                Open all census text
-              </Button>
-            </div>
-
             {selectedPatient ? (
               <Card className='bg-pale-oak border-taupe'>
                 <CardHeader className='py-3 px-4 pb-0'>
@@ -2307,6 +2457,7 @@ function App() {
                     <TabsTrigger value='medications'>Medications</TabsTrigger>
                     <TabsTrigger value='orders'>Orders</TabsTrigger>
                     <TabsTrigger value='photos'>Photos</TabsTrigger>
+                    <TabsTrigger value='reporting'>Reporting</TabsTrigger>
                   </TabsList>
 
                 <TabsContent value='profile'>
@@ -2424,37 +2575,6 @@ function App() {
                       />
                     </div>
                     <div className='flex gap-2 flex-wrap'>
-                      <Button
-                        onClick={() =>
-                          openCopyModal(
-                            toProfileSummary(
-                              selectedPatient,
-                              profileForm,
-                              selectedPatientStructuredMeds,
-                              selectedPatientStructuredLabs,
-                              selectedPatientOrders,
-                            ),
-                            'Profile summary',
-                          )
-                        }
-                      >
-                        Open profile text
-                      </Button>
-                      <Button
-                        onClick={() =>
-                          openCopyModal(
-                            toCensusEntry(
-                              selectedPatient,
-                              selectedPatientStructuredMeds,
-                              selectedPatientStructuredLabs,
-                              selectedPatientOrders,
-                            ),
-                            'Census entry',
-                          )
-                        }
-                      >
-                        Open census entry text
-                      </Button>
                       <Button
                         variant={selectedPatient.status === 'active' ? 'destructive' : 'secondary'}
                         onClick={() => void toggleDischarge(selectedPatient)}
@@ -2664,23 +2784,6 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <div className='flex gap-2 flex-wrap'>
-                      <Button
-                        onClick={() =>
-                          openCopyModal(
-                            toDailySummary(
-                              selectedPatient,
-                              dailyUpdateForm,
-                              patientVitals ?? [],
-                              selectedPatientOrders,
-                            ),
-                            'Daily summary',
-                          )
-                        }
-                      >
-                        Open daily summary text
-                      </Button>
-                    </div>
                   </div>
                 </TabsContent>
                 <TabsContent value='vitals'>
@@ -2764,21 +2867,6 @@ function App() {
                         ) : (
                           <p className='text-sm text-taupe'>No structured vitals in this log yet.</p>
                         )}
-                        <div className='flex gap-2 flex-wrap'>
-                          <Button
-                            onClick={() =>
-                              openCopyModal(
-                                toVitalsLogSummary(
-                                  selectedPatient,
-                                  patientVitals ?? [],
-                                ),
-                                'Vitals log',
-                              )
-                            }
-                          >
-                            Open vitals log text
-                          </Button>
-                        </div>
                       </CardContent>
                     </Card>
                   </div>
@@ -3069,21 +3157,6 @@ function App() {
                               <Button size='sm' variant='secondary' onClick={cancelEditingOrder}>Cancel</Button>
                             </>
                           )}
-                          <Button
-                            size='sm'
-                            variant='secondary'
-                            onClick={() =>
-                              openCopyModal(
-                                toOrdersSummary(
-                                  selectedPatient,
-                                  selectedPatientOrders,
-                                ),
-                                'Orders',
-                              )
-                            }
-                          >
-                            Open orders text
-                          </Button>
                         </div>
                         {selectedPatientOrders.length > 0 ? (
                           <ul className='space-y-1'>
@@ -3241,6 +3314,115 @@ function App() {
                     </Card>
                   </div>
                 </TabsContent>
+                <TabsContent value='reporting'>
+                  <div className='space-y-3'>
+                    {reportingSections.map((section) => (
+                      <Card key={section.id} className='bg-pale-oak-2 border-taupe'>
+                        <CardHeader className='py-2 px-3 pb-0'>
+                          <CardTitle className='text-sm text-mauve-shadow'>{section.title}</CardTitle>
+                        </CardHeader>
+                        <CardContent className='px-3 pb-3 space-y-3'>
+                          <p className='text-sm text-taupe'>{section.description}</p>
+                          {section.id === 'census-reporting' ? (
+                            <div className='space-y-2 rounded-md border border-taupe/40 bg-white p-2'>
+                              <div className='flex items-center justify-between gap-2 flex-wrap'>
+                                <p className='text-xs text-taupe'>
+                                  Included: {selectedCensusPatients.length} of {reportingSelectablePatients.length} active patients
+                                </p>
+                                <div className='flex gap-2'>
+                                  <Button size='sm' variant='secondary' onClick={selectAllCensusPatients}>
+                                    Select all
+                                  </Button>
+                                  <Button size='sm' variant='secondary' onClick={clearCensusPatientsSelection}>
+                                    Clear
+                                  </Button>
+                                </div>
+                              </div>
+                              {reportingSelectablePatients.length > 0 ? (
+                                <div className='flex flex-wrap gap-2'>
+                                  {reportingSelectablePatients.map((patient) => {
+                                    if (patient.id === undefined) return null
+                                    const patientId = patient.id
+                                    const isSelected = selectedCensusPatientIds.includes(patient.id)
+                                    return (
+                                      <Button
+                                        key={patientId}
+                                        type='button'
+                                        size='sm'
+                                        variant={isSelected ? 'default' : 'secondary'}
+                                        onClick={() => toggleCensusPatientSelection(patientId)}
+                                      >
+                                        {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                                      </Button>
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                <p className='text-sm text-taupe'>No active patients to include.</p>
+                              )}
+                              {selectedCensusPatients.length > 0 ? (
+                                <div className='space-y-1'>
+                                  <p className='text-xs text-taupe'>Export order</p>
+                                  <div className='space-y-1'>
+                                    {selectedCensusPatients.map((patient, index) => {
+                                      const patientId = patient.id
+                                      if (patientId === undefined) return null
+
+                                      return (
+                                        <div
+                                          key={`ordered-${patientId}`}
+                                          className='flex items-center justify-between gap-2 rounded border border-taupe/30 bg-pale-oak px-2 py-1'
+                                        >
+                                          <p className='text-sm text-mauve-shadow'>
+                                            {index + 1}. {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                                          </p>
+                                          <div className='flex gap-1'>
+                                            <Button
+                                              size='sm'
+                                              variant='secondary'
+                                              aria-label='Move up'
+                                              title='Move up'
+                                              onClick={() => moveCensusPatientSelection(patientId, 'up')}
+                                              disabled={index === 0}
+                                            >
+                                              ↑
+                                            </Button>
+                                            <Button
+                                              size='sm'
+                                              variant='secondary'
+                                              aria-label='Move down'
+                                              title='Move down'
+                                              onClick={() => moveCensusPatientSelection(patientId, 'down')}
+                                              disabled={index === selectedCensusPatients.length - 1}
+                                            >
+                                              ↓
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          <div className='flex gap-2 flex-wrap'>
+                            {section.actions.map((action) => (
+                              <Button
+                                key={action.id}
+                                type='button'
+                                disabled={action.id === 'all-census' && selectedCensusPatients.length === 0}
+                                onClick={() => openCopyModal(action.buildText(), action.outputTitle)}
+                              >
+                                {action.label}
+                              </Button>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
               </Tabs>
                 </CardContent>
               </Card>
@@ -3274,7 +3456,7 @@ function App() {
                 <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>Open the patient card, then fill Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
-                  <li>Use Open text actions to review, select, and copy handoff-ready text.</li>
+                  <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
               </div>
@@ -3290,6 +3472,7 @@ function App() {
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
+                  <li>Reporting tab: all text exports (profile, census, daily summary, vitals log, and orders) plus all-census output.</li>
                   <li>Settings: backup export/import and clear discharged records.</li>
                 </ul>
               </div>
@@ -3313,9 +3496,9 @@ function App() {
                   <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
-                  <li>Orders tab has Open orders text for quick copy/paste handoff.</li>
+                  <li>Use Reporting tab when you need handoff-ready text output from any section.</li>
                   <li>Orders text box supports multi-line notes and @photo title linking.</li>
-                  <li>Use Open all census text for one-shot census output for active patients.</li>
+                  <li>Use Reporting tab&apos;s All patient exports to select active patients and reorder them before generating all-census output.</li>
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
