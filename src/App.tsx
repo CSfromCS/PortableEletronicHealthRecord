@@ -62,6 +62,11 @@ type ProfileFormState = {
   sex: 'M' | 'F' | 'O'
   service: string
   diagnosis: string
+  chiefComplaint: string
+  hpiText: string
+  pmhText: string
+  peText: string
+  clinicalSummary: string
   plans: string
   medications: string
   labs: string
@@ -77,6 +82,11 @@ const initialProfileForm: ProfileFormState = {
   sex: 'M',
   service: '',
   diagnosis: '',
+  chiefComplaint: '',
+  hpiText: '',
+  pmhText: '',
+  peText: '',
+  clinicalSummary: '',
   plans: '',
   medications: '',
   labs: '',
@@ -1060,6 +1070,7 @@ function App() {
       hpiText: '',
       pmhText: '',
       peText: '',
+      clinicalSummary: '',
       plans: '',
       medications: '',
       labs: '',
@@ -1117,6 +1128,11 @@ function App() {
           sex: profileForm.sex,
           service: profileForm.service.trim(),
           diagnosis: profileForm.diagnosis,
+          chiefComplaint: profileForm.chiefComplaint,
+          hpiText: profileForm.hpiText,
+          pmhText: profileForm.pmhText,
+          peText: profileForm.peText,
+          clinicalSummary: profileForm.clinicalSummary,
           plans: profileForm.plans,
           medications: profileForm.medications,
           labs: profileForm.labs,
@@ -1160,6 +1176,11 @@ function App() {
       sex: patient.sex,
       service: patient.service,
       diagnosis: patient.diagnosis,
+      chiefComplaint: patient.chiefComplaint,
+      hpiText: patient.hpiText,
+      pmhText: patient.pmhText,
+      peText: patient.peText,
+      clinicalSummary: patient.clinicalSummary,
       plans: patient.plans,
       medications: patient.medications,
       labs: patient.labs,
@@ -2214,6 +2235,7 @@ function App() {
         hpiText: '57-year-old male with productive cough and intermittent fever for 5 days, associated with mild dyspnea on exertion. No chest pain. Symptoms improved after IV antibiotics.',
         pmhText: 'Hypertension (8 years), Type 2 Diabetes Mellitus (5 years), ex-smoker',
         peText: 'Awake and coherent, speaks in full sentences.\nVS: BP 128/76, HR 84, RR 18, Temp 37.3°C, SpO2 96% room air.\nChest: bibasal crackles right greater than left, no retractions.\nCVS: adynamic precordium, regular rhythm.\nAbdomen: soft, non-tender.',
+        clinicalSummary: '57M with CAP RLL, now improving with IV antibiotics. Afebrile, stable vitals. Plan to step down to oral antibiotics if remains afebrile. Continue monitoring and pulmonary hygiene.',
         plans: 'Continue IV to oral antibiotic step-down tomorrow if afebrile.\nPulmonary hygiene and ambulation as tolerated.\nRepeat CBC and electrolytes in AM.',
         medications: 'Nebulization PRN for dyspnea episodes.',
         labs: 'Follow-up trends: CBC improving, renal panel stable.',
@@ -2783,6 +2805,66 @@ function App() {
                         placeholder='Diagnosis'
                         value={profileForm.diagnosis}
                         onChange={(nextValue) => updateProfileField('diagnosis', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-chiefcomplaint'>Chief Complaint</Label>
+                      <PhotoMentionField
+                        ariaLabel='Chief Complaint'
+                        placeholder='Chief Complaint'
+                        value={profileForm.chiefComplaint}
+                        onChange={(nextValue) => updateProfileField('chiefComplaint', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-hpi'>History of Present Illness</Label>
+                      <PhotoMentionField
+                        ariaLabel='History of Present Illness'
+                        placeholder='History of Present Illness'
+                        value={profileForm.hpiText}
+                        onChange={(nextValue) => updateProfileField('hpiText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-pmh'>Past Medical History</Label>
+                      <PhotoMentionField
+                        ariaLabel='Past Medical History'
+                        placeholder='Past Medical History'
+                        value={profileForm.pmhText}
+                        onChange={(nextValue) => updateProfileField('pmhText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-pe'>Physical Examination</Label>
+                      <PhotoMentionField
+                        ariaLabel='Physical Examination'
+                        placeholder='Physical Examination'
+                        value={profileForm.peText}
+                        onChange={(nextValue) => updateProfileField('peText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-clinicalsummary'>Clinical Summary</Label>
+                      <PhotoMentionField
+                        ariaLabel='Clinical Summary'
+                        placeholder='Clinical Summary'
+                        value={profileForm.clinicalSummary}
+                        onChange={(nextValue) => updateProfileField('clinicalSummary', nextValue)}
                         attachments={mentionableAttachments}
                         attachmentByTitle={mentionableAttachmentByTitle}
                         onOpenPhotoById={openPhotoById}
