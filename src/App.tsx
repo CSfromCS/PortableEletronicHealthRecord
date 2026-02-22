@@ -1052,7 +1052,7 @@ function App() {
   const abgNormalPfRatio = useMemo(() => {
     if (currentPatientAge === null) return null
     if (currentPatientAge <= 60) return 400
-    return Math.max(0, 400 - (currentPatientAge - 60) * 5)
+    return 400 - (currentPatientAge - 60) * 5
   }, [currentPatientAge])
 
   const structuredOrdersByPatient = useMemo(() => {
