@@ -14,6 +14,7 @@ export interface Patient {
   hpiText: string
   pmhText: string
   peText: string
+  clinicalSummary: string
   plans: string
   medications: string
   labs: string
