@@ -2811,7 +2811,7 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-chiefcomplaint'>Chief Complaint</Label>
+                      <Label>Chief Complaint</Label>
                       <PhotoMentionField
                         ariaLabel='Chief Complaint'
                         placeholder='Chief Complaint'
@@ -2823,7 +2823,7 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-hpi'>History of Present Illness</Label>
+                      <Label>History of Present Illness</Label>
                       <PhotoMentionField
                         ariaLabel='History of Present Illness'
                         placeholder='History of Present Illness'
@@ -2835,7 +2835,7 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-pmh'>Past Medical History</Label>
+                      <Label>Past Medical History</Label>
                       <PhotoMentionField
                         ariaLabel='Past Medical History'
                         placeholder='Past Medical History'
@@ -2847,7 +2847,7 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-pe'>Physical Examination</Label>
+                      <Label>Physical Examination</Label>
                       <PhotoMentionField
                         ariaLabel='Physical Examination'
                         placeholder='Physical Examination'
@@ -2859,7 +2859,7 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-clinicalsummary'>Clinical Summary</Label>
+                      <Label>Clinical Summary</Label>
                       <PhotoMentionField
                         ariaLabel='Clinical Summary'
                         placeholder='Clinical Summary'
