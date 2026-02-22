@@ -652,6 +652,15 @@ type NavigatorWithStandalone = Navigator & {
   standalone?: boolean
 }
 
+type MobileInstallPlatform = 'ios' | 'android' | 'other'
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>
+  userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed'
+    platform: string
+  }>
+}
+
 const isBackupPayload = (value: unknown): value is BackupPayload => {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Record<string, unknown>
@@ -713,6 +722,8 @@ function App() {
   const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
   const censusSelectionInitializedRef = useRef(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const onboardingAutoInstallAttemptedRef = useRef(false)
+  const [deferredInstallPromptEvent, setDeferredInstallPromptEvent] = useState<InstallPromptEvent | null>(null)
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const isStandaloneDisplayMode = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -723,6 +734,17 @@ function App() {
       window.matchMedia('(display-mode: fullscreen)').matches ||
       navigatorWithStandalone.standalone === true
     )
+  }, [])
+  const mobileInstallPlatform = useMemo<MobileInstallPlatform>(() => {
+    if (typeof navigator === 'undefined') return 'other'
+
+    const userAgent = navigator.userAgent || ''
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+    if (isIOS) return 'ios'
+    if (/Android/i.test(userAgent)) return 'android'
+    return 'other'
   }, [])
   const patients = useLiveQuery(() => db.patients.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
@@ -744,6 +766,27 @@ function App() {
   }, [selectedPatientId])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setDeferredInstallPromptEvent(event as InstallPromptEvent)
+    }
+
+    const handleAppInstalled = () => {
+      setDeferredInstallPromptEvent(null)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
+  }, [])
+
+  useEffect(() => {
     if ('storage' in navigator && 'persist' in navigator.storage) {
       void navigator.storage.persist()
     }
@@ -754,6 +797,37 @@ function App() {
       setShowOnboarding(true)
     }
   }, [patients])
+
+  useEffect(() => {
+    if (!showOnboarding) {
+      onboardingAutoInstallAttemptedRef.current = false
+      return
+    }
+
+    if (
+      mobileInstallPlatform !== 'android'
+      || isStandaloneDisplayMode
+      || deferredInstallPromptEvent === null
+      || onboardingAutoInstallAttemptedRef.current
+    ) {
+      return
+    }
+
+    onboardingAutoInstallAttemptedRef.current = true
+
+    const runInstallPrompt = async () => {
+      try {
+        await deferredInstallPromptEvent.prompt()
+        const choice = await deferredInstallPromptEvent.userChoice
+        setDeferredInstallPromptEvent(null)
+        setNotice(choice.outcome === 'accepted' ? 'Install prompt accepted.' : 'Install prompt dismissed.')
+      } catch {
+        setNotice('Use browser menu → Install app/Add to Home screen to install PUHRR.')
+      }
+    }
+
+    void runInstallPrompt()
+  }, [deferredInstallPromptEvent, isStandaloneDisplayMode, mobileInstallPlatform, showOnboarding])
 
   useEffect(() => {
     if (!notice) {
@@ -3840,6 +3914,7 @@ function App() {
               <div className='space-y-1'>
                 <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
+                  <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
                   <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
@@ -3931,6 +4006,29 @@ function App() {
             <p className='text-center text-sm text-clay leading-relaxed'>
               Track patients, capture vitals, organize labs, meds, and orders &mdash; all offline, right from your phone. No account needed. Your data stays on this device.
             </p>
+            <div className='mt-1 rounded-lg border border-clay bg-blush-sand p-3 text-sm text-espresso'>
+              <h4 className='font-semibold'>Install as app (recommended on mobile)</h4>
+              {isStandaloneDisplayMode ? (
+                <p className='mt-1 text-sm text-clay'>PUHRR is already running in installed app mode.</p>
+              ) : mobileInstallPlatform === 'android' ? (
+                <ol className='mt-1 list-decimal pl-5 space-y-1'>
+                  <li>Open this site in Chrome on Android.</li>
+                  <li>Tap the browser menu (⋮), then choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
+                  <li>Confirm Install/Add, then launch PUHRR from your home screen.</li>
+                </ol>
+              ) : mobileInstallPlatform === 'ios' ? (
+                <ol className='mt-1 list-decimal pl-5 space-y-1'>
+                  <li>Open this site in Safari on iPhone or iPad.</li>
+                  <li>Tap <strong>Share</strong> (square with arrow up), then tap <strong>Add to Home Screen</strong>.</li>
+                  <li>Tap <strong>Add</strong>, then open PUHRR from your home screen.</li>
+                </ol>
+              ) : (
+                <div className='mt-1 space-y-1'>
+                  <p>Android (Chrome): menu (⋮) &rarr; <strong>Install app</strong> or <strong>Add to Home screen</strong>.</p>
+                  <p>iPhone/iPad (Safari): <strong>Share</strong> &rarr; <strong>Add to Home Screen</strong>.</p>
+                </div>
+              )}
+            </div>
             <div className='flex flex-col gap-2 mt-2'>
               <Button onClick={() => setShowOnboarding(false)}>
                 Add Your First Patient
