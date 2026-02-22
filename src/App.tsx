@@ -805,8 +805,7 @@ function App() {
     }
 
     if (
-      mobileInstallPlatform !== 'android'
-      || isStandaloneDisplayMode
+      isStandaloneDisplayMode
       || deferredInstallPromptEvent === null
       || onboardingAutoInstallAttemptedRef.current
     ) {
@@ -827,7 +826,7 @@ function App() {
     }
 
     void runInstallPrompt()
-  }, [deferredInstallPromptEvent, isStandaloneDisplayMode, mobileInstallPlatform, showOnboarding])
+  }, [deferredInstallPromptEvent, isStandaloneDisplayMode, showOnboarding])
 
   useEffect(() => {
     if (!notice) {
@@ -3852,7 +3851,7 @@ function App() {
               <CardTitle className='text-base text-espresso'>Settings</CardTitle>
             </CardHeader>
             <CardContent className='px-4 pb-4 space-y-3'>
-              <p className='text-sm text-clay'>Export/import backup JSON, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
+              <p className='text-sm text-clay'>Export/import backup JSON, reopen onboarding, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
               <div className='flex flex-col gap-2'>
                 <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
                 <input
@@ -3863,6 +3862,7 @@ function App() {
                   onChange={(event) => void importBackup(event)}
                 />
                 <Button variant='secondary' onClick={() => backupFileInputRef.current?.click()}>Import backup JSON</Button>
+                <Button variant='secondary' onClick={() => setShowOnboarding(true)}>Show onboarding page / install app</Button>
                 <Button variant='secondary' onClick={() => void addSamplePatient()}>Add sample patient (Juan Dela Cruz)</Button>
                 <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
               </div>
@@ -3894,7 +3894,7 @@ function App() {
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
                   <li>Reporting tab: all text exports (profile, census, daily summary, vitals log, and orders) plus all-census output.</li>
-                  <li>Settings: backup export/import and clear discharged records.</li>
+                  <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
                 </ul>
               </div>
 
@@ -3927,6 +3927,7 @@ function App() {
                   <li>In Photos tab, use Take photo for camera capture or Choose existing for gallery images.</li>
                   <li>In notes/text fields, type @ to pick an uploaded photo title; tap the linked @title to open the same photo modal.</li>
                   <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
+                  <li>In Settings, tap Show onboarding any time to re-open the Welcome modal and retry the install prompt when your browser offers it.</li>
                 </ul>
               </div>
             </section>

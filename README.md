@@ -7,6 +7,7 @@ When **Patient** is open on mobile, the Profile/FRICHMOND/Vitals/Labs/Medication
 Use the **Reporting** tab for all text exporting and formatting actions (profile, census, daily summary, vitals log, orders, and all-census output).
 In **All patient exports**, choose exactly which active patients are included and reorder them before generating all-census text.
 In the **Orders** tab, use **Edit** on an entry to update its status or remove it from the same edit controls.
+In **Settings**, use **Show onboarding** any time to reopen the Welcome modal and retry the install prompt when the browser still provides it.
 
 ## Photo attachments (MVP)
 
