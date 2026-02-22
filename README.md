@@ -55,7 +55,7 @@ Each open patient has eight focused tabs:
 | **Profile** | Demographics, admitting/working diagnosis, clinical details |
 | **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
-| **Labs** | CBC, electrolytes, liver/kidney function with trend comparison |
+| **Labs** | Free-text labs plus structured templates (CBC, urinalysis, electrolytes/renal, ABG with oxygenation calculators) |
 | **Medications** | Active medication list with status tracking |
 | **Orders** | Doctor's orders — add, edit status, remove in one place |
 | **Photos** | Camera capture or gallery pick, organized by section category |
