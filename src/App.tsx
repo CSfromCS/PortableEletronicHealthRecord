@@ -1479,7 +1479,6 @@ function App() {
     patient: Patient,
     medicationEntries: MedicationEntry[],
     labEntries: LabEntry[],
-    orderEntries: OrderEntry[],
   ) => {
     // Section 11: CENSUS REPORT
     // Format:
@@ -1537,9 +1536,6 @@ function App() {
   const toProfileSummary = (
     patient: Patient,
     profile: ProfileFormState,
-    medicationEntries: MedicationEntry[],
-    labEntries: LabEntry[],
-    orderEntries: OrderEntry[],
   ) => {
     // Section 1.2: Service Parsing Logic
     const serviceLines = profile.service.trim().split('\n').filter(Boolean)
@@ -1619,8 +1615,6 @@ function App() {
   const toDailySummary = (
     patient: Patient,
     update: DailyUpdateFormState,
-    vitalsEntries: VitalEntry[],
-    orderEntries: OrderEntry[],
   ) => {
     const hasAnyUpdate =
       update.fluid ||
