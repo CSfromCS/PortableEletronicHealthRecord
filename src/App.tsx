@@ -2552,7 +2552,7 @@ function App() {
       <main>
         <div className='mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex items-center gap-1'>
-            <img src="./puhr-v1.svg" alt="PUHRR logo" className='h-10 w-10 sm:h-12 sm:w-12 shrink-0' />
+            <img src="/assets/puhr-v1/puhr-v1.svg" alt="PUHRR logo" className='h-10 w-10 sm:h-12 sm:w-12 shrink-0' />
             <div>
               <div className='flex items-baseline gap-2'>
                 <h1 className='text-2xl sm:text-3xl font-bold tracking-tight text-espresso'>PUHRR</h1>
@@ -3924,7 +3924,7 @@ function App() {
           <DialogContent className='max-w-md'>
             <DialogHeader>
               <div className='flex justify-center mb-3'>
-                <img src="./puhr-v1.svg" alt="PUHRR" className='h-16 w-16' />
+                <img src="/assets/puhr-v1/puhr-v1.svg" alt="PUHRR" className='h-16 w-16' />
               </div>
               <DialogTitle className='text-center text-xl'>Welcome to PUHRR</DialogTitle>
             </DialogHeader>
