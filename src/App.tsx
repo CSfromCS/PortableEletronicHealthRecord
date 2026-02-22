@@ -1425,12 +1425,34 @@ function App() {
     return entries.map((entry) => {
       const template = labTemplatesById.get(entry.templateId)
       const label = template?.name ?? entry.templateId
+
+      // Parse lab name to get just the type (e.g., "UST - CBC" -> "CBC")
+      const labType = label.includes(' - ') ? label.split(' - ')[1] : label
+
+      // Format datetime as "MM-DD h:mm AM/PM"
+      let formattedDateTime = ''
+      if (entry.createdAt) {
+        const dt = new Date(entry.createdAt)
+        const month = (dt.getMonth() + 1).toString().padStart(2, '0')
+        const day = dt.getDate().toString().padStart(2, '0')
+        const hours = dt.getHours()
+        const minutes = dt.getMinutes()
+        const suffix = hours >= 12 ? 'PM' : 'AM'
+        const hour12 = hours % 12 === 0 ? 12 : hours % 12
+        const minuteStr = minutes.toString().padStart(2, '0')
+        formattedDateTime = `${month}-${day} ${hour12}:${minuteStr} ${suffix}`
+      } else {
+        // Fallback to date only if no createdAt
+        const dateParts = entry.date.split('-')
+        formattedDateTime = `${dateParts[1]}-${dateParts[2]}`
+      }
+
       const note = entry.note ? ` — ${entry.note}` : ''
 
       // Use custom formatter when available
       if (template?.formatReport) {
         const formatted = template.formatReport(entry.results ?? {})
-        return `${entry.date} ${label}: ${formatted}${note}`
+        return `${labType} ${formattedDateTime}: ${formatted}${note}`
       }
 
       // Default: key: value concatenation
@@ -1443,7 +1465,7 @@ function App() {
         .filter((text): text is string => text !== null)
 
       const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
-      return `${entry.date} ${label}: ${details}${note}`
+      return `${labType} ${formattedDateTime}: ${details}${note}`
     })
   }
 
@@ -1451,7 +1473,6 @@ function App() {
     patient: Patient,
     medicationEntries: MedicationEntry[],
     labEntries: LabEntry[],
-    orderEntries: OrderEntry[],
   ) => {
     const activeStructuredMeds = medicationEntries
       .filter((entry) => entry.status === 'active')
@@ -1463,59 +1484,66 @@ function App() {
     const freeformLabs = patient.labs.trim()
     const structuredLabLines = buildStructuredLabLines(labEntries)
     const labsCombined = [freeformLabs, ...structuredLabLines].filter(Boolean).join('\n')
-    const activeOrders = orderEntries
-      .filter((entry) => entry.status === 'active')
-      .map((entry) => {
-        const serviceText = (entry.service ?? '').trim()
-        const whenText = [entry.orderDate ?? '', entry.orderTime ?? ''].filter(Boolean).join(' ')
-        const header = [serviceText, whenText, entry.orderText].filter(Boolean).join(' • ')
-        return [header || entry.orderText, entry.note].filter(Boolean).join(' — ')
-      })
-      .filter(Boolean)
-      .join('; ')
 
-    return [
-      `${patient.roomNumber} ${patient.lastName}, ${patient.firstName} ${patient.age}/${patient.sex}`,
-      patient.diagnosis,
-      `Labs: ${labsCombined || '-'}`,
-      `Meds: ${medsCombined || '-'}`,
-      `Orders: ${activeOrders || '-'}`,
-      `Pendings: ${patient.pendings || '-'}`,
-    ].join('\n')
+    const lines = [
+      `${patient.roomNumber} – ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
+      `${patient.age} / ${patient.sex}`,
+      patient.diagnosis || '-',
+    ]
+
+    if (labsCombined) {
+      lines.push(`Labs:`)
+      lines.push(labsCombined)
+    }
+
+    if (medsCombined) {
+      lines.push(`Medications:`)
+      lines.push(medsCombined)
+    }
+
+    if (patient.pendings.trim()) {
+      lines.push(`Pendings:`)
+      lines.push(patient.pendings.trim())
+    }
+
+    return lines.join('\n')
   }
 
-  const toProfileSummary = (
-    patient: Patient,
-    profile: ProfileFormState,
-    medicationEntries: MedicationEntry[],
-    labEntries: LabEntry[],
-    orderEntries: OrderEntry[],
-  ) => {
-    const activeStructuredMeds = medicationEntries
-      .filter((entry) => entry.status === 'active')
-      .map(formatStructuredMedication)
-      .filter(Boolean)
-    const medsCombined = [profile.medications.trim(), ...activeStructuredMeds].filter(Boolean).join('\n')
+  const toProfileSummary = (patient: Patient, profile: ProfileFormState) => {
+    // Parse service: first line is main, rest are referrals
+    const serviceLines = profile.service.split('\n').filter(Boolean)
+    const mainService = serviceLines[0] || ''
+    const referralServices = serviceLines.slice(1)
 
-    const structuredLabLines = buildStructuredLabLines(labEntries)
-    const labsCombined = [profile.labs.trim(), ...structuredLabLines].filter(Boolean).join('\n')
+    const lines = [
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
+      `${patient.age} / ${patient.sex}`,
+    ]
 
-    const ordersCombined = orderEntries.length
-      ? orderEntries.map((entry) => formatOrderEntry(entry)).join('\n')
-      : ''
+    if (mainService) {
+      lines.push(`Main: ${mainService}`)
+    }
+    if (referralServices.length > 0) {
+      lines.push(`Referrals: ${referralServices.join(', ')}`)
+    }
 
-    return [
-      `PROFILE — ${patient.lastName}, ${patient.firstName} (${patient.roomNumber})`,
-      `${patient.age}/${patient.sex} • ${patient.service}`,
-      `Admit date: ${patient.admitDate}`,
-      `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
-      `Plans: ${profile.plans.trim() || '-'}`,
-      `Meds: ${medsCombined || '-'}`,
-      `Labs: ${labsCombined || '-'}`,
-      `Orders: ${ordersCombined || '-'}`,
-      `Pendings: ${profile.pendings.trim() || '-'}`,
-      `Clerk notes: ${profile.clerkNotes.trim() || '-'}`,
-    ].join('\n')
+    lines.push(`Dx: ${profile.diagnosis.trim() || '-'}`)
+
+    if (profile.pendings.trim()) {
+      lines.push(`Pendings:`)
+      // Split pendings by newline and add numbering
+      const pendingLines = profile.pendings.trim().split('\n').filter(Boolean)
+      pendingLines.forEach((line, index) => {
+        lines.push(`${index + 1}. ${line}`)
+      })
+    }
+
+    if (profile.clerkNotes.trim()) {
+      lines.push(`Notes:`)
+      lines.push(profile.clerkNotes.trim())
+    }
+
+    return lines.join('\n')
   }
 
   const formatVitalEntry = (entry: VitalEntry) => {
@@ -1551,7 +1579,6 @@ function App() {
     patient: Patient,
     update: DailyUpdateFormState,
     vitalsEntries: VitalEntry[],
-    orderEntries: OrderEntry[],
   ) => {
     const hasAnyUpdate =
       vitalsEntries.length > 0 ||
@@ -1568,43 +1595,127 @@ function App() {
       update.assessment ||
       update.plans
 
-    const vitalsLines: string[] = []
-    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals (${entry.date}): ${formatVitalEntry(entry)}`))
-    if (vitalsLines.length === 0 && !hasAnyUpdate) {
-      vitalsLines.push('No update yet.')
-    }
+    // Format date as MM-DD-YYYY
+    const [year, month, day] = dailyDate.split('-')
+    const formattedDate = `${month}-${day}-${year}`
 
     const lines = [
-      `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
-      ...vitalsLines,
-      update.fluid ? `F: ${update.fluid}` : '',
-      update.respiratory ? `R: ${update.respiratory}` : '',
-      update.infectious ? `I: ${update.infectious}` : '',
-      update.cardio ? `C: ${update.cardio}` : '',
-      update.hema ? `H: ${update.hema}` : '',
-      update.metabolic ? `M: ${update.metabolic}` : '',
-      update.output ? `O: ${update.output}` : '',
-      update.neuro ? `N: ${update.neuro}` : '',
-      update.drugs ? `D: ${update.drugs}` : '',
-      update.other ? `Other: ${update.other}` : '',
-      orderEntries.filter((entry) => entry.status === 'active').length > 0
-        ? `Orders: ${orderEntries
-            .filter((entry) => entry.status === 'active')
-            .map((entry) => entry.orderText)
-            .join('; ')}`
-        : '',
-      update.assessment ? `Assessment: ${update.assessment}` : '',
-      update.plans ? `Plan: ${update.plans}` : '',
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName} — ${formattedDate}`,
     ]
 
-    return lines.filter(Boolean).join('\n')
+    // VS trends (optional) - only if vitals exist
+    if (vitalsEntries.length > 0) {
+      const bps: number[] = []
+      const hrs: number[] = []
+      const rrs: number[] = []
+      const temps: number[] = []
+      const spo2s: number[] = []
+
+      vitalsEntries.forEach((entry) => {
+        // Parse BP (systolic/diastolic)
+        const bpMatch = entry.bp.trim().match(/(\d+)\/(\d+)/)
+        if (bpMatch) {
+          bps.push(Number.parseInt(bpMatch[1], 10), Number.parseInt(bpMatch[2], 10))
+        }
+        const hr = Number.parseInt(entry.hr.trim(), 10)
+        if (!Number.isNaN(hr)) hrs.push(hr)
+        const rr = Number.parseInt(entry.rr.trim(), 10)
+        if (!Number.isNaN(rr)) rrs.push(rr)
+        const temp = Number.parseFloat(entry.temp.trim())
+        if (!Number.isNaN(temp)) temps.push(temp)
+        const spo2 = Number.parseInt(entry.spo2.trim(), 10)
+        if (!Number.isNaN(spo2)) spo2s.push(spo2)
+      })
+
+      if (bps.length >= 2 || hrs.length > 0 || rrs.length > 0 || temps.length > 0 || spo2s.length > 0) {
+        // Get time range for VS trends
+        const firstEntry = vitalsEntries[0]
+        const lastEntry = vitalsEntries[vitalsEntries.length - 1]
+
+        const formatTimeRange = (entry: VitalEntry) => {
+          const [hourText] = entry.time.split(':')
+          const parsedHour = Number.parseInt(hourText, 10)
+          if (Number.isNaN(parsedHour)) return entry.time
+          const suffix = parsedHour >= 12 ? 'PM' : 'AM'
+          const hour12 = parsedHour % 12 === 0 ? 12 : parsedHour % 12
+          return `${hour12}${suffix}`
+        }
+
+        const firstDate = firstEntry.date
+        const lastDate = lastEntry.date
+        const firstTime = formatTimeRange(firstEntry)
+        const lastTime = formatTimeRange(lastEntry)
+
+        // Parse dates for formatting
+        const firstDateParts = firstDate.split('-')
+        const lastDateParts = lastDate.split('-')
+
+        let timeRangeStr = ''
+        if (firstDate === lastDate) {
+          timeRangeStr = `${Number.parseInt(firstDateParts[1], 10)}/${Number.parseInt(firstDateParts[2], 10)} ${firstTime}–${lastTime}`
+        } else {
+          timeRangeStr = `${Number.parseInt(firstDateParts[1], 10)}/${Number.parseInt(firstDateParts[2], 10)} ${firstTime}–${Number.parseInt(lastDateParts[1], 10)}/${Number.parseInt(lastDateParts[2], 10)} ${lastTime}`
+        }
+
+        const vsTrendsParts: string[] = []
+
+        if (bps.length >= 2) {
+          const minSystolic = Math.min(...bps.filter((_, i) => i % 2 === 0))
+          const maxSystolic = Math.max(...bps.filter((_, i) => i % 2 === 0))
+          const minDiastolic = Math.min(...bps.filter((_, i) => i % 2 === 1))
+          const maxDiastolic = Math.max(...bps.filter((_, i) => i % 2 === 1))
+          vsTrendsParts.push(`${minSystolic}–${maxSystolic}/${minDiastolic}–${maxDiastolic}`)
+        }
+        if (hrs.length > 0) {
+          vsTrendsParts.push(`${Math.min(...hrs)}–${Math.max(...hrs)}`)
+        }
+        if (rrs.length > 0) {
+          vsTrendsParts.push(`${Math.min(...rrs)}–${Math.max(...rrs)}`)
+        }
+        if (temps.length > 0) {
+          vsTrendsParts.push(`${Math.min(...temps)}–${Math.max(...temps)}`)
+        }
+        if (spo2s.length > 0) {
+          vsTrendsParts.push(`${Math.min(...spo2s)}–${Math.max(...spo2s)}%`)
+        }
+
+        if (vsTrendsParts.length > 0) {
+          lines.push(`VS trends ${timeRangeStr} ${vsTrendsParts.join(', ')}`)
+        }
+      }
+    }
+
+    if (!hasAnyUpdate && vitalsEntries.length === 0) {
+      lines.push('No update yet.')
+    }
+
+    if (update.fluid) lines.push(`F: ${update.fluid}`)
+    if (update.respiratory) lines.push(`R: ${update.respiratory}`)
+    if (update.infectious) lines.push(`I: ${update.infectious}`)
+    if (update.cardio) lines.push(`C: ${update.cardio}`)
+    if (update.hema) lines.push(`H: ${update.hema}`)
+    if (update.metabolic) lines.push(`M: ${update.metabolic}`)
+    if (update.output) lines.push(`O: ${update.output}`)
+    if (update.neuro) lines.push(`N: ${update.neuro}`)
+    if (update.drugs) lines.push(`D: ${update.drugs}`)
+    if (update.other) lines.push(`Other: ${update.other}`)
+    // Orders segment removed as per requirement
+    if (update.assessment) lines.push(`Assessment: ${update.assessment}`)
+    if (update.plans) lines.push(`Plan: ${update.plans}`)
+
+    return lines.join('\n')
   }
 
   const toVitalsLogSummary = (patient: Patient, vitalsEntries: VitalEntry[]) => {
     const lines = [
-      `VITALS LOG — ${patient.lastName} (${patient.roomNumber})`,
-      ...vitalsEntries.map((entry) => `Vitals (${entry.date}): ${formatVitalEntry(entry)}`),
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
     ]
+
+    vitalsEntries.forEach((entry) => {
+      const formattedVitals = formatVitalEntry(entry)
+      const note = entry.note.trim() ? ` ${entry.note}` : ''
+      lines.push(`${formattedVitals}${note}`)
+    })
 
     if (vitalsEntries.length === 0) {
       lines.push('No structured vitals yet.')
@@ -1615,9 +1726,46 @@ function App() {
 
   const toOrdersSummary = (patient: Patient, orderEntries: OrderEntry[]) => {
     const lines = [
-      `ORDERS — ${patient.lastName} (${patient.roomNumber})`,
-      ...orderEntries.map((entry) => formatOrderEntry(entry)),
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
     ]
+
+    orderEntries.forEach((entry) => {
+      const serviceText = (entry.service ?? '').trim()
+
+      // Format date as MM-DD
+      let dateStr = ''
+      if (entry.orderDate) {
+        const dateParts = entry.orderDate.split('-')
+        dateStr = `${dateParts[1]}-${dateParts[2]}`
+      }
+
+      // Format time to 12-hour format with AM/PM
+      let timeStr = ''
+      if (entry.orderTime) {
+        const [hourText, minuteText = '00'] = entry.orderTime.split(':')
+        const parsedHour = Number.parseInt(hourText, 10)
+        if (!Number.isNaN(parsedHour)) {
+          const suffix = parsedHour >= 12 ? 'PM' : 'AM'
+          const hour12 = parsedHour % 12 === 0 ? 12 : parsedHour % 12
+          const parsedMinute = Number.parseInt(minuteText, 10)
+          if (!Number.isNaN(parsedMinute) && parsedMinute !== 0) {
+            timeStr = `${hour12}:${minuteText} ${suffix}`
+          } else {
+            timeStr = `${hour12} ${suffix}`
+          }
+        } else {
+          timeStr = entry.orderTime
+        }
+      }
+
+      const header = [serviceText, dateStr, timeStr].filter(Boolean).join(' – ')
+      lines.push(header)
+
+      // Add order text lines (preserve user formatting)
+      if (entry.orderText.trim()) {
+        lines.push(entry.orderText.trim())
+      }
+    })
 
     if (orderEntries.length === 0) {
       lines.push('No orders yet.')
@@ -1648,7 +1796,7 @@ function App() {
 
   const toLabsSummary = (patient: Patient, labEntries: LabEntry[]) => {
     const lines = [
-      `LABS — ${patient.lastName} (${patient.roomNumber})`,
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
       ...buildStructuredLabLines(labEntries),
     ]
 
@@ -2518,26 +2666,14 @@ function App() {
               id: 'profile-summary',
               label: 'Profile',
               outputTitle: 'Profile summary',
-              buildText: () =>
-                toProfileSummary(
-                  selectedPatient,
-                  profileForm,
-                  selectedPatientStructuredMeds,
-                  selectedPatientStructuredLabs,
-                  selectedPatientOrders,
-                ),
+              buildText: () => toProfileSummary(selectedPatient, profileForm),
             },
             {
               id: 'daily-summary',
               label: 'FRICHMOND',
               outputTitle: 'FRICHMOND',
               buildText: () =>
-                toDailySummary(
-                  selectedPatient,
-                  dailyUpdateForm,
-                  patientVitals ?? [],
-                  selectedPatientOrders,
-                ),
+                toDailySummary(selectedPatient, dailyUpdateForm, patientVitals ?? []),
             },
             {
               id: 'vitals-log',
@@ -2572,7 +2708,6 @@ function App() {
                   selectedPatient,
                   selectedPatientStructuredMeds,
                   selectedPatientStructuredLabs,
-                  selectedPatientOrders,
                 ),
             },
           ],
@@ -2593,7 +2728,6 @@ function App() {
                       patient,
                       structuredMedsByPatient.get(patient.id ?? -1) ?? [],
                       structuredLabsByPatient.get(patient.id ?? -1) ?? [],
-                      structuredOrdersByPatient.get(patient.id ?? -1) ?? [],
                     ),
                   )
                   .join('\n\n'),
