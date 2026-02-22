@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
 
 @theme {
   /* PUHRR brand palette */
@@ -41,7 +42,26 @@
   --color-ring: var(--color-action-primary);
 
   /* Typography */
-  --font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --font-sans:
+    "Inter",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    "Noto Sans",
+    "Liberation Sans",
+    "Arial",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  --font-heading:
+    "Plus Jakarta Sans Variable",
+    "Inter",
+    "Segoe UI",
+    "Roboto",
+    "Helvetica Neue",
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 @layer base {
@@ -72,8 +92,13 @@
 body {
   margin: 0;
   min-width: 320px;
+  font-family: var(--font-sans);
   background-color: var(--color-warm-ivory);
   color: var(--color-espresso);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
 }
 
 #root {
