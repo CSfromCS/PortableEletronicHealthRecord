@@ -1,83 +1,252 @@
-# Portable Unofficial Health Record - Really (PUHRR)
-A simple app for an electronic health record for doing hospital rounds and patient history for medical clerks to use on their phones primarily offline.
+# PUHRR — Portable Unofficial Health Record, Really
 
-Patient tabs now separate key workflows into **Profile, FRICHMOND, Vitals, Labs, Medications, Orders, Photos, and Reporting** for faster focused updates.
-Top-level navigation includes **Patients**, **Focused patient**, and **Settings**; on mobile this is a sticky bottom bar (**Patients / Patient / Settings**), while desktop keeps top navigation with focused patient label (**Room - Last name**). Tap **Open** on a patient card to jump directly into the focused patient view.
-When **Patient** is open on mobile, the Profile/FRICHMOND/Vitals/Labs/Medications/Orders/Photos/Reporting tab row stays fixed just above the bottom nav and still wraps to multiple rows when needed.
-Use the **Reporting** tab for all text exporting and formatting actions (profile, census, daily summary, vitals log, orders, and all-census output).
-In **All patient exports**, choose exactly which active patients are included and reorder them before generating all-census text.
-In the **Orders** tab, use **Edit** on an entry to update its status or remove it from the same edit controls.
-In **Settings**, use **Show onboarding** any time to reopen the Welcome modal and retry the install prompt when the browser still provides it.
+> An offline-first Progressive Web App for medical clerks doing hospital rounds.  
+> Replaces Google Sheets for tracking ~10 active patients during a rotation — built to be fast on a phone.
 
-## Photo attachments (MVP)
+[![License](https://img.shields.io/github/license/CSfromCS/PortableEletronicHealthRecord)](LICENSE)
+[![PWA](https://img.shields.io/badge/PWA-offline--first-blue)](#)
+[![React](https://img.shields.io/badge/React-19-61dafb)](#)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6)](#)
 
-- Photos can be attached per patient and organized by section category (Profile, FRICHMOND, Vitals, Medications, Labs, Orders).
-- In mobile workflow, use **Take photo** for direct camera capture or **Choose existing** to pick from gallery.
-- Photo title is prefilled automatically as `Category + date/time` for quick unique naming and can still be edited.
-- The app stores compressed photo copies in IndexedDB for offline viewing.
-- Current JSON backup/export is text-data only and excludes photo attachments.
-- Deleting a photo inside the app removes only the app copy and does not delete the original phone gallery file.
+---
 
-## Dexie schema compatibility note
+## Table of Contents
 
-- Version `1.0.0` resets local app data to a clean-slate schema baseline.
-- The app now initializes a fresh IndexedDB database (`roundingAppDatabase_v1`) with only actively used stores.
-- Legacy stores and migration chains from pre-1.0 prototypes are intentionally dropped for new installs.
+- [About](#about)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [Project Structure](#project-structure)
+- [Data & Privacy](#data--privacy)
+- [Validating Changes](#validating-changes)
+- [Known Limitations](#known-limitations)
+- [License](#license)
 
-## Run locally
+---
 
-### 1) Install prerequisites
-- Node.js 20+ (LTS recommended)
-- npm (comes with Node.js)
+## About
 
-### 2) Install dependencies
+PUHRR is a **single-user, personal** PWA designed for a medical clerk who needs to:
+
+1. Quickly capture patient notes during morning rounds on a phone.
+2. Generate copy-paste-ready text to share via Viber/WhatsApp to a laptop.
+3. Paste into Google Docs for the official record.
+
+It is **not** a shared EHR, team tool, or full EMR — just a fast personal notebook that works offline.
+
+---
+
+## Features
+
+### Navigation
+
+- **Bottom nav on mobile** — Patients / Patient / Settings sticky bar.
+- **Top nav on desktop** — same sections, with focused patient shown as *Room – Last name*.
+- Tap **Open** on any patient card to jump directly into the focused patient view.
+- On mobile, the tab row stays fixed just above the bottom nav when a patient is open.
+
+### Patient Tabs
+
+Each open patient has eight focused tabs:
+
+| Tab | Purpose |
+|---|---|
+| **Profile** | Demographics, admitting/working diagnosis, clinical details |
+| **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) |
+| **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
+| **Labs** | CBC, electrolytes, liver/kidney function with trend comparison |
+| **Medications** | Active medication list with status tracking |
+| **Orders** | Doctor's orders — add, edit status, remove in one place |
+| **Photos** | Camera capture or gallery pick, organized by section category |
+| **Reporting** | All text export actions (profile, census, daily summary, vitals log, orders, all-census) |
+
+### Reporting & Export
+
+- **Census entry** and **daily summary** formatted for copy-paste into chat apps.
+- **All patient exports** — choose exactly which active patients to include and reorder them before generating.
+- Text output opens in a popup with full-select and **Copy full text** button.
+
+### Photos
+
+- Attach photos per patient, categorized by section (Profile, FRICHMOND, Vitals, Medications, Labs, Orders).
+- Photo title is auto-prefilled as `Category + date/time`; editable before saving.
+- Use `@photo-title` mentions in long-form notes to link directly to an attached photo.
+- Compressed copies stored in IndexedDB for offline viewing.
+- Deleting a photo removes only the in-app copy — the original phone gallery file is untouched.
+
+### Settings
+
+- **Backup / restore** — export all text data as JSON; import to restore.
+- **Clear discharged patients** — bulk-remove patients marked as discharged.
+- **Show onboarding** — reopen the Welcome modal and retry the install prompt at any time.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript 5.9 |
+| Build tool | Vite 7 |
+| PWA | vite-plugin-pwa (Workbox, autoUpdate) |
+| Styling | Tailwind CSS v4 (CSS-only config in `src/index.css`) |
+| UI components | shadcn/ui (files in `src/components/ui/`) |
+| Local database | Dexie.js v4 (IndexedDB) |
+| Forms | React Hook Form + Zod |
+| Icons | lucide-react |
+
+> **Tailwind v4 note:** There is no `tailwind.config.js`. All theme tokens (colors, spacing) are declared in the `@theme` block inside `src/index.css`.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Node.js 20 LTS or later** — [nodejs.org](https://nodejs.org)
+- **npm** (bundled with Node.js)
+
+### Install & run
+
 ```bash
+# 1. Clone the repo
+git clone https://github.com/CSfromCS/PortableEletronicHealthRecord.git
+cd PortableEletronicHealthRecord
+
+# 2. Install dependencies
 npm install
-```
 
-### 3) Start development server
-```bash
+# 3. Start the dev server
 npm run dev
 ```
-Vite will print a local URL (usually `http://localhost:5173`).
 
-## Host it yourself
+Vite starts on **http://localhost:5173** by default.
 
-### Option A: Local production preview
-Build and serve the production bundle on your machine:
+### Testing on a real phone (Codespaces / remote)
+
+1. Run `npm run dev` in the terminal.
+2. Open the **Ports** panel in VS Code — port 5173 appears automatically.
+3. Set visibility to **Public**.
+4. Copy the forwarded URL and open it in Chrome on your phone.
+5. Use **Add to Home Screen** in Chrome to install the PWA.
+
+### Recommended VS Code extension
+
+- **Tailwind CSS IntelliSense** (`bradlc.vscode-tailwindcss`) — autocomplete for custom tokens like `bg-coral-punch`.
+
+---
+
+## Deployment
+
+### Option A — Local production preview
+
 ```bash
 npm run build
 npm run preview
 ```
-Preview usually runs at `http://localhost:4173`.
 
-### Option B: Static hosting
-After `npm run build`, deploy the generated `dist/` folder to any static host (for example: Netlify, GitHub Pages, Cloudflare Pages, Vercel static output).
+Preview serves the production bundle at **http://localhost:4173**.
 
-### Option C: GitHub Pages (automated with GitHub Actions)
-This repository includes `.github/workflows/deploy-pages.yml` to automatically deploy on pushes to `main`.
+### Option B — Static hosting
 
-Before it works, enable GitHub Pages in repository settings:
-1. Go to **Settings → Pages**.
+After `npm run build`, deploy the `dist/` folder to any static host:
+
+- [Netlify](https://netlify.com)
+- [Cloudflare Pages](https://pages.cloudflare.com)
+- [Vercel](https://vercel.com) (static output mode)
+- GitHub Pages (see Option C)
+
+The build uses relative asset paths (`./`) so it works in a subdirectory without extra configuration.
+
+### Option C — GitHub Pages (automated)
+
+A GitHub Actions workflow (`.github/workflows/deploy-pages.yml`) deploys automatically on every push to `main`.
+
+**One-time setup:**
+
+1. Go to **Settings → Pages** in your fork.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
-3. Push to `main` (or run the workflow manually from the **Actions** tab).
+3. Push to `main` (or trigger the workflow manually from the **Actions** tab).
 
-What to know:
-- The app now uses relative asset paths so the same build works on GitHub Pages and other static hosts.
-- PWA manifest metadata is authored in `vite.config.ts` (`VitePWA.manifest`), and `public/manifest.json` is kept in sync as a mirror for static-host compatibility.
-- The deployment URL appears in the workflow run after the `deploy` job finishes.
+The live URL appears in the workflow run after the `deploy` job completes.
 
-## Test/validate directly
+> **PWA manifest:** Metadata is the source of truth in `vite.config.ts` (`VitePWA.manifest`). `public/manifest.json` is kept in sync as a static mirror for hosts that fetch manifests directly.
 
-There is currently no dedicated automated test suite yet. Use the current checks:
+---
+
+## Project Structure
+
+```
+src/
+├── App.tsx              # Main app — all views, tabs, and UI logic
+├── db.ts                # Dexie schema, migrations, and DB helper functions
+├── types.ts             # TypeScript domain types
+├── index.css            # Tailwind v4 @theme tokens + global styles
+├── labFormatters.ts     # Lab result formatting utilities
+├── main.tsx             # React entry point + PWA registration
+├── components/
+│   └── ui/              # shadcn/ui base components (edit freely)
+├── hooks/               # Custom React hooks
+└── lib/
+    └── utils.ts         # cn() helper and shared utilities
+
+public/
+└── manifest.json        # Static PWA manifest mirror (keep in sync with vite.config.ts)
+```
+
+### Database stores (IndexedDB via Dexie)
+
+| Store | Contents |
+|---|---|
+| `patients` | Demographics, diagnosis, clinical details, status |
+| `dailyUpdates` | FRICHMOND notes per patient per day |
+| `vitals` | Vital signs history |
+| `medications` | Medication list entries |
+| `labs` | Lab results |
+| `orders` | Doctor's orders |
+| `photoAttachments` | Compressed photo blobs + metadata |
+
+> **Schema baseline:** The database is named `roundingAppDatabase_v1`. Legacy pre-1.0 stores and migration chains are intentionally dropped for clean installs.
+
+---
+
+## Data & Privacy
+
+- **All data stays on your device.** Nothing is sent to any server.
+- No analytics, no telemetry, no external API calls.
+- Backups are plain JSON files exported manually from Settings.
+- Photo attachments are stored in IndexedDB only — they are **excluded** from the JSON backup.
+
+---
+
+## Validating Changes
+
+No automated test suite yet. Use these checks before shipping:
+
 ```bash
 npm run lint
 npm run build
 ```
 
-Then do a quick manual check:
-1. Open the app in browser.
-2. Confirm the page loads with the title **Portable Unofficial Health Record - Really (PUHRR)**.
-3. Confirm text output actions open a large popup where you can select partial text or tap **Copy full text**.
-4. Confirm no errors in browser console.
-5. (Optional PWA check) Install app from browser menu and verify it opens in standalone mode.
+Then do a quick manual smoke test:
+
+1. Open the app — confirm it loads with title **PUHRR**.
+2. Add a patient, enter a FRICHMOND note, check a generated summary.
+3. Confirm no errors in the browser console.
+4. *(Optional)* Disable network in DevTools → confirm the app still loads and data is accessible.
+5. *(Optional)* Install via browser menu → confirm it opens in standalone mode.
+
+---
+
+## Known Limitations
+
+- JSON backup/restore covers **text data only** — photo attachments are not included.
+- No multi-user or sync support by design.
+- Offline support depends on the PWA service worker being registered on first load while online.
+
+---
+
+## License
+
+[MIT](LICENSE)
