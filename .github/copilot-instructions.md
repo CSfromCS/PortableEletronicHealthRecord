@@ -45,6 +45,15 @@
 
 ---
 
+## Quick Validation Commands
+
+- Install dependencies: `npm ci`
+- Lint: `npm run lint`
+- Dev server (manual verification): `npm run dev`
+- Preview production build locally (when explicitly requested): `npm run preview`
+
+---
+
 ## Color Tokens (Tailwind Classes)
 
 These are the PUHRR brand colors — use them instead of arbitrary color values:
