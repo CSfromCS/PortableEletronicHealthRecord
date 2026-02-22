@@ -1427,23 +1427,51 @@ function App() {
       const label = template?.name ?? entry.templateId
       const note = entry.note ? ` — ${entry.note}` : ''
 
+      // Section 4.2: Per-Lab Header Format
+      // From: 2026-02-21 UST - CBC:
+      // To: <Lab Type> <MM-DD> <h:mm AM/PM>
+      // Example: CBC 02-21 7:45 PM
+
+      // Parse the date and time from entry.createdAt (which is ISO string)
+      const createdDate = new Date(entry.createdAt || entry.date + 'T00:00:00')
+      const month = String(createdDate.getMonth() + 1).padStart(2, '0')
+      const day = String(createdDate.getDate()).padStart(2, '0')
+      const hours = createdDate.getHours()
+      const minutes = createdDate.getMinutes()
+      const hour12 = hours % 12 === 0 ? 12 : hours % 12
+      const suffix = hours >= 12 ? 'PM' : 'AM'
+      const formattedTime = `${hour12}:${String(minutes).padStart(2, '0')} ${suffix}`
+      const formattedDate = `${month}-${day}`
+
+      // Extract lab type name (remove "UST - " prefix if present)
+      let labType = label
+      if (labType.startsWith('UST - ')) {
+        labType = labType.substring(6)
+      }
+
+      const header = `${labType} ${formattedDate} ${formattedTime}`
+
       // Use custom formatter when available
       if (template?.formatReport) {
         const formatted = template.formatReport(entry.results ?? {})
-        return `${entry.date} ${label}: ${formatted}${note}`
+        return `${header}\n${formatted}${note}`
       }
 
-      // Default: key: value concatenation
+      // Default: key: value concatenation (Section 6: CBC Rules - no colons, no units)
       const resultTexts = (template?.tests ?? [])
         .map((test) => {
           const value = (entry.results?.[test.key] ?? '').trim()
           if (!value) return null
+          // Section 6: CBC formatting - no colons, no units
+          if (entry.templateId === 'ust-cbc') {
+            return `${test.key} ${value}`
+          }
           return `${test.key}: ${value}${test.unit ? ` ${test.unit}` : ''}`
         })
         .filter((text): text is string => text !== null)
 
       const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
-      return `${entry.date} ${label}: ${details}${note}`
+      return `${header}\n${details}${note}`
     })
   }
 
@@ -1453,35 +1481,57 @@ function App() {
     labEntries: LabEntry[],
     orderEntries: OrderEntry[],
   ) => {
+    // Section 11: CENSUS REPORT
+    // Format:
+    // <Room> – <LASTNAME>, <First name>
+    // <Age> / <Sex>
+    // <Diagnosis>
+    // Labs:
+    // <Selected labs only>
+    // Medications:
+    // Pendings:
+
+    const lines: string[] = []
+
+    // Header
+    lines.push(`${patient.roomNumber} – ${patient.lastName.toUpperCase()}, ${patient.firstName}`)
+    lines.push(`${patient.age} / ${patient.sex}`)
+
+    // Diagnosis
+    lines.push(patient.diagnosis || '-')
+
+    // Labs (same formatting rules as Labs Summary)
+    lines.push('Labs:')
+    const structuredLabLines = buildStructuredLabLines(labEntries)
+    if (structuredLabLines.length > 0) {
+      structuredLabLines.forEach(line => lines.push(line))
+    } else {
+      lines.push('-')
+    }
+
+    // Medications
+    lines.push('')
+    lines.push('Medications:')
     const activeStructuredMeds = medicationEntries
       .filter((entry) => entry.status === 'active')
       .map(formatStructuredMedication)
       .filter(Boolean)
+    if (activeStructuredMeds.length > 0) {
+      activeStructuredMeds.forEach(med => lines.push(med))
+    } else {
+      lines.push('-')
+    }
 
-    const freeformMeds = patient.medications.trim()
-    const medsCombined = [freeformMeds, ...activeStructuredMeds].filter(Boolean).join('\n')
-    const freeformLabs = patient.labs.trim()
-    const structuredLabLines = buildStructuredLabLines(labEntries)
-    const labsCombined = [freeformLabs, ...structuredLabLines].filter(Boolean).join('\n')
-    const activeOrders = orderEntries
-      .filter((entry) => entry.status === 'active')
-      .map((entry) => {
-        const serviceText = (entry.service ?? '').trim()
-        const whenText = [entry.orderDate ?? '', entry.orderTime ?? ''].filter(Boolean).join(' ')
-        const header = [serviceText, whenText, entry.orderText].filter(Boolean).join(' • ')
-        return [header || entry.orderText, entry.note].filter(Boolean).join(' — ')
-      })
-      .filter(Boolean)
-      .join('; ')
+    // Pendings
+    lines.push('')
+    lines.push('Pendings:')
+    if (patient.pendings && patient.pendings.trim()) {
+      lines.push(patient.pendings.trim())
+    } else {
+      lines.push('-')
+    }
 
-    return [
-      `${patient.roomNumber} ${patient.lastName}, ${patient.firstName} ${patient.age}/${patient.sex}`,
-      patient.diagnosis,
-      `Labs: ${labsCombined || '-'}`,
-      `Meds: ${medsCombined || '-'}`,
-      `Orders: ${activeOrders || '-'}`,
-      `Pendings: ${patient.pendings || '-'}`,
-    ].join('\n')
+    return lines.join('\n')
   }
 
   const toProfileSummary = (
@@ -1491,31 +1541,50 @@ function App() {
     labEntries: LabEntry[],
     orderEntries: OrderEntry[],
   ) => {
-    const activeStructuredMeds = medicationEntries
-      .filter((entry) => entry.status === 'active')
-      .map(formatStructuredMedication)
-      .filter(Boolean)
-    const medsCombined = [profile.medications.trim(), ...activeStructuredMeds].filter(Boolean).join('\n')
+    // Section 1.2: Service Parsing Logic
+    const serviceLines = profile.service.trim().split('\n').filter(Boolean)
+    const mainService = serviceLines.length > 0 ? serviceLines[0] : ''
+    const referralServices = serviceLines.slice(1)
 
-    const structuredLabLines = buildStructuredLabLines(labEntries)
-    const labsCombined = [profile.labs.trim(), ...structuredLabLines].filter(Boolean).join('\n')
+    const lines: string[] = []
 
-    const ordersCombined = orderEntries.length
-      ? orderEntries.map((entry) => formatOrderEntry(entry)).join('\n')
-      : ''
+    // Header: <Room> - <LASTNAME>, <First name>
+    lines.push(`${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`)
 
-    return [
-      `PROFILE — ${patient.lastName}, ${patient.firstName} (${patient.roomNumber})`,
-      `${patient.age}/${patient.sex} • ${patient.service}`,
-      `Admit date: ${patient.admitDate}`,
-      `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
-      `Plans: ${profile.plans.trim() || '-'}`,
-      `Meds: ${medsCombined || '-'}`,
-      `Labs: ${labsCombined || '-'}`,
-      `Orders: ${ordersCombined || '-'}`,
-      `Pendings: ${profile.pendings.trim() || '-'}`,
-      `Clerk notes: ${profile.clerkNotes.trim() || '-'}`,
-    ].join('\n')
+    // Age / Sex
+    lines.push(`${patient.age} / ${patient.sex}`)
+
+    // Main service
+    if (mainService) {
+      lines.push(`Main: ${mainService}`)
+    }
+
+    // Referral services
+    if (referralServices.length > 0) {
+      lines.push(`Referrals: ${referralServices.join(', ')}`)
+    }
+
+    // Diagnosis (labeled as "Dx:")
+    lines.push(`Dx: ${profile.diagnosis.trim() || '-'}`)
+
+    // Pendings (with blank lines between items)
+    const pendingItems = profile.pendings.trim().split('\n').filter(Boolean)
+    if (pendingItems.length > 0) {
+      lines.push('Pendings:')
+      lines.push(pendingItems.join('\n\n'))
+    } else {
+      lines.push('Pendings:')
+      lines.push('-')
+    }
+
+    // Clerk Notes (labeled as "Notes:" - omit if blank)
+    const clerkNotes = profile.clerkNotes.trim()
+    if (clerkNotes) {
+      lines.push('Notes:')
+      lines.push(clerkNotes)
+    }
+
+    return lines.join('\n')
   }
 
   const formatVitalEntry = (entry: VitalEntry) => {
@@ -1554,7 +1623,6 @@ function App() {
     orderEntries: OrderEntry[],
   ) => {
     const hasAnyUpdate =
-      vitalsEntries.length > 0 ||
       update.fluid ||
       update.respiratory ||
       update.infectious ||
@@ -1568,43 +1636,57 @@ function App() {
       update.assessment ||
       update.plans
 
-    const vitalsLines: string[] = []
-    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals (${entry.date}): ${formatVitalEntry(entry)}`))
-    if (vitalsLines.length === 0 && !hasAnyUpdate) {
-      vitalsLines.push('No update yet.')
-    }
+    // Section 2.1: Header Format
+    // From: DAILY UPDATE – Dela Cruz (512A) – 2026-02-21
+    // To: 512A - DELA CRUZ, Juan — 02-21-2026
+    const dateObj = new Date(dailyDate + 'T00:00:00')
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    const year = dateObj.getFullYear()
+    const formattedDate = `${month}-${day}-${year}`
 
     const lines = [
-      `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
-      ...vitalsLines,
-      update.fluid ? `F: ${update.fluid}` : '',
-      update.respiratory ? `R: ${update.respiratory}` : '',
-      update.infectious ? `I: ${update.infectious}` : '',
-      update.cardio ? `C: ${update.cardio}` : '',
-      update.hema ? `H: ${update.hema}` : '',
-      update.metabolic ? `M: ${update.metabolic}` : '',
-      update.output ? `O: ${update.output}` : '',
-      update.neuro ? `N: ${update.neuro}` : '',
-      update.drugs ? `D: ${update.drugs}` : '',
-      update.other ? `Other: ${update.other}` : '',
-      orderEntries.filter((entry) => entry.status === 'active').length > 0
-        ? `Orders: ${orderEntries
-            .filter((entry) => entry.status === 'active')
-            .map((entry) => entry.orderText)
-            .join('; ')}`
-        : '',
-      update.assessment ? `Assessment: ${update.assessment}` : '',
-      update.plans ? `Plan: ${update.plans}` : '',
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName} — ${formattedDate}`,
     ]
 
-    return lines.filter(Boolean).join('\n')
+    // Section 2.2: Vitals removed by default (no vitals output)
+    // Section 2.3: Orders section removed completely
+
+    if (!hasAnyUpdate) {
+      lines.push('No update yet.')
+    } else {
+      if (update.fluid) lines.push(`F: ${update.fluid}`)
+      if (update.respiratory) lines.push(`R: ${update.respiratory}`)
+      if (update.infectious) lines.push(`I: ${update.infectious}`)
+      if (update.cardio) lines.push(`C: ${update.cardio}`)
+      if (update.hema) lines.push(`H: ${update.hema}`)
+      if (update.metabolic) lines.push(`M: ${update.metabolic}`)
+      if (update.output) lines.push(`O: ${update.output}`)
+      if (update.neuro) lines.push(`N: ${update.neuro}`)
+      if (update.drugs) lines.push(`D: ${update.drugs}`)
+      if (update.other) lines.push(`Other: ${update.other}`)
+      if (update.assessment) lines.push(`Assessment: ${update.assessment}`)
+      if (update.plans) lines.push(`Plan: ${update.plans}`)
+    }
+
+    return lines.join('\n')
   }
 
   const toVitalsLogSummary = (patient: Patient, vitalsEntries: VitalEntry[]) => {
+    // Section 3.1: Header Format
+    // From: VITALS LOG — Dela Cruz (512A)
+    // To: 512A - DELA CRUZ, Juan
     const lines = [
-      `VITALS LOG — ${patient.lastName} (${patient.roomNumber})`,
-      ...vitalsEntries.map((entry) => `Vitals (${entry.date}): ${formatVitalEntry(entry)}`),
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
     ]
+
+    // Section 3.2: Entry Format - show only: <Time> <BP> <HR> <RR> <Temp> <SpO2>
+    vitalsEntries.forEach((entry) => {
+      const vitalsLine = formatVitalEntry(entry)
+      if (vitalsLine) {
+        lines.push(vitalsLine)
+      }
+    })
 
     if (vitalsEntries.length === 0) {
       lines.push('No structured vitals yet.')
@@ -1614,16 +1696,60 @@ function App() {
   }
 
   const toOrdersSummary = (patient: Patient, orderEntries: OrderEntry[]) => {
-    const lines = [
-      `ORDERS — ${patient.lastName} (${patient.roomNumber})`,
-      ...orderEntries.map((entry) => formatOrderEntry(entry)),
-    ]
+    // Section 12: ORDERS REPORT FORMAT
+    const lines: string[] = []
+
+    orderEntries.forEach((entry) => {
+      // Section 12: Header Format
+      // <Room> - <LASTNAME>, <First name>
+      // <Main Service> – <MM-DD h:mm AM/PM>
+      const orderDate = entry.orderDate || ''
+      const orderTime = entry.orderTime || ''
+
+      let formattedDateTime = ''
+      if (orderDate && orderTime) {
+        const dateObj = new Date(orderDate + 'T00:00:00')
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+        const day = String(dateObj.getDate()).padStart(2, '0')
+
+        // Parse time to 12-hour format
+        const [hourStr, minuteStr] = orderTime.split(':')
+        const hour24 = Number.parseInt(hourStr, 10)
+        const minute = Number.parseInt(minuteStr, 10)
+        const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
+        const suffix = hour24 >= 12 ? 'PM' : 'AM'
+        const formattedTime = `${hour12}:${String(minute).padStart(2, '0')} ${suffix}`
+
+        formattedDateTime = `${month}-${day} ${formattedTime}`
+      }
+
+      const serviceText = (entry.service ?? '').trim()
+
+      // Header line
+      const headerParts: string[] = []
+      headerParts.push(`${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`)
+      if (serviceText && formattedDateTime) {
+        headerParts.push(`${serviceText} – ${formattedDateTime}`)
+      } else if (serviceText) {
+        headerParts.push(serviceText)
+      } else if (formattedDateTime) {
+        headerParts.push(formattedDateTime)
+      }
+
+      lines.push(headerParts.join('\n'))
+      lines.push('')
+
+      // Section 12: Orders exactly as entered - preserve original formatting
+      lines.push(entry.orderText)
+      lines.push('')
+    })
 
     if (orderEntries.length === 0) {
+      lines.push(`${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`)
       lines.push('No orders yet.')
     }
 
-    return lines.join('\n')
+    return lines.join('\n').trim()
   }
 
   const toMedicationsSummary = (patient: Patient, medicationEntries: MedicationEntry[]) => {
@@ -1647,10 +1773,16 @@ function App() {
   }
 
   const toLabsSummary = (patient: Patient, labEntries: LabEntry[]) => {
+    // Section 4.1: Header Format
+    // From: LABS — Dela Cruz (512A)
+    // To: 512A - DELA CRUZ, Juan
     const lines = [
-      `LABS — ${patient.lastName} (${patient.roomNumber})`,
-      ...buildStructuredLabLines(labEntries),
+      `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
     ]
+
+    // Section 4.2: Per-Lab Header Format will be handled in buildStructuredLabLines
+    const labLines = buildStructuredLabLines(labEntries)
+    labLines.forEach(line => lines.push(line))
 
     if (labEntries.length === 0) {
       lines.push('No labs yet.')
