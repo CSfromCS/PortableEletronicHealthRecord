@@ -4001,18 +4001,19 @@ function App() {
               <div className='flex justify-center mb-3'>
                 <img src="/assets/puhr-v1/puhr-v1.svg" alt="PUHRR" className='h-16 w-16' />
               </div>
-              <DialogTitle className='text-center text-xl'>Welcome to PUHRR</DialogTitle>
+              <DialogTitle className='text-center text-2xl text-espresso'>Welcome to PUHRR</DialogTitle>
             </DialogHeader>
-            <p className='text-center text-sm text-clay leading-relaxed'>
+            <p className='text-center text-base font-medium text-espresso leading-relaxed'>
               Track patients, capture vitals, organize labs, meds, and orders &mdash; all offline, right from your phone. No account needed. Your data stays on this device.
             </p>
-            <div className='mt-1 rounded-lg border border-clay bg-blush-sand p-3 text-sm text-espresso'>
-              <h4 className='font-semibold'>Install as app (recommended on mobile)</h4>
+            <div className='mt-1 rounded-lg border border-clay/40 bg-warm-ivory p-3 text-xs text-clay'>
+              <h4 className='font-medium text-clay'>Highly Recommended: Add to Home Screen</h4>
+              <p className='mt-1 pl-2 space-y-1'>Bigger screen space. No downloads required.</p>
               {isStandaloneDisplayMode ? (
-                <p className='mt-1 text-sm text-clay'>PUHRR is already running in installed app mode.</p>
+                <p className='mt-1'>PUHRR is already running in installed app mode.</p>
               ) : mobileInstallPlatform === 'android' ? (
                 <ol className='mt-1 list-decimal pl-5 space-y-1'>
-                  <li>Open this site in Chrome on Android.</li>
+                  <li>For Android phone: Open this site on a browser.</li>
                   <li>Tap the browser menu (⋮), then choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>
                   <li>Confirm Install/Add, then launch PUHRR from your home screen.</li>
                 </ol>
@@ -4028,7 +4029,10 @@ function App() {
                   <p>iPhone/iPad (Safari): <strong>Share</strong> &rarr; <strong>Add to Home Screen</strong>.</p>
                 </div>
               )}
-            </div>
+            </div>            
+            <p className='text-center text-sm text-clay'>
+              Start by adding your first patient<br />or exploring the sample record.
+            </p>
             <div className='flex flex-col gap-2 mt-2'>
               <Button onClick={() => setShowOnboarding(false)}>
                 Add Your First Patient
