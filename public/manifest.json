@@ -8,10 +8,16 @@
   "theme_color": "#E2614A",
   "icons": [
     {
-      "src": "puhrr-logo.svg",
+      "src": "puhr-v1.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "puhr-v1.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

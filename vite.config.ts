@@ -33,7 +33,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['puhrr-logo.svg'],
+      includeAssets: ['puhr-v1.svg'],
       // Source of truth for PWA metadata. Keep `public/manifest.json` mirrored.
       manifest: {
         name: 'PUHRR - Portable Electronic Health Record',
@@ -45,10 +45,16 @@ export default defineConfig({
         theme_color: '#E2614A',
         icons: [
           {
-            src: 'puhrr-logo.svg',
+            src: 'puhr-v1.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any',
+          },
+          {
+            src: 'puhr-v1.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'maskable',
           },
         ],
       },
