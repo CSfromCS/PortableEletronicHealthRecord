@@ -35,6 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { formatUrinalysis } from './labFormatters'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -420,18 +421,18 @@ const PhotoMentionField = ({
           />
         )}
         {activeMention !== null && filteredSuggestions.length > 0 ? (
-          <div className='absolute left-0 right-0 z-20 mt-1 rounded-md border border-taupe/40 bg-white shadow-sm'>
+          <div className='absolute left-0 right-0 z-20 mt-1 rounded-md border border-clay/40 bg-white shadow-sm'>
             <ul className='max-h-44 overflow-auto py-1'>
               {filteredSuggestions.map((entry) => (
                 <li key={entry.id}>
                   <button
                     type='button'
-                    className='w-full px-3 py-1.5 text-left text-sm hover:bg-pale-oak'
+                    className='w-full px-3 py-1.5 text-left text-sm hover:bg-warm-ivory'
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectSuggestion(entry)}
                   >
-                    <span className='font-medium text-mauve-shadow'>{entry.title}</span>
-                    <span className='ml-2 text-xs text-taupe'>{formatPhotoCategory(entry.category)}</span>
+                    <span className='font-medium text-espresso'>{entry.title}</span>
+                    <span className='ml-2 text-xs text-clay'>{formatPhotoCategory(entry.category)}</span>
                   </button>
                 </li>
               ))}
@@ -711,6 +712,7 @@ function App() {
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
   const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
   const censusSelectionInitializedRef = useRef(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const isStandaloneDisplayMode = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -746,6 +748,12 @@ function App() {
       void navigator.storage.persist()
     }
   }, [])
+
+  useEffect(() => {
+    if (patients && patients.length === 0) {
+      setShowOnboarding(true)
+    }
+  }, [patients])
 
   useEffect(() => {
     if (!notice) {
@@ -2533,25 +2541,25 @@ function App() {
         <div className='fixed top-2 left-1/2 z-50 w-[min(92vw,40rem)] -translate-x-1/2 px-1 pointer-events-none'>
           <Alert
             className={cn(
-              'border-action-primary/30 bg-cherry-blossom/95 pointer-events-auto transition-opacity duration-5000 ease-linear',
+              'border-action-primary/30 bg-peach-cream/95 pointer-events-auto transition-opacity duration-5000 ease-linear',
               noticeIsDecaying ? 'opacity-0' : 'opacity-100',
             )}
           >
-            <AlertDescription className='text-mauve-shadow font-semibold'>{notice}</AlertDescription>
+            <AlertDescription className='text-espresso font-semibold'>{notice}</AlertDescription>
           </Alert>
         </div>
       ) : null}
       <main>
-        <div className='mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
-            <div className='mb-0.5 grid grid-cols-[auto_1fr] grid-rows-2 items-center gap-x-2 gap-y-0'>
-              <h1 className='row-span-2 text-3xl leading-none font-semibold text-mauve-shadow'>PUHRR</h1>
-              <p className='row-span-2 self-stretch text-sm leading-none text-taupe flex flex-col justify-center'>
-                <span className='block'>Portable Unofficial </span>
-                <span className='block'>Health Record, Really!</span>
-              </p>
+        <div className='mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex items-center gap-3'>
+            <img src="./puhrr-logo.svg" alt="PUHRR logo" className='h-10 w-10 sm:h-12 sm:w-12 shrink-0' />
+            <div>
+              <div className='flex items-baseline gap-2'>
+                <h1 className='text-2xl sm:text-3xl font-bold tracking-tight text-espresso'>PUHRR</h1>
+                <p className='text-xs sm:text-sm font-medium text-clay hidden sm:block'>Portable Unofficial Health Record, Really!</p>
+              </div>
+              <p className='text-sm text-clay/80 italic'>The puhrrfect tool for clerk admin work.</p>
             </div>
-            <p className='text-sm italic text-taupe'>The puhrrfect tool for clerk admin work.</p>
           </div>
           <div className='hidden sm:flex justify-end gap-2 flex-wrap'>
             <div className='flex gap-2 flex-wrap justify-end'>
@@ -2570,9 +2578,9 @@ function App() {
           <>
             {view === 'patients' ? (
               <>
-            <Card className='bg-pale-oak border-taupe mb-4'>
+            <Card className='bg-warm-ivory border-clay mb-4'>
               <CardHeader className='py-2 px-3 pb-0'>
-                <CardTitle className='text-sm text-mauve-shadow'>Add patient</CardTitle>
+                <CardTitle className='text-sm text-espresso'>Add patient</CardTitle>
               </CardHeader>
               <CardContent className='px-3 pb-3'>
                 <form className='grid grid-cols-2 gap-2 sm:grid-cols-3' onSubmit={handleSubmit}>
@@ -2594,7 +2602,7 @@ function App() {
               </CardContent>
             </Card>
 
-            <Card className='bg-pale-oak border-taupe mb-4'>
+            <Card className='bg-warm-ivory border-clay mb-4'>
               <CardContent className='px-3 py-2'>
                 <div className='flex gap-2 flex-wrap'>
                   <Input
@@ -2626,26 +2634,26 @@ function App() {
 
             <div className='flex flex-col gap-2'>
               {visiblePatients.map((patient) => (
-                <Card key={patient.id} className='bg-cherry-blossom border-taupe hover:shadow-md transition-shadow'>
+                <Card key={patient.id} className={cn('bg-peach-cream border-clay/40 hover:shadow-md hover:border-clay/60 transition-all duration-200 overflow-hidden', patient.status === 'active' ? 'border-l-4 border-l-action-primary' : 'border-l-4 border-l-clay/40')}>
                   <CardContent className='flex items-center justify-between gap-3 py-3 px-4'>
                     <div className='flex-1 min-w-0'>
-                      <p className='font-semibold text-mauve-shadow truncate'>
+                      <p className='font-semibold text-espresso truncate text-base'>
                         {patient.roomNumber} — {patient.lastName}, {patient.firstName}
                       </p>
-                      <p className='text-sm text-taupe mt-0.5'>
+                      <p className='text-sm text-clay mt-0.5'>
                         {patient.age}/{patient.sex} • {patient.service.split('\n')[0]}
                       </p>
-                      <div className='flex items-center gap-2 mt-1 flex-wrap'>
+                      <div className='flex items-center gap-2 mt-1.5 flex-wrap'>
                         <Badge className={cn(
                           'text-xs',
                           patient.status === 'active'
-                            ? 'bg-action-primary text-white'
+                            ? 'bg-[#3AA766] text-white'
                             : 'bg-action-secondary/20 text-action-secondary'
                         )}>
                           {patient.status}
                         </Badge>
                         {patient.diagnosis && (
-                          <span className='text-xs text-mauve-shadow/80 truncate'>
+                          <span className='text-xs text-espresso/80 truncate'>
                             {patient.diagnosis.split('\n')[0]}
                           </span>
                         )}
@@ -2661,7 +2669,7 @@ function App() {
 
             {view === 'patient' ? (
               selectedPatient ? (
-              <Card className='bg-pale-oak border-taupe'>
+              <Card className='bg-warm-ivory border-clay'>
                 <CardHeader className='py-3 px-4 pb-0'>
                   <Select
                     value={selectedPatient.id?.toString() ?? ''}
@@ -2675,7 +2683,7 @@ function App() {
                   >
                     <SelectTrigger
                       aria-label='Switch focused patient'
-                      className='h-auto w-full sm:w-fit max-w-full border-0 bg-transparent px-0 py-0 text-base font-semibold tracking-tight text-mauve-shadow shadow-none ring-0 focus:ring-0 focus:ring-offset-0 [&>svg]:text-mauve-shadow/70'
+                      className='h-auto w-full sm:w-fit max-w-full border-0 bg-transparent px-0 py-0 text-base font-semibold tracking-tight text-espresso shadow-none ring-0 focus:ring-0 focus:ring-offset-0 [&>svg]:text-espresso/70'
                     >
                       <SelectValue placeholder='Switch focused patient' />
                     </SelectTrigger>
@@ -2695,19 +2703,19 @@ function App() {
                 <CardContent className='px-4 pb-36 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
                   <TabsList className={cn(
-                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto flex flex-wrap justify-center sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8',
+                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto overflow-x-auto hide-scrollbar flex gap-0.5 px-1 sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8 sm:overflow-visible',
                     isStandaloneDisplayMode
                       ? 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]'
                       : 'bottom-11',
                   )}>
-                    <TabsTrigger className='sm:w-full' value='profile'>Profile</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='frichmond'>FRICHMOND</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='vitals'>Vitals</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='labs'>Labs</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='medications'>Medications</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='orders'>Orders</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='photos'>Photos</TabsTrigger>
-                    <TabsTrigger className='sm:w-full' value='reporting'>Reporting</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='profile'>Profile</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='frichmond'>FRICH</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='vitals'>Vitals</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='labs'>Labs</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='medications'>Meds</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='orders'>Orders</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='photos'>Photos</TabsTrigger>
+                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='reporting'>Report</TabsTrigger>
                   </TabsList>
 
                 <TabsContent value='profile'>
@@ -3038,9 +3046,9 @@ function App() {
                 </TabsContent>
                 <TabsContent value='vitals'>
                   <div className='space-y-3'>
-                    <Card className='bg-pale-oak-2 border-taupe'>
+                    <Card className='bg-blush-sand border-clay'>
                       <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured vitals log</CardTitle>
+                        <CardTitle className='text-sm text-espresso'>Structured vitals log</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
@@ -3051,7 +3059,7 @@ function App() {
                           <div className='space-y-1'>
                             <Label>BP</Label>
                             <Input
-                              className='placeholder:text-taupe/60'
+                              className='placeholder:text-clay/60'
                               aria-label='Vital blood pressure'
                               placeholder='120/80'
                               value={vitalForm.bp}
@@ -3061,7 +3069,7 @@ function App() {
                           <div className='space-y-1'>
                             <Label>HR</Label>
                             <Input
-                              className='placeholder:text-taupe/60'
+                              className='placeholder:text-clay/60'
                               aria-label='Vital heart rate'
                               placeholder='80'
                               value={vitalForm.hr}
@@ -3071,7 +3079,7 @@ function App() {
                           <div className='space-y-1'>
                             <Label>RR</Label>
                             <Input
-                              className='placeholder:text-taupe/60'
+                              className='placeholder:text-clay/60'
                               aria-label='Vital respiratory rate'
                               placeholder='18'
                               value={vitalForm.rr}
@@ -3081,7 +3089,7 @@ function App() {
                           <div className='space-y-1'>
                             <Label>Temp</Label>
                             <Input
-                              className='placeholder:text-taupe/60'
+                              className='placeholder:text-clay/60'
                               aria-label='Vital temperature'
                               placeholder='37.0'
                               value={vitalForm.temp}
@@ -3091,7 +3099,7 @@ function App() {
                           <div className='space-y-1'>
                             <Label>SpO2</Label>
                             <Input
-                              className='placeholder:text-taupe/60'
+                              className='placeholder:text-clay/60'
                               aria-label='Vital oxygen saturation'
                               placeholder='99'
                               value={vitalForm.spo2}
@@ -3126,9 +3134,9 @@ function App() {
                         {patientVitals && patientVitals.length > 0 ? (
                           <ul className='space-y-1'>
                             {patientVitals.map((entry) => (
-                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-clay/30 last:border-0'>
                                 {editingVitalId === entry.id ? (
-                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                  <span className='text-clay italic'>(Editing above...)</span>
                                 ) : (
                                   <>
                                     <span className='whitespace-pre-wrap'>
@@ -3145,7 +3153,13 @@ function App() {
                             ))}
                           </ul>
                         ) : (
-                          <p className='text-sm text-taupe'>No structured vitals in this log yet.</p>
+                          <div className='flex flex-col items-center justify-center py-8 text-center'>
+                            <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                              <HeartPulse className='h-6 w-6 text-clay' />
+                            </div>
+                            <p className='text-sm font-medium text-espresso'>No vitals recorded yet</p>
+                            <p className='text-xs text-clay mt-1'>Add your first vital signs entry above.</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -3165,9 +3179,9 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
+                    <Card className='bg-blush-sand border-clay'>
                       <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured medications</CardTitle>
+                        <CardTitle className='text-sm text-espresso'>Structured medications</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-2 gap-2'>
@@ -3225,9 +3239,9 @@ function App() {
                         {selectedPatientStructuredMeds.length > 0 ? (
                           <ul className='space-y-1'>
                             {selectedPatientStructuredMeds.map((entry) => (
-                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-clay/30 last:border-0'>
                                 {editingMedicationId === entry.id ? (
-                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                  <span className='text-clay italic'>(Editing above...)</span>
                                 ) : (
                                   <>
                                       <span className='whitespace-pre-wrap'>
@@ -3244,7 +3258,13 @@ function App() {
                             ))}
                           </ul>
                         ) : (
-                          <p className='text-sm text-taupe'>No structured medications yet.</p>
+                          <div className='flex flex-col items-center justify-center py-8 text-center'>
+                            <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                              <Pill className='h-6 w-6 text-clay' />
+                            </div>
+                            <p className='text-sm font-medium text-espresso'>No medications added yet</p>
+                            <p className='text-xs text-clay mt-1'>Add your first medication entry above.</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -3264,9 +3284,9 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <Card className='bg-pale-oak-2 border-taupe'>
+                    <Card className='bg-blush-sand border-clay'>
                       <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Structured labs</CardTitle>
+                        <CardTitle className='text-sm text-espresso'>Structured labs</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
@@ -3308,10 +3328,10 @@ function App() {
                               return (
                                 <div key={test.key}>
                                   {showSection && (
-                                    <p className='text-xs font-semibold text-taupe uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
+                                    <p className='text-xs font-semibold text-clay uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
                                   )}
                                   <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
-                                    <p className='text-sm text-mauve-shadow font-medium'>
+                                    <p className='text-sm text-espresso font-medium'>
                                       {test.key}
                                       {test.fullName ? ` - ${test.fullName}` : ''}
                                       {test.unit ? ` (${test.unit})` : ''}
@@ -3356,9 +3376,9 @@ function App() {
                             {buildStructuredLabLines(selectedPatientStructuredLabs).map((line, index) => {
                               const entry = selectedPatientStructuredLabs[index]
                               return (
-                                <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                                <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-clay/30 last:border-0'>
                                   {editingLabId === entry.id ? (
-                                    <span className='text-taupe italic'>(Editing above...)</span>
+                                    <span className='text-clay italic'>(Editing above...)</span>
                                   ) : (
                                     <>
                                       <span className='whitespace-pre-wrap'>
@@ -3376,7 +3396,13 @@ function App() {
                             })}
                           </ul>
                         ) : (
-                          <p className='text-sm text-taupe'>No structured labs yet.</p>
+                          <div className='flex flex-col items-center justify-center py-8 text-center'>
+                            <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                              <FlaskConical className='h-6 w-6 text-clay' />
+                            </div>
+                            <p className='text-sm font-medium text-espresso'>No lab results yet</p>
+                            <p className='text-xs text-clay mt-1'>Add your first lab entry above.</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -3384,9 +3410,9 @@ function App() {
                 </TabsContent>
                 <TabsContent value='orders'>
                   <div className='space-y-3'>
-                    <Card className='bg-pale-oak-2 border-taupe'>
+                    <Card className='bg-blush-sand border-clay'>
                       <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Doctor&apos;s orders</CardTitle>
+                        <CardTitle className='text-sm text-espresso'>Doctor&apos;s orders</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-2 gap-2'>
@@ -3453,9 +3479,9 @@ function App() {
                         {selectedPatientOrders.length > 0 ? (
                           <ul className='space-y-1'>
                             {selectedPatientOrders.map((entry) => (
-                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-taupe/30 last:border-0'>
+                              <li key={entry.id} className='flex items-center justify-between gap-2 text-sm py-1 border-b border-clay/30 last:border-0'>
                                 {editingOrderId === entry.id ? (
-                                  <span className='text-taupe italic'>(Editing above...)</span>
+                                  <span className='text-clay italic'>(Editing above...)</span>
                                 ) : (
                                   <>
                                     <span className='min-w-0 flex-1 whitespace-pre-wrap text-left'>
@@ -3472,7 +3498,13 @@ function App() {
                             ))}
                           </ul>
                         ) : (
-                          <p className='text-sm text-taupe'>No orders yet.</p>
+                          <div className='flex flex-col items-center justify-center py-8 text-center'>
+                            <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                              <ClipboardList className='h-6 w-6 text-clay' />
+                            </div>
+                            <p className='text-sm font-medium text-espresso'>No orders yet</p>
+                            <p className='text-xs text-clay mt-1'>Add your first order above.</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -3480,9 +3512,9 @@ function App() {
                 </TabsContent>
                 <TabsContent value='photos'>
                   <div className='space-y-3'>
-                    <Card className='bg-pale-oak-2 border-taupe'>
+                    <Card className='bg-blush-sand border-clay'>
                       <CardHeader className='py-2 px-3 pb-0'>
-                        <CardTitle className='text-sm text-mauve-shadow'>Photo attachments</CardTitle>
+                        <CardTitle className='text-sm text-espresso'>Photo attachments</CardTitle>
                       </CardHeader>
                       <CardContent className='px-3 pb-3 space-y-3'>
                         <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
@@ -3566,10 +3598,10 @@ function App() {
                               const createdAt = new Date(entry.createdAt).toLocaleString()
 
                               return (
-                                <div key={entry.id} className='rounded-md border border-taupe/40 bg-white p-1.5 space-y-1'>
+                                <div key={entry.id} className='rounded-md border border-clay/40 bg-white p-1.5 space-y-1'>
                                   <button
                                     type='button'
-                                    className='w-full overflow-hidden rounded border border-taupe/30 bg-pale-oak'
+                                    className='w-full overflow-hidden rounded border border-clay/30 bg-warm-ivory'
                                     onClick={() => setSelectedAttachmentId(entry.id ?? null)}
                                   >
                                     {previewUrl ? (
@@ -3580,17 +3612,17 @@ function App() {
                                         loading='lazy'
                                       />
                                     ) : (
-                                      <div className='h-28 flex items-center justify-center text-xs text-taupe'>No preview</div>
+                                      <div className='h-28 flex items-center justify-center text-xs text-clay'>No preview</div>
                                     )}
                                   </button>
-                                  <p className='text-xs text-mauve-shadow line-clamp-2'>
+                                  <p className='text-xs text-espresso line-clamp-2'>
                                     {entry.title || '(No title)'}
                                   </p>
-                                  <p className='text-[11px] text-taupe'>
+                                  <p className='text-[11px] text-clay'>
                                     {formatPhotoCategory(entry.category)} • {createdAt}
                                   </p>
                                   <div className='flex justify-between items-center gap-2'>
-                                    <p className='text-[11px] text-taupe'>{formatBytes(entry.byteSize)}</p>
+                                    <p className='text-[11px] text-clay'>{formatBytes(entry.byteSize)}</p>
                                     <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(entry.id)}>
                                       Remove
                                     </Button>
@@ -3600,7 +3632,13 @@ function App() {
                             })}
                           </div>
                         ) : (
-                          <p className='text-sm text-taupe'>No photos in this filter yet.</p>
+                          <div className='flex flex-col items-center justify-center py-8 text-center'>
+                            <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                              <Camera className='h-6 w-6 text-clay' />
+                            </div>
+                            <p className='text-sm font-medium text-espresso'>No photos yet</p>
+                            <p className='text-xs text-clay mt-1'>Take a photo or choose one from your gallery above.</p>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
@@ -3609,16 +3647,16 @@ function App() {
                 <TabsContent value='reporting'>
                   <div className='space-y-3'>
                     {reportingSections.map((section) => (
-                      <Card key={section.id} className='bg-pale-oak-2 border-taupe'>
+                      <Card key={section.id} className='bg-blush-sand border-clay'>
                         <CardHeader className='py-2 px-3 pb-0'>
-                          <CardTitle className='text-sm text-mauve-shadow'>{section.title}</CardTitle>
+                          <CardTitle className='text-sm text-espresso'>{section.title}</CardTitle>
                         </CardHeader>
                         <CardContent className='px-3 pb-3 space-y-3'>
-                          <p className='text-sm text-taupe'>{section.description}</p>
+                          <p className='text-sm text-clay'>{section.description}</p>
                           {section.id === 'census-reporting' ? (
-                            <div className='space-y-2 rounded-md border border-taupe/40 bg-white p-2'>
+                            <div className='space-y-2 rounded-md border border-clay/40 bg-white p-2'>
                               <div className='flex items-center justify-between gap-2 flex-wrap'>
-                                <p className='text-xs text-taupe'>
+                                <p className='text-xs text-clay'>
                                   Included: {selectedCensusPatients.length} of {reportingSelectablePatients.length} active patients
                                 </p>
                                 <div className='flex gap-2'>
@@ -3650,11 +3688,11 @@ function App() {
                                   })}
                                 </div>
                               ) : (
-                                <p className='text-sm text-taupe'>No active patients to include.</p>
+                                <p className='text-sm text-clay'>No active patients to include.</p>
                               )}
                               {selectedCensusPatients.length > 0 ? (
                                 <div className='space-y-1'>
-                                  <p className='text-xs text-taupe'>Export order</p>
+                                  <p className='text-xs text-clay'>Export order</p>
                                   <div className='space-y-1'>
                                     {selectedCensusPatients.map((patient, index) => {
                                       const patientId = patient.id
@@ -3663,9 +3701,9 @@ function App() {
                                       return (
                                         <div
                                           key={`ordered-${patientId}`}
-                                          className='flex items-center justify-between gap-2 rounded border border-taupe/30 bg-pale-oak px-2 py-1'
+                                          className='flex items-center justify-between gap-2 rounded border border-clay/30 bg-warm-ivory px-2 py-1'
                                         >
-                                          <p className='text-sm text-mauve-shadow'>
+                                          <p className='text-sm text-espresso'>
                                             {index + 1}. {patient.roomNumber} — {patient.lastName}, {patient.firstName}
                                           </p>
                                           <div className='flex gap-1'>
@@ -3719,24 +3757,24 @@ function App() {
                 </CardContent>
               </Card>
               ) : (
-                <Card className='bg-pale-oak border-taupe'>
+                <Card className='bg-warm-ivory border-clay'>
                   <CardHeader className='py-3 px-4 pb-0'>
-                    <CardTitle className='text-base text-mauve-shadow'>Focused patient</CardTitle>
+                    <CardTitle className='text-base text-espresso'>Focused patient</CardTitle>
                   </CardHeader>
                   <CardContent className='px-4 pb-4'>
-                    <p className='text-sm text-taupe'>No focused patient selected. Open one from Patients.</p>
+                    <p className='text-sm text-clay'>No focused patient selected. Open one from Patients.</p>
                   </CardContent>
                 </Card>
               )
             ) : null}
           </>
         ) : (
-          <Card className='bg-pale-oak border-taupe'>
+          <Card className='bg-warm-ivory border-clay'>
             <CardHeader className='py-3 px-4 pb-0'>
-              <CardTitle className='text-base text-mauve-shadow'>Settings</CardTitle>
+              <CardTitle className='text-base text-espresso'>Settings</CardTitle>
             </CardHeader>
             <CardContent className='px-4 pb-4 space-y-3'>
-              <p className='text-sm text-taupe'>Export/import backup JSON, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
+              <p className='text-sm text-clay'>Export/import backup JSON, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
               <div className='flex flex-col gap-2'>
                 <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
                 <input
@@ -3751,11 +3789,11 @@ function App() {
                 <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
               </div>
 
-            <section className='space-y-3 rounded-lg border border-taupe bg-pale-oak-2 p-3'>
-              <h3 className='text-base font-semibold text-mauve-shadow'>How to use</h3>
+            <section className='space-y-3 rounded-lg border border-clay bg-blush-sand p-3'>
+              <h3 className='text-base font-semibold text-espresso'>How to use</h3>
               <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-mauve-shadow'>Main workflow</h4>
-                <ol className='list-decimal pl-5 text-sm text-mauve-shadow space-y-1'>
+                <h4 className='text-sm font-semibold text-espresso'>Main workflow</h4>
+                <ol className='list-decimal pl-5 text-sm text-espresso space-y-1'>
                   <li>Add/admit a patient from the Patients form.</li>
                   <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
                   <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
@@ -3766,8 +3804,8 @@ function App() {
               </div>
 
               <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-mauve-shadow'>Parts of the app</h4>
-                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
+                <h4 className='text-sm font-semibold text-espresso'>Parts of the app</h4>
+                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics, diagnosis, plans, pendings, and clerk notes.</li>
@@ -3783,8 +3821,8 @@ function App() {
               </div>
 
               <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-mauve-shadow'>Saving and persistence</h4>
-                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
+                <h4 className='text-sm font-semibold text-espresso'>Saving and persistence</h4>
+                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
                   <li>Attached photos are stored as compressed copies inside the app database and remain available offline.</li>
                   <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
@@ -3796,8 +3834,8 @@ function App() {
               </div>
 
               <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-mauve-shadow'>Quick tips</h4>
-                <ul className='list-disc pl-5 text-sm text-mauve-shadow space-y-1'>
+                <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
+                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
@@ -3822,7 +3860,7 @@ function App() {
             <DialogHeader>
               <DialogTitle>{outputPreviewTitle}</DialogTitle>
             </DialogHeader>
-            <p className='text-sm text-taupe'>Select any part manually, or tap Copy full text.</p>
+            <p className='text-sm text-clay'>Select any part manually, or tap Copy full text.</p>
             <div className='flex gap-2 flex-wrap'>
               {canUseWebShare ? (
                 <Button variant='secondary' onClick={() => void sharePreviewText()}>Share</Button>
@@ -3832,7 +3870,7 @@ function App() {
             </div>
             <ScrollArea className='flex-1'>
               <textarea
-                className='w-full min-h-64 font-mono bg-white resize-none p-2 rounded border border-taupe text-sm'
+                className='w-full min-h-64 font-mono bg-white resize-none p-2 rounded border border-clay text-sm'
                 aria-label='Generated text preview'
                 readOnly
                 value={outputPreview}
@@ -3849,7 +3887,7 @@ function App() {
             {selectedAttachment ? (
               <>
                 {selectedAttachment.id !== undefined && attachmentPreviewUrls[selectedAttachment.id] ? (
-                  <ScrollArea className='max-h-[64vh] rounded border border-taupe/30 bg-pale-oak'>
+                  <ScrollArea className='max-h-[64vh] rounded border border-clay/30 bg-warm-ivory'>
                     <img
                       src={attachmentPreviewUrls[selectedAttachment.id]}
                       alt={selectedAttachment.title || 'Attachment preview'}
@@ -3857,9 +3895,9 @@ function App() {
                     />
                   </ScrollArea>
                 ) : (
-                  <p className='text-sm text-taupe'>Preview unavailable.</p>
+                  <p className='text-sm text-clay'>Preview unavailable.</p>
                 )}
-                <div className='text-sm text-mauve-shadow space-y-1'>
+                <div className='text-sm text-espresso space-y-1'>
                   <p><strong>Category:</strong> {formatPhotoCategory(selectedAttachment.category)}</p>
                   <p><strong>Size:</strong> {formatBytes(selectedAttachment.byteSize)} ({selectedAttachment.width}×{selectedAttachment.height})</p>
                   <p><strong>Added:</strong> {new Date(selectedAttachment.createdAt).toLocaleString()}</p>
@@ -3877,50 +3915,76 @@ function App() {
             ) : null}
           </DialogContent>
         </Dialog>
+
+        <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <div className='flex justify-center mb-3'>
+                <img src="./puhrr-logo.svg" alt="PUHRR" className='h-16 w-16' />
+              </div>
+              <DialogTitle className='text-center text-xl'>Welcome to PUHRR</DialogTitle>
+            </DialogHeader>
+            <p className='text-center text-sm text-clay leading-relaxed'>
+              Track patients, capture vitals, organize labs, meds, and orders &mdash; all offline, right from your phone. No account needed. Your data stays on this device.
+            </p>
+            <div className='flex flex-col gap-2 mt-2'>
+              <Button onClick={() => setShowOnboarding(false)}>
+                Add Your First Patient
+              </Button>
+              <Button variant='secondary' onClick={() => { void addSamplePatient(); setShowOnboarding(false) }}>
+                Try a Sample Patient
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
       <nav className={cn(
-        'fixed inset-x-0 bottom-0 z-40 border-t border-taupe bg-pale-oak/95 px-2 pt-2 backdrop-blur sm:hidden',
-        isStandaloneDisplayMode ? 'pb-[calc(0.5rem+env(safe-area-inset-bottom))]' : 'pb-0',
+        'fixed inset-x-0 bottom-0 z-40 border-t border-clay/40 bg-warm-ivory/95 px-2 pt-1.5 backdrop-blur-md sm:hidden',
+        isStandaloneDisplayMode ? 'pb-[calc(0.25rem+env(safe-area-inset-bottom))]' : 'pb-1',
       )}>
-        <div className='mx-auto flex w-full max-w-xl gap-2'>
-          <Button
-            size='sm'
-            className='shrink-0 whitespace-nowrap px-3'
-            variant={view === 'patients' ? 'default' : 'secondary'}
+        <div className='mx-auto flex w-full max-w-xl justify-around'>
+          <button
+            className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors',
+              view === 'patients' ? 'text-action-primary' : 'text-clay'
+            )}
             onClick={() => setView('patients')}
           >
-            Patients
-          </Button>
+            <Users className='h-5 w-5' />
+            <span>Patients</span>
+          </button>
           {canShowFocusedPatientNavButton ? (
-            <Button
-              size='sm'
-              className='min-w-0 flex-1 truncate'
-              variant={view === 'patient' ? 'default' : 'secondary'}
+            <button
+              className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors min-w-0 max-w-[40%]',
+                view === 'patient' ? 'text-action-primary' : 'text-clay'
+              )}
               onClick={() => setView('patient')}
             >
-              {focusedPatientNavLabel}
-            </Button>
+              <UserRound className='h-5 w-5' />
+              <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
+            </button>
           ) : (
-            <Button size='sm' className='min-w-0 flex-1' variant='secondary' disabled>
-              PUHRR
-            </Button>
+            <div className='flex flex-col items-center gap-0.5 px-3 py-1 text-xs text-clay/40'>
+              <UserRound className='h-5 w-5' />
+              <span>Patient</span>
+            </div>
           )}
-          <Button
-            size='sm'
-            className='shrink-0 whitespace-nowrap px-3'
-            variant={view === 'settings' ? 'default' : 'secondary'}
+          <button
+            className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors',
+              view === 'settings' ? 'text-action-primary' : 'text-clay'
+            )}
             onClick={() => setView('settings')}
           >
-            Settings
-          </Button>
+            <Settings className='h-5 w-5' />
+            <span>Settings</span>
+          </button>
         </div>
       </nav>
-      <footer className='mt-6 border-t border-taupe/40 pt-3 text-sm text-taupe'>
+      <footer className='mt-6 border-t border-clay/40 pt-3 text-sm text-clay'>
         <div className='flex items-center justify-between gap-2 flex-wrap'>
           <div className='flex items-center gap-2 flex-wrap min-h-9'>
             {selectedPatientId !== null ? (
               <>
-                <p className='text-sm text-taupe'>
+                <p className='text-sm text-clay'>
                   Last saved:{' '}
                   {lastSavedAt
                     ? new Date(lastSavedAt).toLocaleTimeString([], {

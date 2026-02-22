@@ -2,42 +2,42 @@
 
 @theme {
   /* PUHRR brand palette */
-  --color-burnt-peach: #b85b43;
-  --color-cherry-blossom: #f2d6d9;
-  --color-pale-oak: #f2e8dd;
-  --color-pale-oak-2: #eadaca;
-  --color-taupe: #8c7468;
-  --color-mauve-shadow: #3f2c35;
+  --color-coral-punch: #E2614A;
+  --color-peach-cream: #FFF0E8;
+  --color-warm-ivory: #FDF6F0;
+  --color-blush-sand: #F5E1D0;
+  --color-clay: #8A6355;
+  --color-espresso: #2D1F1A;
 
   /* Semantic action tokens */
-  --color-action-primary: #b85b43;
-  --color-action-primary-hover: #9f4d39;
-  --color-action-secondary: #6a5c59;
-  --color-action-secondary-hover: #574c49;
-  --color-action-edit: #2f5f9b;
-  --color-action-edit-hover: #254d7e;
-  --color-action-danger: #ad2e2e;
-  --color-action-danger-hover: #902727;
+  --color-action-primary: #E2614A;
+  --color-action-primary-hover: #C9503C;
+  --color-action-secondary: #6B5B55;
+  --color-action-secondary-hover: #574A44;
+  --color-action-edit: #3574B8;
+  --color-action-edit-hover: #2A5F99;
+  --color-action-danger: #C43131;
+  --color-action-danger-hover: #A22828;
 
   /* shadcn semantic aliases (Tailwind v4) */
-  --color-background: var(--color-pale-oak);
-  --color-foreground: var(--color-mauve-shadow);
-  --color-card: var(--color-cherry-blossom);
-  --color-card-foreground: var(--color-mauve-shadow);
-  --color-popover: var(--color-pale-oak);
-  --color-popover-foreground: var(--color-mauve-shadow);
+  --color-background: var(--color-warm-ivory);
+  --color-foreground: var(--color-espresso);
+  --color-card: var(--color-peach-cream);
+  --color-card-foreground: var(--color-espresso);
+  --color-popover: var(--color-warm-ivory);
+  --color-popover-foreground: var(--color-espresso);
   --color-primary: var(--color-action-primary);
   --color-primary-foreground: #ffffff;
   --color-secondary: var(--color-action-secondary);
   --color-secondary-foreground: #ffffff;
-  --color-muted: var(--color-pale-oak-2);
-  --color-muted-foreground: var(--color-taupe);
-  --color-accent: var(--color-cherry-blossom);
-  --color-accent-foreground: var(--color-mauve-shadow);
+  --color-muted: var(--color-blush-sand);
+  --color-muted-foreground: var(--color-clay);
+  --color-accent: var(--color-peach-cream);
+  --color-accent-foreground: var(--color-espresso);
   --color-destructive: var(--color-action-danger);
   --color-destructive-foreground: #ffffff;
-  --color-border: var(--color-taupe);
-  --color-input: var(--color-taupe);
+  --color-border: var(--color-clay);
+  --color-input: var(--color-clay);
   --color-ring: var(--color-action-primary);
 
   /* Typography */
@@ -46,24 +46,24 @@
 
 @layer base {
   :root {
-    --background: var(--color-pale-oak);
-    --foreground: var(--color-mauve-shadow);
-    --card: var(--color-cherry-blossom);
-    --card-foreground: var(--color-mauve-shadow);
-    --popover: var(--color-pale-oak);
-    --popover-foreground: var(--color-mauve-shadow);
+    --background: var(--color-warm-ivory);
+    --foreground: var(--color-espresso);
+    --card: var(--color-peach-cream);
+    --card-foreground: var(--color-espresso);
+    --popover: var(--color-warm-ivory);
+    --popover-foreground: var(--color-espresso);
     --primary: var(--color-action-primary);
     --primary-foreground: #ffffff;
-    --secondary: var(--color-pale-oak-2);
-    --secondary-foreground: var(--color-mauve-shadow);
-    --muted: var(--color-pale-oak-2);
-    --muted-foreground: var(--color-taupe);
-    --accent: var(--color-cherry-blossom);
-    --accent-foreground: var(--color-mauve-shadow);
+    --secondary: var(--color-blush-sand);
+    --secondary-foreground: var(--color-espresso);
+    --muted: var(--color-blush-sand);
+    --muted-foreground: var(--color-clay);
+    --accent: var(--color-peach-cream);
+    --accent-foreground: var(--color-espresso);
     --destructive: var(--color-action-danger);
     --destructive-foreground: #ffffff;
-    --border: var(--color-taupe);
-    --input: var(--color-taupe);
+    --border: var(--color-clay);
+    --input: var(--color-clay);
     --ring: var(--color-action-primary);
     --radius: 0.5rem;
   }
@@ -72,8 +72,8 @@
 body {
   margin: 0;
   min-width: 320px;
-  background-color: var(--color-pale-oak);
-  color: var(--color-mauve-shadow);
+  background-color: var(--color-warm-ivory);
+  color: var(--color-espresso);
 }
 
 #root {
@@ -86,4 +86,13 @@ body {
   #root {
     padding: 2rem 1rem;
   }
+}
+
+/* Utility: hide scrollbar for horizontal tab scrolling */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

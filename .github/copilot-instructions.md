@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-**PUHRR** (Portable Unofficial Health Record - Really) — A personal Progressive Web App (PWA) for medical clerks doing hospital rounds at University of Santo Tomas Hospital. This is a **single-user, offline-first** note-taking tool that replaces Google Sheets for tracking ~10 active patients during a 2-month rotation.
+**PUHRR** (Portable Electronic Health Record) — A personal Progressive Web App (PWA) for medical clerks doing hospital rounds. This is a **single-user, offline-first** note-taking tool that replaces Google Sheets for tracking ~10 active patients during a 2-month rotation.
 
 **Core goal:** Make it faster to take patient notes on a phone and generate copy-paste-ready text for sharing via messaging apps (Viber/WhatsApp) to a laptop for Google Docs.
 
@@ -51,23 +51,23 @@ These are the PUHRR brand colors — use them instead of arbitrary color values:
 
 | Token | Class examples | Hex | Use for |
 |---|---|---|---|
-| `burnt-peach` | `bg-burnt-peach`, `text-burnt-peach` | #b85b43 | Primary brand color |
-| `cherry-blossom` | `bg-cherry-blossom` | #f2d6d9 | Patient card backgrounds |
-| `pale-oak` | `bg-pale-oak` | #f2e8dd | Main background, panels |
-| `pale-oak-2` | `bg-pale-oak-2` | #eadaca | Section card backgrounds |
-| `taupe` | `text-taupe`, `border-taupe` | #8c7468 | Secondary text, borders |
-| `mauve-shadow` | `text-mauve-shadow` | #3f2c35 | Primary text |
-| `action-primary` | `bg-action-primary` | #b85b43 | Primary buttons |
-| `action-secondary` | `bg-action-secondary` | #6a5c59 | Secondary buttons |
-| `action-edit` | `bg-action-edit` | #2f5f9b | Edit buttons |
-| `action-danger` | `bg-action-danger` | #ad2e2e | Delete/danger buttons |
+| `coral-punch` | `bg-coral-punch`, `text-coral-punch` | #E2614A | Primary brand color |
+| `peach-cream` | `bg-peach-cream` | #FFF0E8 | Patient card backgrounds |
+| `warm-ivory` | `bg-warm-ivory` | #FDF6F0 | Main background, panels |
+| `blush-sand` | `bg-blush-sand` | #F5E1D0 | Section card backgrounds |
+| `clay` | `text-clay`, `border-clay` | #8A6355 | Secondary text, borders |
+| `espresso` | `text-espresso` | #2D1F1A | Primary text |
+| `action-primary` | `bg-action-primary` | #E2614A | Primary buttons |
+| `action-secondary` | `bg-action-secondary` | #6B5B55 | Secondary buttons |
+| `action-edit` | `bg-action-edit` | #3574B8 | Edit buttons |
+| `action-danger` | `bg-action-danger` | #C43131 | Delete/danger buttons |
 
 ---
 
 ## Component Architecture
 
 ### shadcn/ui base components (`src/components/ui/`)
-- `Button` — variants: `default` (burnt-peach), `secondary`, `destructive`, `edit` (custom blue), `outline`, `ghost`, `link`
+- `Button` — variants: `default` (coral-punch), `secondary`, `destructive`, `edit` (custom blue), `outline`, `ghost`, `link`
 - `Card`, `CardHeader`, `CardTitle`, `CardContent` — use for all panels and sections
 - `Badge` — for status labels (active/discharged/medication status)
 - `Input`, `Textarea`, `Select`, `SelectTrigger`, `SelectValue`, `SelectContent`, `SelectItem`
@@ -91,14 +91,14 @@ When generating new UI for this app, follow these rules:
 2. **Use shadcn/ui components** from `@/components/ui/` for all interactive elements
 3. **Use `cn()` from `@/lib/utils`** to merge classes conditionally
 4. **Button variants:**
-   - Primary actions → `<Button>` (default, burnt-peach)
+   - Primary actions → `<Button>` (default, coral-punch)
    - Neutral/cancel → `<Button variant="secondary">`
    - Edit/update → `<Button variant="edit">`
    - Delete/danger → `<Button variant="destructive">`
 5. **Card usage conventions:**
-   - Patient cards → `<Card className="bg-cherry-blossom border-taupe">`
-   - Detail panels → `<Card className="bg-pale-oak border-taupe">`
-   - Section panels (vitals/meds/labs/orders) → `<Card className="bg-pale-oak-2 border-taupe">`
+   - Patient cards → `<Card className="bg-peach-cream border-clay">`
+   - Detail panels → `<Card className="bg-warm-ivory border-clay">`
+   - Section panels (vitals/meds/labs/orders) → `<Card className="bg-blush-sand border-clay">`
 6. **Form fields:** Always use `<Label>` above `<Input>`, `<Textarea>`, or `<Select>`. Wrap in `<div className="space-y-1">`
 7. **Lists:** Use `flex flex-col gap-2` for card lists, `space-y-1` for item lists within sections
 8. **Modals:** Always use `<Dialog>` from shadcn/ui — never custom modal divs
@@ -171,7 +171,7 @@ For every user-visible or behavior-changing update:
 2. Open the **Ports** panel (bottom VS Code bar) — port 5173 appears automatically
 3. Set visibility to **Public** to test from phone during rounds
 4. `Ctrl+Shift+P` → "Simple Browser: Show" → paste the forwarded URL for in-IDE preview
-5. Install the **Tailwind CSS IntelliSense** extension (`bradlc.vscode-tailwindcss`) for autocomplete on `bg-burnt-peach`, `text-mauve-shadow`, etc.
+5. Install the **Tailwind CSS IntelliSense** extension (`bradlc.vscode-tailwindcss`) for autocomplete on `bg-coral-punch`, `text-espresso`, etc.
 
 ---
 
