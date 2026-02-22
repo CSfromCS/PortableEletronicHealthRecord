@@ -2574,6 +2574,10 @@ function App() {
           </div>
         </div>
 
+        {view === 'patient' && selectedPatient ? (
+          <div className='mb-3 h-px bg-clay/25 sm:hidden' aria-hidden='true' />
+        ) : null}
+
         {view !== 'settings' ? (
           <>
             {view === 'patients' ? (
@@ -2669,8 +2673,8 @@ function App() {
 
             {view === 'patient' ? (
               selectedPatient ? (
-              <Card className='bg-warm-ivory border-clay'>
-                <CardHeader className='py-3 px-4 pb-0'>
+              <Card className='border-0 bg-transparent shadow-none sm:bg-warm-ivory sm:border-clay sm:shadow-md sm:ring-1 sm:ring-clay/20'>
+                <CardHeader className='py-3 px-0 pb-0 sm:px-4'>
                   <Select
                     value={selectedPatient.id?.toString() ?? ''}
                     onValueChange={(value) => {
@@ -2683,7 +2687,7 @@ function App() {
                   >
                     <SelectTrigger
                       aria-label='Switch focused patient'
-                      className='h-auto w-full sm:w-fit max-w-full border-0 bg-transparent px-0 py-0 text-base font-semibold tracking-tight text-espresso shadow-none ring-0 focus:ring-0 focus:ring-offset-0 [&>svg]:text-espresso/70'
+                        className='h-auto w-full sm:w-fit max-w-full border-0 bg-transparent px-0 py-0 text-xl font-bold tracking-tight text-espresso shadow-none ring-0 focus:ring-0 focus:ring-offset-0 sm:text-base sm:font-semibold [&>svg]:text-espresso/70'
                     >
                       <SelectValue placeholder='Switch focused patient' />
                     </SelectTrigger>
@@ -2700,22 +2704,22 @@ function App() {
                     </SelectContent>
                   </Select>
                 </CardHeader>
-                <CardContent className='px-4 pb-36 sm:pb-4'>
+                <CardContent className='px-0 pb-5 sm:px-4 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
                   <TabsList className={cn(
-                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto overflow-x-auto hide-scrollbar flex gap-0.5 px-1 sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid sm:grid-cols-4 lg:grid-cols-8 sm:overflow-visible',
+                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto grid grid-cols-4 gap-0.5 px-1 sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid-cols-4 lg:grid-cols-8',
                     isStandaloneDisplayMode
-                      ? 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]'
-                      : 'bottom-11',
+                      ? 'bottom-[calc(3.25rem+env(safe-area-inset-bottom))]'
+                      : 'bottom-14',
                   )}>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='profile'>Profile</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='frichmond'>FRICH</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='vitals'>Vitals</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='labs'>Labs</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='medications'>Meds</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='orders'>Orders</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='photos'>Photos</TabsTrigger>
-                    <TabsTrigger className='sm:w-full shrink-0 text-xs px-2.5' value='reporting'>Report</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='profile'>Profile</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='frichmond'>FRICH</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='vitals'>Vitals</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='labs'>Labs</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='medications'>Meds</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='orders'>Orders</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='photos'>Photos</TabsTrigger>
+                    <TabsTrigger className='w-full text-xs px-2.5' value='reporting'>Report</TabsTrigger>
                   </TabsList>
 
                 <TabsContent value='profile'>
@@ -3046,11 +3050,11 @@ function App() {
                 </TabsContent>
                 <TabsContent value='vitals'>
                   <div className='space-y-3'>
-                    <Card className='bg-blush-sand border-clay'>
-                      <CardHeader className='py-2 px-3 pb-0'>
+                    <Card className='border-0 bg-transparent shadow-none sm:bg-blush-sand sm:border-clay sm:shadow-md'>
+                      <CardHeader className='py-2 px-0 pb-0 sm:px-3'>
                         <CardTitle className='text-sm text-espresso'>Structured vitals log</CardTitle>
                       </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
+                      <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
                           <div className='space-y-1'>
                             <Label>Time</Label>
@@ -3179,11 +3183,11 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <Card className='bg-blush-sand border-clay'>
-                      <CardHeader className='py-2 px-3 pb-0'>
+                    <Card className='border-0 bg-transparent shadow-none sm:bg-blush-sand sm:border-clay sm:shadow-md'>
+                      <CardHeader className='py-2 px-0 pb-0 sm:px-3'>
                         <CardTitle className='text-sm text-espresso'>Structured medications</CardTitle>
                       </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
+                      <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-2 gap-2'>
                           <div className='space-y-1'>
                             <Label>Medication</Label>
@@ -3284,11 +3288,11 @@ function App() {
                         onOpenPhotoById={openPhotoById}
                       />
                     </div>
-                    <Card className='bg-blush-sand border-clay'>
-                      <CardHeader className='py-2 px-3 pb-0'>
+                    <Card className='border-0 bg-transparent shadow-none sm:bg-blush-sand sm:border-clay sm:shadow-md'>
+                      <CardHeader className='py-2 px-0 pb-0 sm:px-3'>
                         <CardTitle className='text-sm text-espresso'>Structured labs</CardTitle>
                       </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
+                      <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                           <div className='space-y-1'>
                             <Label>Date</Label>
@@ -3410,11 +3414,11 @@ function App() {
                 </TabsContent>
                 <TabsContent value='orders'>
                   <div className='space-y-3'>
-                    <Card className='bg-blush-sand border-clay'>
-                      <CardHeader className='py-2 px-3 pb-0'>
+                    <Card className='border-0 bg-transparent shadow-none sm:bg-blush-sand sm:border-clay sm:shadow-md'>
+                      <CardHeader className='py-2 px-0 pb-0 sm:px-3'>
                         <CardTitle className='text-sm text-espresso'>Doctor&apos;s orders</CardTitle>
                       </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
+                      <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-2 gap-2'>
                           <div className='space-y-1'>
                             <Label>Date</Label>
@@ -3512,11 +3516,11 @@ function App() {
                 </TabsContent>
                 <TabsContent value='photos'>
                   <div className='space-y-3'>
-                    <Card className='bg-blush-sand border-clay'>
-                      <CardHeader className='py-2 px-3 pb-0'>
+                    <Card className='border-0 bg-transparent shadow-none sm:bg-blush-sand sm:border-clay sm:shadow-md'>
+                      <CardHeader className='py-2 px-0 pb-0 sm:px-3'>
                         <CardTitle className='text-sm text-espresso'>Photo attachments</CardTitle>
                       </CardHeader>
-                      <CardContent className='px-3 pb-3 space-y-3'>
+                      <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
                           <div className='space-y-1'>
                             <Label>Category</Label>
@@ -3979,7 +3983,7 @@ function App() {
           </button>
         </div>
       </nav>
-      <footer className='mt-6 border-t border-clay/40 pt-3 text-sm text-clay'>
+      <footer className='mt-3 mb-3 border-t border-clay/40 pt-3 text-sm text-clay'>
         <div className='flex items-center justify-between gap-2 flex-wrap'>
           <div className='flex items-center gap-2 flex-wrap min-h-9'>
             {selectedPatientId !== null ? (
