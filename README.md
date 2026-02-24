@@ -53,7 +53,7 @@ Each open patient has eight focused tabs:
 | Tab | Purpose |
 |---|---|
 | **Profile** | Demographics plus case-review notes (chief complaint, HPI, PMH, PE, clinical summary), diagnosis, and clinical details |
-| **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) |
+| **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) with a Copy latest entry action to carry forward all daily fields |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
 | **Labs** | CBC, urinalysis, electrolytes/renal, and Others (custom label + freeform result) with trend comparison |
 | **Medications** | Active medication list with status tracking |

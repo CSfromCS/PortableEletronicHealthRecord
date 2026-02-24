@@ -1204,6 +1204,50 @@ function App() {
     setDailyDirty(false)
   }
 
+  const copyLatestDailyUpdateToForm = useCallback(async () => {
+    if (selectedPatientId === null) return
+
+    const updates = await db.dailyUpdates.where('patientId').equals(selectedPatientId).toArray()
+    if (updates.length === 0) {
+      setNotice('No saved daily entry to copy yet.')
+      return
+    }
+
+    const latestUpdate = updates.reduce((latest, candidate) => {
+      if (candidate.date > latest.date) {
+        return candidate
+      }
+      if (candidate.date < latest.date) {
+        return latest
+      }
+
+      const latestTimestamp = Date.parse(latest.lastUpdated)
+      const candidateTimestamp = Date.parse(candidate.lastUpdated)
+      if (Number.isFinite(candidateTimestamp) && Number.isFinite(latestTimestamp)) {
+        return candidateTimestamp >= latestTimestamp ? candidate : latest
+      }
+
+      return candidate
+    })
+
+    setDailyUpdateForm({
+      fluid: latestUpdate.fluid,
+      respiratory: latestUpdate.respiratory,
+      infectious: latestUpdate.infectious,
+      cardio: latestUpdate.cardio,
+      hema: latestUpdate.hema,
+      metabolic: latestUpdate.metabolic,
+      output: latestUpdate.output,
+      neuro: latestUpdate.neuro,
+      drugs: latestUpdate.drugs,
+      other: latestUpdate.other,
+      assessment: latestUpdate.assessment,
+      plans: latestUpdate.plans,
+    })
+    setDailyDirty(true)
+    setNotice(`Copied latest daily entry (${latestUpdate.date}).`)
+  }, [selectedPatientId])
+
   const saveProfile = useCallback(
     async () => {
       if (selectedPatientId === null) return false
@@ -3066,24 +3110,35 @@ function App() {
                 </TabsContent>
                 <TabsContent value='frichmond'>
                   <div className='space-y-3'>
-                    <div className='space-y-1 max-w-60'>
-                      <Label htmlFor='daily-date'>Date</Label>
-                      <Input
-                        id='daily-date'
-                        type='date'
-                        value={dailyDate}
-                        onChange={(event) => {
-                          const nextDate = event.target.value
-                          if (dailyDirty) {
-                            void saveDailyUpdate()
-                          }
-                          setDailyDate(nextDate)
-                          if (selectedPatient?.id) {
-                            void loadDailyUpdate(selectedPatient.id, nextDate)
-                          }
-                        }}
-                      />
+                    <div className='flex flex-wrap items-end gap-2'>
+                      <div className='space-y-1 max-w-60'>
+                        <Label htmlFor='daily-date'>Date</Label>
+                        <Input
+                          id='daily-date'
+                          type='date'
+                          value={dailyDate}
+                          onChange={(event) => {
+                            const nextDate = event.target.value
+                            if (dailyDirty) {
+                              void saveDailyUpdate()
+                            }
+                            setDailyDate(nextDate)
+                            if (selectedPatient?.id) {
+                              void loadDailyUpdate(selectedPatient.id, nextDate)
+                            }
+                          }}
+                        />
+                      </div>
+                      <Button
+                        type='button'
+                        variant='secondary'
+                        onClick={() => void copyLatestDailyUpdateToForm()}
+                        disabled={selectedPatientId === null}
+                      >
+                        Copy latest entry
+                      </Button>
                     </div>
+                    <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) from the latest saved date.</p>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
                       <PhotoMentionField
@@ -4047,6 +4102,7 @@ function App() {
                   <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
                   <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
+                  <li>In FRICHMOND, pick the target date, then tap Copy latest entry if you want to carry forward the latest saved daily note before editing.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
@@ -4058,7 +4114,7 @@ function App() {
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
-                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
+                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Copy latest entry to carry forward the latest saved daily note.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
