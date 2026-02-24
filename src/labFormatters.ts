@@ -22,6 +22,41 @@ const valOrDefault = (val: string | undefined, defaultVal: string): string => {
   return trimmed === '' ? defaultVal : trimmed
 }
 
+const parseNumericInput = (value: string | undefined): number | null => {
+  const sanitized = (value ?? '').trim().replaceAll(',', '').replaceAll('%', '')
+  if (!sanitized) return null
+
+  const parsed = Number.parseFloat(sanitized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const formatMultiplier = (value: number): string => {
+  const rounded = Number.parseFloat(value.toFixed(2))
+  return rounded.toString()
+}
+
+const ULN_KEY_PREFIX = '__uln:'
+const NORMAL_RANGE_KEY_PREFIX = '__nv:'
+
+const BLOOD_CHEM_LEGACY_KEY_MAP: Record<string, string> = {
+  Sodium: 'Na',
+  Potassium: 'K',
+  Chloride: 'Cl',
+  Creatinine: 'Crea',
+}
+
+const getBloodChemResult = (results: Record<string, string>, key: string): string => {
+  const directValue = (results[key] ?? '').trim()
+  if (directValue) return directValue
+
+  const legacyKey = BLOOD_CHEM_LEGACY_KEY_MAP[key]
+  if (!legacyKey) return ''
+  return (results[legacyKey] ?? '').trim()
+}
+
+const getUlnKey = (testKey: string) => `${ULN_KEY_PREFIX}${testKey}`
+const getNormalRangeKey = (testKey: string) => `${NORMAL_RANGE_KEY_PREFIX}${testKey}`
+
 // ---------------------------------------------------------------------------
 // UST – Urinalysis formatter
 // ---------------------------------------------------------------------------
@@ -117,6 +152,95 @@ export function formatUrinalysis(r: Record<string, string>): string {
     if (negativeCrystals.length > 0) {
       parts.push(`${negativeCrystals.map((c) => c.label).join('/')} neg`)
     }
+  }
+
+  return parts.join(', ')
+}
+
+// ---------------------------------------------------------------------------
+// UST – Blood Chemistry formatter
+// ---------------------------------------------------------------------------
+
+const BLOOD_CHEM_FIELDS = [
+  'Sodium',
+  'Potassium',
+  'Chloride',
+  'Magnesium',
+  'Ionized Calcium',
+  'BUN',
+  'Creatinine',
+  'eGFR',
+  'AST',
+  'ALT',
+  'ALP',
+  'Total Bilirubin',
+  'Direct Bilirubin',
+  'Indirect Bilirubin',
+  'Total Protein',
+  'Albumin',
+  'Globulin',
+  'Cholesterol',
+  'Triglycerides',
+  'HDL',
+  'LDL',
+  'VLDL',
+  'HbA1c',
+  'Fasting Plasma Glucose',
+  'LDH',
+  'D-Dimer',
+  'ESR',
+  'CRP',
+  'TSH',
+  'FT4',
+  'FT3',
+] as const
+
+const ULN_BASED_FIELDS = new Set([
+  'AST',
+  'ALT',
+  'Total Bilirubin',
+  'Direct Bilirubin',
+  'Indirect Bilirubin',
+  'LDH',
+  'D-Dimer',
+  'ESR',
+  'CRP',
+])
+
+const NORMAL_RANGE_FIELDS = new Set(['TSH', 'FT4', 'FT3'])
+
+export function formatBloodChemistry(results: Record<string, string>): string {
+  const parts: string[] = []
+
+  BLOOD_CHEM_FIELDS.forEach((field) => {
+    const value = getBloodChemResult(results, field)
+    if (!value) return
+
+    let suffix = ''
+
+    if (ULN_BASED_FIELDS.has(field)) {
+      const valueNumber = parseNumericInput(value)
+      const ulnNumber = parseNumericInput(results[getUlnKey(field)])
+      if (valueNumber !== null && ulnNumber !== null && ulnNumber > 0) {
+        const multiplier = valueNumber / ulnNumber
+        if (multiplier > 1) {
+          suffix = ` (${formatMultiplier(multiplier)}x ULN)`
+        }
+      }
+    }
+
+    if (NORMAL_RANGE_FIELDS.has(field)) {
+      const normalRange = (results[getNormalRangeKey(field)] ?? '').trim()
+      if (normalRange) {
+        suffix = `${suffix} (NV ${normalRange})`
+      }
+    }
+
+    parts.push(`${field} ${value}${suffix}`)
+  })
+
+  if (parts.length === 0) {
+    return '-'
   }
 
   return parts.join(', ')

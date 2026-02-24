@@ -73,6 +73,7 @@ export interface LabEntry {
   id?: number
   patientId: number
   date: string
+  time?: string
   templateId: string
   results: Record<string, string>
   note: string

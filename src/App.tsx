@@ -34,7 +34,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { formatUrinalysis } from './labFormatters'
+import { formatBloodChemistry, formatUrinalysis } from './labFormatters'
 import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera } from 'lucide-react'
 
 type PatientFormState = {
@@ -493,6 +493,8 @@ type LabTemplateTest = {
   fullName?: string
   unit?: string
   section?: string
+  requiresUln?: boolean
+  requiresNormalRange?: boolean
 }
 
 type LabTemplate = {
@@ -507,6 +509,7 @@ type LabTemplate = {
 const OTHERS_LAB_TEMPLATE_ID = 'others'
 const OTHERS_LABEL_KEY = '__customLabel'
 const OTHERS_RESULT_KEY = '__freeformResult'
+const UST_BLOOD_CHEM_TEMPLATE_ID = 'ust-electrolytes'
 const UST_ABG_TEMPLATE_ID = 'ust-abg'
 const ABG_DESIRED_PAO2_KEY = '__abgDesiredPaO2'
 const ABG_PO2_KEY = 'pO2'
@@ -514,6 +517,11 @@ const ABG_ACTUAL_FIO2_KEY = 'Actual FiO2'
 const ABG_PF_RATIO_KEY = 'pO2/FiO2'
 const ABG_DESIRED_FIO2_KEY = 'Desired FiO2'
 const DEFAULT_ABG_DESIRED_PAO2 = 60
+const ULN_KEY_PREFIX = '__uln:'
+const NORMAL_RANGE_KEY_PREFIX = '__nv:'
+
+const getUlnFieldKey = (testKey: string) => `${ULN_KEY_PREFIX}${testKey}`
+const getNormalRangeFieldKey = (testKey: string) => `${NORMAL_RANGE_KEY_PREFIX}${testKey}`
 
 type ReportingAction = {
   id: string
@@ -600,16 +608,41 @@ const LAB_TEMPLATES: LabTemplate[] = [
     ],
   },
   {
-    id: 'ust-electrolytes',
-    name: 'UST - Electrolytes / Renal',
+    id: UST_BLOOD_CHEM_TEMPLATE_ID,
+    name: 'UST - Blood Chemistry',
+    formatReport: formatBloodChemistry,
     tests: [
-      { key: 'Na', unit: 'mmol/L' },
-      { key: 'K', unit: 'mmol/L' },
-      { key: 'Cl', unit: 'mmol/L' },
-      { key: 'HCO3', unit: 'mmol/L' },
-      { key: 'BUN', unit: 'mg/dL' },
-      { key: 'Crea', unit: 'mg/dL' },
-      { key: 'eGFR', unit: 'mL/min/1.73m²' },
+      { key: 'Sodium' },
+      { key: 'Potassium' },
+      { key: 'Chloride' },
+      { key: 'Magnesium' },
+      { key: 'Ionized Calcium' },
+      { key: 'BUN' },
+      { key: 'Creatinine' },
+      { key: 'eGFR' },
+      { key: 'AST', requiresUln: true },
+      { key: 'ALT', requiresUln: true },
+      { key: 'ALP' },
+      { key: 'Total Bilirubin', requiresUln: true },
+      { key: 'Direct Bilirubin', requiresUln: true },
+      { key: 'Indirect Bilirubin', requiresUln: true },
+      { key: 'Total Protein' },
+      { key: 'Albumin' },
+      { key: 'Globulin' },
+      { key: 'Cholesterol' },
+      { key: 'Triglycerides' },
+      { key: 'HDL' },
+      { key: 'LDL' },
+      { key: 'VLDL' },
+      { key: 'HbA1c' },
+      { key: 'Fasting Plasma Glucose' },
+      { key: 'LDH', requiresUln: true },
+      { key: 'D-Dimer', requiresUln: true },
+      { key: 'ESR', requiresUln: true },
+      { key: 'CRP', requiresUln: true },
+      { key: 'TSH', requiresNormalRange: true },
+      { key: 'FT4', requiresNormalRange: true },
+      { key: 'FT3', requiresNormalRange: true },
     ],
   },
   {
@@ -770,6 +803,7 @@ function App() {
   const [orderDirty, setOrderDirty] = useState(false)
   const [selectedLabTemplateId, setSelectedLabTemplateId] = useState(DEFAULT_LAB_TEMPLATE_ID)
   const [labTemplateDate, setLabTemplateDate] = useState(() => toLocalISODate())
+  const [labTemplateTime, setLabTemplateTime] = useState(() => toLocalTime())
   const [labTemplateValues, setLabTemplateValues] = useState<Record<string, string>>({})
   const [labTemplateNote, setLabTemplateNote] = useState('')
   const [editingLabId, setEditingLabId] = useState<number | null>(null)
@@ -1045,6 +1079,11 @@ function App() {
       list.sort((a, b) => {
         if (a.date !== b.date) {
           return b.date.localeCompare(a.date)
+        }
+        const aTime = a.time ?? ''
+        const bTime = b.time ?? ''
+        if (aTime !== bTime) {
+          return bTime.localeCompare(aTime)
         }
         return b.createdAt.localeCompare(a.createdAt)
       })
@@ -1465,6 +1504,7 @@ function App() {
     setOrderDirty(false)
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
     setLabTemplateDate(toLocalISODate())
+    setLabTemplateTime(toLocalTime())
     setLabTemplateValues({})
     setLabTemplateNote('')
     setEditingLabId(null)
@@ -1529,15 +1569,34 @@ function App() {
       }
     }
 
+    let hasPrimaryResult = false
     const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
       const value = (labTemplateValues[test.key] ?? '').trim()
       if (value) {
         accumulator[test.key] = value
+        hasPrimaryResult = true
       }
+
+      if (test.requiresUln) {
+        const ulnKey = getUlnFieldKey(test.key)
+        const ulnValue = (labTemplateValues[ulnKey] ?? '').trim()
+        if (ulnValue) {
+          accumulator[ulnKey] = ulnValue
+        }
+      }
+
+      if (test.requiresNormalRange) {
+        const normalRangeKey = getNormalRangeFieldKey(test.key)
+        const normalRangeValue = (labTemplateValues[normalRangeKey] ?? '').trim()
+        if (normalRangeValue) {
+          accumulator[normalRangeKey] = normalRangeValue
+        }
+      }
+
       return accumulator
     }, {})
 
-    if (Object.keys(filteredResults).length === 0) {
+    if (!hasPrimaryResult) {
       return null
     }
 
@@ -1662,16 +1721,17 @@ function App() {
         ? customLabel || 'Others'
         : template?.name ?? entry.templateId
       const note = entry.note ? ` — ${entry.note}` : ''
+      const dateTimeLabel = `${entry.date}${entry.time ? ` ${entry.time}` : ''}`
 
       if (isOthersTemplate) {
         const freeformResult = (entry.results?.[OTHERS_RESULT_KEY] ?? '').trim()
-        return `${entry.date} ${label}: ${freeformResult || '-'}${note}`
+        return `${dateTimeLabel} ${label}: ${freeformResult || '-'}${note}`
       }
 
       // Use custom formatter when available
       if (template?.formatReport) {
         const formatted = template.formatReport(entry.results ?? {})
-        return `${entry.date} ${label}: ${formatted}${note}`
+        return `${dateTimeLabel} ${label}: ${formatted}${note}`
       }
 
       // Default: key: value concatenation
@@ -1684,7 +1744,7 @@ function App() {
         .filter((text): text is string => text !== null)
 
       const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
-      return `${entry.date} ${label}: ${details}${note}`
+      return `${dateTimeLabel} ${label}: ${details}${note}`
     })
   }
 
@@ -2294,6 +2354,7 @@ function App() {
     await db.labs.add({
       patientId: selectedPatientId,
       date: entryDate,
+      time: labTemplateTime || '',
       templateId: selectedLabTemplate.id,
       results: resultsPayload,
       note: labTemplateNote.trim(),
@@ -2302,6 +2363,7 @@ function App() {
 
     setLabTemplateValues({})
     setLabTemplateNote('')
+    setLabTemplateTime(toLocalTime())
     setNotice(`Lab added from ${selectedLabTemplate.name}.`)
   }
 
@@ -2312,6 +2374,7 @@ function App() {
       setEditingLabId(null)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
       setLabTemplateDate(toLocalISODate())
+      setLabTemplateTime(toLocalTime())
       setLabTemplateValues({})
       setLabTemplateNote('')
     }
@@ -2325,6 +2388,7 @@ function App() {
     setEditingLabId(entry.id)
     setSelectedLabTemplateId(entry.templateId)
     setLabTemplateDate(entry.date)
+    setLabTemplateTime(entry.time ?? '')
     setLabTemplateValues(entry.results ?? {})
     setLabTemplateNote(entry.note ?? '')
   }
@@ -2345,6 +2409,7 @@ function App() {
 
     await db.labs.update(editingLabId, {
       date: labTemplateDate || toLocalISODate(),
+      time: labTemplateTime || '',
       templateId: selectedLabTemplate.id,
       results: resultsPayload,
       note: labTemplateNote.trim(),
@@ -2353,6 +2418,7 @@ function App() {
     setEditingLabId(null)
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
     setLabTemplateDate(toLocalISODate())
+    setLabTemplateTime(toLocalTime())
     setLabTemplateValues({})
     setLabTemplateNote('')
     setNotice('Lab updated.')
@@ -2362,6 +2428,7 @@ function App() {
     setEditingLabId(null)
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
     setLabTemplateDate(toLocalISODate())
+    setLabTemplateTime(toLocalTime())
     setLabTemplateValues({})
     setLabTemplateNote('')
   }
@@ -2446,6 +2513,7 @@ function App() {
       setOrderDirty(false)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
       setLabTemplateDate(toLocalISODate())
+      setLabTemplateTime(toLocalTime())
       setLabTemplateValues({})
       setLabTemplateNote('')
       setEditingLabId(null)
@@ -2501,6 +2569,7 @@ function App() {
       setOrderDirty(false)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
       setLabTemplateDate(toLocalISODate())
+      setLabTemplateTime(toLocalTime())
       setLabTemplateValues({})
       setLabTemplateNote('')
       setEditingLabId(null)
@@ -2707,17 +2776,23 @@ function App() {
         {
           patientId: samplePatientId,
           date: today,
-          templateId: 'ust-electrolytes',
+          time: '06:00',
+          templateId: UST_BLOOD_CHEM_TEMPLATE_ID,
           results: {
-            Na: '138',
-            K: '4.1',
-            Cl: '102',
-            HCO3: '24',
+            Sodium: '138',
+            Potassium: '4.1',
+            Chloride: '102',
+            Magnesium: '2.0',
+            'Ionized Calcium': '1.12',
             BUN: '16',
-            Crea: '1.0',
+            Creatinine: '1.0',
             eGFR: '86',
+            AST: '20',
+            ALT: '41.5',
+            '__uln:AST': '35',
+            '__uln:ALT': '41.1',
           },
-          note: 'Renal function and electrolytes within acceptable range.',
+          note: 'Blood chemistry with liver enzyme comparison vs ULN.',
           createdAt: now,
         },
       ])
@@ -3717,7 +3792,7 @@ function App() {
                         <CardTitle className='text-sm text-espresso'>Structured labs</CardTitle>
                       </CardHeader>
                       <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
-                        <div className='grid grid-cols-1 sm:grid-cols-2 gap-2'>
+                        <div className='grid grid-cols-1 sm:grid-cols-3 gap-2'>
                           <div className='space-y-1'>
                             <Label>Date</Label>
                             <Input
@@ -3725,6 +3800,15 @@ function App() {
                               aria-label='Lab date'
                               value={labTemplateDate}
                               onChange={(event) => setLabTemplateDate(event.target.value)}
+                            />
+                          </div>
+                          <div className='space-y-1'>
+                            <Label>Time</Label>
+                            <Input
+                              type='time'
+                              aria-label='Lab time'
+                              value={labTemplateTime}
+                              onChange={(event) => setLabTemplateTime(event.target.value)}
                             />
                           </div>
                           <div className='space-y-1'>
@@ -3814,6 +3898,22 @@ function App() {
                                           className={cn(isCalculatedAbgField && 'bg-warm-ivory text-clay')}
                                           onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
                                         />
+                                        {test.requiresUln ? (
+                                          <Input
+                                            aria-label={`${selectedLabTemplate.name} ${test.key} upper limit of normal`}
+                                            placeholder='ULN (upper limit of normal)'
+                                            value={labTemplateValues[getUlnFieldKey(test.key)] ?? ''}
+                                            onChange={(event) => updateLabTemplateValue(getUlnFieldKey(test.key), event.target.value)}
+                                          />
+                                        ) : null}
+                                        {test.requiresNormalRange ? (
+                                          <Input
+                                            aria-label={`${selectedLabTemplate.name} ${test.key} normal range`}
+                                            placeholder='Normal range (e.g., 1.71-3.71)'
+                                            value={labTemplateValues[getNormalRangeFieldKey(test.key)] ?? ''}
+                                            onChange={(event) => updateLabTemplateValue(getNormalRangeFieldKey(test.key), event.target.value)}
+                                          />
+                                        ) : null}
                                       </div>
                                     </div>
                                   </div>
@@ -4313,7 +4413,7 @@ function App() {
                   <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry with overwrite confirmation.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
-                  <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
+                  <li>Labs tab: free-text labs plus structured lab templates and trends, including collection date/time fields.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
@@ -4339,7 +4439,8 @@ function App() {
                 <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
-                  <li>Use Structured labs templates (CBC, Urinalysis, Electrolytes, ABG, or Others), then fill values and add.</li>
+                  <li>Use Structured labs templates (CBC, Urinalysis, Blood Chemistry, ABG, or Others), then fill values and add.</li>
+                  <li>For Blood Chemistry, enter collection time when needed; AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP can include ULN values to auto-show xULN, while TSH/FT4/FT3 can include NV ranges.</li>
                   <li>ABG template auto-calculates pO2/FiO2 and Desired FiO2 from pO2 and Actual FiO2 (with optional Desired PaO2 override; default is 60).</li>
                   <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
