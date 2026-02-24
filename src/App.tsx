@@ -774,6 +774,12 @@ function App() {
   const labs = useLiveQuery(() => db.labs.toArray(), [])
   const orders = useLiveQuery(() => db.orders.toArray(), [])
   const photoAttachments = useLiveQuery(() => db.photoAttachments.toArray(), [])
+  const savedDailyEntryDates = useLiveQuery(async () => {
+    if (selectedPatientId === null) return [] as string[]
+
+    const entries = await db.dailyUpdates.where('patientId').equals(selectedPatientId).toArray()
+    return Array.from(new Set(entries.map((entry) => entry.date))).sort((a, b) => a.localeCompare(b))
+  }, [selectedPatientId])
   const patientVitals = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as VitalEntry[]
     const vitals = await db.vitals.where('patientId').equals(selectedPatientId).toArray()
@@ -3138,6 +3144,34 @@ function App() {
                         Copy latest entry
                       </Button>
                     </div>
+                    <div className='space-y-1'>
+                      <p className='text-xs text-clay'>Saved entry dates</p>
+                      {(savedDailyEntryDates ?? []).length > 0 ? (
+                        <div className='flex flex-wrap gap-1'>
+                          {(savedDailyEntryDates ?? []).map((entryDate) => (
+                            <Button
+                              key={entryDate}
+                              type='button'
+                              variant={entryDate === dailyDate ? 'default' : 'outline'}
+                              className='h-7 px-2 text-xs'
+                              onClick={() => {
+                                if (dailyDirty) {
+                                  void saveDailyUpdate()
+                                }
+                                setDailyDate(entryDate)
+                                if (selectedPatient?.id) {
+                                  void loadDailyUpdate(selectedPatient.id, entryDate)
+                                }
+                              }}
+                            >
+                              {entryDate}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className='text-xs text-clay'>No saved daily entries yet.</p>
+                      )}
+                    </div>
                     <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) from the latest saved date.</p>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
@@ -4103,6 +4137,7 @@ function App() {
                   <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
                   <li>In FRICHMOND, pick the target date, then tap Copy latest entry if you want to carry forward the latest saved daily note before editing.</li>
+                  <li>In FRICHMOND, use Saved entry dates to quickly jump to dates that already have entries; the selected date is highlighted.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
@@ -4114,7 +4149,7 @@ function App() {
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
-                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Copy latest entry to carry forward the latest saved daily note.</li>
+                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry to carry forward the latest saved daily note.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
