@@ -105,6 +105,7 @@ export interface PhotoAttachment {
   patientId: number
   category: PhotoCategory
   title: string
+  uploadGroupId?: string
   mimeType: string
   width: number
   height: number

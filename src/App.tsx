@@ -35,7 +35,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { formatBloodChemistry, formatUrinalysis } from './labFormatters'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -159,6 +159,18 @@ const buildDefaultPhotoTitle = (category: PhotoCategory, date = new Date()) => {
   return `${label}-${year}-${month}-${day}-${hours}:${minutes}:${seconds}`
 }
 
+const buildPhotoUploadGroupId = () => {
+  const randomToken = Math.random().toString(36).slice(2, 10)
+  return `group-${Date.now()}-${randomToken}`
+}
+
+const getPhotoGroupKey = (attachment: PhotoAttachment) => {
+  if (attachment.uploadGroupId && attachment.uploadGroupId.trim().length > 0) {
+    return attachment.uploadGroupId
+  }
+  return `legacy-${attachment.id ?? attachment.createdAt}`
+}
+
 const loadImageElementFromFile = (file: File) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file)
@@ -222,6 +234,13 @@ type MentionablePhoto = {
   title: string
   category: PhotoCategory
   createdAt: string
+}
+
+type PhotoAttachmentGroup = {
+  groupId: string
+  createdAt: string
+  entries: Array<PhotoAttachment & { id: number }>
+  totalByteSize: number
 }
 
 type ActivePhotoMention = {
@@ -1188,9 +1207,38 @@ function App() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }, [photoAttachments, selectedPatientId])
 
-  const selectedPatientAttachments = useMemo(() => {
-    return selectedPatientAllAttachments
+  const selectedPatientAttachmentGroups = useMemo(() => {
+    const scopedAttachments = selectedPatientAllAttachments
+      .filter((entry): entry is PhotoAttachment & { id: number } => entry.id !== undefined)
       .filter((entry) => (attachmentFilter === 'all' ? true : entry.category === attachmentFilter))
+
+    const groupsById = new Map<string, PhotoAttachmentGroup>()
+    scopedAttachments.forEach((entry) => {
+      const groupKey = getPhotoGroupKey(entry)
+      const existing = groupsById.get(groupKey)
+      if (existing) {
+        existing.entries.push(entry)
+        existing.totalByteSize += entry.byteSize
+        if (entry.createdAt > existing.createdAt) {
+          existing.createdAt = entry.createdAt
+        }
+        return
+      }
+
+      groupsById.set(groupKey, {
+        groupId: groupKey,
+        createdAt: entry.createdAt,
+        entries: [entry],
+        totalByteSize: entry.byteSize,
+      })
+    })
+
+    return Array.from(groupsById.values())
+      .map((group) => ({
+        ...group,
+        entries: [...group.entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   }, [attachmentFilter, selectedPatientAllAttachments])
 
   const mentionableAttachments = useMemo(() => {
@@ -1239,10 +1287,47 @@ function App() {
     }
   }, [selectedPatientAllAttachments])
 
-  const selectedAttachment = useMemo(() => {
+  const selectedAttachmentCarousel = useMemo(() => {
     if (selectedAttachmentId === null) return null
-    return selectedPatientAllAttachments.find((entry) => entry.id === selectedAttachmentId) ?? null
+
+    const grouped = new Map<string, Array<PhotoAttachment & { id: number }>>()
+    selectedPatientAllAttachments
+      .filter((entry): entry is PhotoAttachment & { id: number } => entry.id !== undefined)
+      .forEach((entry) => {
+        const key = getPhotoGroupKey(entry)
+        const list = grouped.get(key) ?? []
+        list.push(entry)
+        grouped.set(key, list)
+      })
+
+    for (const entries of grouped.values()) {
+      const sortedEntries = [...entries].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      const currentIndex = sortedEntries.findIndex((entry) => entry.id === selectedAttachmentId)
+      if (currentIndex >= 0) {
+        return {
+          entries: sortedEntries,
+          currentIndex,
+        }
+      }
+    }
+
+    return null
   }, [selectedAttachmentId, selectedPatientAllAttachments])
+
+  const selectedAttachmentCarouselEntry = selectedAttachmentCarousel
+    ? selectedAttachmentCarousel.entries[selectedAttachmentCarousel.currentIndex]
+    : null
+
+  const moveCarousel = useCallback((direction: 'previous' | 'next') => {
+    if (!selectedAttachmentCarousel) return
+
+    const total = selectedAttachmentCarousel.entries.length
+    if (total <= 1) return
+
+    const offset = direction === 'next' ? 1 : -1
+    const nextIndex = (selectedAttachmentCarousel.currentIndex + offset + total) % total
+    setSelectedAttachmentId(selectedAttachmentCarousel.entries[nextIndex].id)
+  }, [selectedAttachmentCarousel])
 
   const visiblePatients = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -1604,33 +1689,42 @@ function App() {
   }, [isOthersLabTemplate, labTemplateValues, selectedLabTemplate.id, selectedLabTemplate.tests])
 
   const addPhotoAttachment = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || selectedPatientId === null) {
+    const files = Array.from(event.target.files ?? []).filter((file) => file.type.startsWith('image/'))
+    if (files.length === 0 || selectedPatientId === null) {
       event.target.value = ''
       return
     }
 
     setIsPhotoSaving(true)
-    setNotice('Saving photo...')
+    setNotice(files.length === 1 ? 'Saving photo...' : `Saving ${files.length} photos...`)
 
     try {
-      const compressed = await compressImageFile(file)
-      await db.photoAttachments.add({
-        patientId: selectedPatientId,
-        category: attachmentCategory,
-        title: attachmentTitle.trim() || buildDefaultPhotoTitle(attachmentCategory),
-        mimeType: compressed.mimeType,
-        width: compressed.width,
-        height: compressed.height,
-        byteSize: compressed.blob.size,
-        imageBlob: compressed.blob,
-        createdAt: new Date().toISOString(),
-      })
+      const title = attachmentTitle.trim() || buildDefaultPhotoTitle(attachmentCategory)
+      const uploadGroupId = buildPhotoUploadGroupId()
+      const preparedAttachments = await Promise.all(
+        files.map(async (file) => {
+          const compressed = await compressImageFile(file)
+          return {
+            patientId: selectedPatientId,
+            category: attachmentCategory,
+            title,
+            uploadGroupId,
+            mimeType: compressed.mimeType,
+            width: compressed.width,
+            height: compressed.height,
+            byteSize: compressed.blob.size,
+            imageBlob: compressed.blob,
+            createdAt: new Date().toISOString(),
+          }
+        }),
+      )
+
+      await db.photoAttachments.bulkAdd(preparedAttachments)
 
       setAttachmentTitle(buildDefaultPhotoTitle(attachmentCategory))
-      setNotice('Photo attached.')
+      setNotice(files.length === 1 ? 'Photo attached.' : `${files.length} photos attached in one block.`)
     } catch {
-      setNotice('Unable to attach photo.')
+      setNotice('Unable to attach photos.')
     } finally {
       setIsPhotoSaving(false)
       event.target.value = ''
@@ -1644,6 +1738,22 @@ function App() {
       setSelectedAttachmentId(null)
     }
     setNotice('Photo removed from app record.')
+  }
+
+  const deletePhotoAttachmentGroup = async (group: PhotoAttachmentGroup) => {
+    const attachmentIds = group.entries.map((entry) => entry.id)
+    if (attachmentIds.length === 0) return
+
+    await db.photoAttachments.bulkDelete(attachmentIds)
+    if (selectedAttachmentId !== null && attachmentIds.includes(selectedAttachmentId)) {
+      setSelectedAttachmentId(null)
+    }
+
+    setNotice(
+      attachmentIds.length === 1
+        ? 'Photo removed from app record.'
+        : `${attachmentIds.length} photos removed from app record.`,
+    )
   }
 
   const hasUnsavedChanges = profileDirty || dailyDirty || vitalDirty || orderDirty
@@ -4153,6 +4263,7 @@ function App() {
                           type='file'
                           accept='image/*'
                           capture='environment'
+                          multiple
                           className='hidden'
                           onChange={(event) => void addPhotoAttachment(event)}
                         />
@@ -4160,15 +4271,16 @@ function App() {
                           ref={galleryPhotoInputRef}
                           type='file'
                           accept='image/*'
+                          multiple
                           className='hidden'
                           onChange={(event) => void addPhotoAttachment(event)}
                         />
                         <div className='flex gap-2 flex-wrap'>
                           <Button size='sm' onClick={() => cameraPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
-                            {isPhotoSaving ? 'Saving photo...' : 'Take photo'}
+                            {isPhotoSaving ? 'Saving photos...' : 'Take photo(s)'}
                           </Button>
                           <Button size='sm' variant='secondary' onClick={() => galleryPhotoInputRef.current?.click()} disabled={isPhotoSaving}>
-                            Choose existing
+                            Choose existing photo(s)
                           </Button>
                         </div>
 
@@ -4190,40 +4302,45 @@ function App() {
                           </Select>
                         </div>
 
-                        {selectedPatientAttachments.length > 0 ? (
+                        {selectedPatientAttachmentGroups.length > 0 ? (
                           <div className='grid grid-cols-2 sm:grid-cols-3 gap-2'>
-                            {selectedPatientAttachments.map((entry) => {
-                              const previewUrl = entry.id === undefined ? undefined : attachmentPreviewUrls[entry.id]
-                              const createdAt = new Date(entry.createdAt).toLocaleString()
+                            {selectedPatientAttachmentGroups.map((group) => {
+                              const coverPhoto = group.entries[0]
+                              const previewUrl = attachmentPreviewUrls[coverPhoto.id]
+                              const createdAt = new Date(group.createdAt).toLocaleString()
+                              const photoCount = group.entries.length
 
                               return (
-                                <div key={entry.id} className='rounded-md border border-clay/40 bg-white p-1.5 space-y-1'>
+                                <div key={group.groupId} className='rounded-md border border-clay/40 bg-white p-1.5 space-y-1'>
                                   <button
                                     type='button'
-                                    className='w-full overflow-hidden rounded border border-clay/30 bg-warm-ivory'
-                                    onClick={() => setSelectedAttachmentId(entry.id ?? null)}
+                                    className='relative w-full overflow-hidden rounded border border-clay/30 bg-warm-ivory'
+                                    onClick={() => setSelectedAttachmentId(coverPhoto.id)}
                                   >
                                     {previewUrl ? (
                                       <img
                                         src={previewUrl}
-                                        alt={entry.title || `Attachment ${formatPhotoCategory(entry.category)}`}
+                                        alt={coverPhoto.title || `Attachment ${formatPhotoCategory(coverPhoto.category)}`}
                                         className='h-28 w-full object-cover'
                                         loading='lazy'
                                       />
                                     ) : (
                                       <div className='h-28 flex items-center justify-center text-xs text-clay'>No preview</div>
                                     )}
+                                    <span className='absolute right-1.5 top-1.5 rounded-full bg-espresso/85 px-1.5 py-0.5 text-[11px] font-semibold text-white'>
+                                      {photoCount}
+                                    </span>
                                   </button>
                                   <p className='text-xs text-espresso line-clamp-2'>
-                                    {entry.title || '(No title)'}
+                                    {coverPhoto.title || '(No title)'}
                                   </p>
                                   <p className='text-[11px] text-clay'>
-                                    {formatPhotoCategory(entry.category)} • {createdAt}
+                                    {formatPhotoCategory(coverPhoto.category)} • {createdAt}
                                   </p>
                                   <div className='flex justify-between items-center gap-2'>
-                                    <p className='text-[11px] text-clay'>{formatBytes(entry.byteSize)}</p>
-                                    <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(entry.id)}>
-                                      Remove
+                                    <p className='text-[11px] text-clay'>{formatBytes(group.totalByteSize)}</p>
+                                    <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachmentGroup(group)}>
+                                      Remove set
                                     </Button>
                                   </div>
                                 </div>
@@ -4236,7 +4353,7 @@ function App() {
                               <Camera className='h-6 w-6 text-clay' />
                             </div>
                             <p className='text-sm font-medium text-espresso'>No photos yet</p>
-                            <p className='text-xs text-clay mt-1'>Take a photo or choose one from your gallery above.</p>
+                            <p className='text-xs text-clay mt-1'>Take photo(s) or choose existing photo(s) above.</p>
                           </div>
                         )}
                       </CardContent>
@@ -4416,7 +4533,7 @@ function App() {
                   <li>Labs tab: free-text labs plus structured lab templates and trends, including collection date/time fields.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
-                  <li>Photos tab: categorized image attachments with camera/gallery capture and in-app preview.</li>
+                  <li>Photos tab: categorized image attachments with grouped multi-photo upload blocks, count badges, and in-app carousel preview.</li>
                   <li>Reporting tab: all text exports (profile, census, daily summary, vitals log, and orders) plus all-census output.</li>
                   <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
                 </ul>
@@ -4451,7 +4568,8 @@ function App() {
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
-                  <li>In Photos tab, use Take photo for camera capture or Choose existing for gallery images.</li>
+                  <li>In Photos tab, use Take photo(s) or Choose existing photo(s) to upload multiple images at once under one shared title/category block.</li>
+                  <li>Each upload block shows a small count badge; tap the block to open a carousel and move through the set using Previous/Next.</li>
                   <li>In notes/text fields, type @ to pick an uploaded photo title; tap the linked @title to open the same photo modal.</li>
                   <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
                   <li>In Settings, tap Show onboarding any time to re-open the Welcome modal and retry the install prompt when your browser offers it.</li>
@@ -4486,32 +4604,53 @@ function App() {
           </DialogContent>
         </Dialog>
 
-        <Dialog open={selectedAttachment !== null} onOpenChange={(open) => { if (!open) setSelectedAttachmentId(null) }}>
+        <Dialog open={selectedAttachmentCarouselEntry !== null} onOpenChange={(open) => { if (!open) setSelectedAttachmentId(null) }}>
           <DialogContent className='flex flex-col gap-3 p-4 max-h-[92vh] max-w-3xl'>
             <DialogHeader>
-              <DialogTitle>Photo attachment</DialogTitle>
+              <DialogTitle>Photo attachment carousel</DialogTitle>
             </DialogHeader>
-            {selectedAttachment ? (
+            {selectedAttachmentCarouselEntry ? (
               <>
-                {selectedAttachment.id !== undefined && attachmentPreviewUrls[selectedAttachment.id] ? (
+                {attachmentPreviewUrls[selectedAttachmentCarouselEntry.id] ? (
                   <ScrollArea className='max-h-[64vh] rounded border border-clay/30 bg-warm-ivory'>
                     <img
-                      src={attachmentPreviewUrls[selectedAttachment.id]}
-                      alt={selectedAttachment.title || 'Attachment preview'}
+                      src={attachmentPreviewUrls[selectedAttachmentCarouselEntry.id]}
+                      alt={selectedAttachmentCarouselEntry.title || 'Attachment preview'}
                       className='w-full h-auto'
                     />
                   </ScrollArea>
                 ) : (
                   <p className='text-sm text-clay'>Preview unavailable.</p>
                 )}
+                {selectedAttachmentCarousel && selectedAttachmentCarousel.entries.length > 1 ? (
+                  <div className='flex items-center justify-between gap-2'>
+                    <Button
+                      variant='secondary'
+                      onClick={() => moveCarousel('previous')}
+                    >
+                      <ChevronLeft className='mr-1 h-4 w-4' />
+                      Previous
+                    </Button>
+                    <p className='text-xs text-clay'>
+                      {selectedAttachmentCarousel.currentIndex + 1} of {selectedAttachmentCarousel.entries.length}
+                    </p>
+                    <Button
+                      variant='secondary'
+                      onClick={() => moveCarousel('next')}
+                    >
+                      Next
+                      <ChevronRight className='ml-1 h-4 w-4' />
+                    </Button>
+                  </div>
+                ) : null}
                 <div className='text-sm text-espresso space-y-1'>
-                  <p><strong>Category:</strong> {formatPhotoCategory(selectedAttachment.category)}</p>
-                  <p><strong>Size:</strong> {formatBytes(selectedAttachment.byteSize)} ({selectedAttachment.width}×{selectedAttachment.height})</p>
-                  <p><strong>Added:</strong> {new Date(selectedAttachment.createdAt).toLocaleString()}</p>
-                  <p><strong>Title:</strong> {selectedAttachment.title || '-'}</p>
+                  <p><strong>Category:</strong> {formatPhotoCategory(selectedAttachmentCarouselEntry.category)}</p>
+                  <p><strong>Size:</strong> {formatBytes(selectedAttachmentCarouselEntry.byteSize)} ({selectedAttachmentCarouselEntry.width}×{selectedAttachmentCarouselEntry.height})</p>
+                  <p><strong>Added:</strong> {new Date(selectedAttachmentCarouselEntry.createdAt).toLocaleString()}</p>
+                  <p><strong>Title:</strong> {selectedAttachmentCarouselEntry.title || '-'}</p>
                 </div>
                 <div className='flex gap-2 flex-wrap'>
-                  <Button variant='destructive' onClick={() => void deletePhotoAttachment(selectedAttachment.id)}>
+                  <Button variant='destructive' onClick={() => void deletePhotoAttachment(selectedAttachmentCarouselEntry.id)}>
                     Remove from app
                   </Button>
                   <Button variant='secondary' onClick={() => setSelectedAttachmentId(null)}>
