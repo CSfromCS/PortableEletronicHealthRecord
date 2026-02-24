@@ -731,6 +731,8 @@ function App() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [dailyDirty, setDailyDirty] = useState(false)
+  const [copyLatestConfirmOpen, setCopyLatestConfirmOpen] = useState(false)
+  const [pendingLatestDailyUpdate, setPendingLatestDailyUpdate] = useState<DailyUpdate | null>(null)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos' | 'reporting'>('profile')
   const [notice, setNotice] = useState('')
   const [noticeIsDecaying, setNoticeIsDecaying] = useState(false)
@@ -1210,6 +1212,24 @@ function App() {
     setDailyDirty(false)
   }
 
+  const applyDailyUpdateToForm = useCallback((update: DailyUpdate) => {
+    setDailyUpdateForm({
+      fluid: update.fluid,
+      respiratory: update.respiratory,
+      infectious: update.infectious,
+      cardio: update.cardio,
+      hema: update.hema,
+      metabolic: update.metabolic,
+      output: update.output,
+      neuro: update.neuro,
+      drugs: update.drugs,
+      other: update.other,
+      assessment: update.assessment,
+      plans: update.plans,
+    })
+    setDailyDirty(true)
+  }, [])
+
   const copyLatestDailyUpdateToForm = useCallback(async () => {
     if (selectedPatientId === null) return
 
@@ -1236,23 +1256,29 @@ function App() {
       return candidate
     })
 
-    setDailyUpdateForm({
-      fluid: latestUpdate.fluid,
-      respiratory: latestUpdate.respiratory,
-      infectious: latestUpdate.infectious,
-      cardio: latestUpdate.cardio,
-      hema: latestUpdate.hema,
-      metabolic: latestUpdate.metabolic,
-      output: latestUpdate.output,
-      neuro: latestUpdate.neuro,
-      drugs: latestUpdate.drugs,
-      other: latestUpdate.other,
-      assessment: latestUpdate.assessment,
-      plans: latestUpdate.plans,
-    })
-    setDailyDirty(true)
-    setNotice(`Copied latest daily entry (${latestUpdate.date}).`)
+    setPendingLatestDailyUpdate(latestUpdate)
+    setCopyLatestConfirmOpen(true)
   }, [selectedPatientId])
+
+  const confirmCopyLatestDailyUpdate = useCallback(() => {
+    if (!pendingLatestDailyUpdate) return
+
+    applyDailyUpdateToForm(pendingLatestDailyUpdate)
+    setNotice(`Copied latest daily entry (${pendingLatestDailyUpdate.date}).`)
+    setCopyLatestConfirmOpen(false)
+    setPendingLatestDailyUpdate(null)
+  }, [applyDailyUpdateToForm, pendingLatestDailyUpdate])
+
+  const closeCopyLatestConfirm = useCallback(() => {
+    setCopyLatestConfirmOpen(false)
+    setPendingLatestDailyUpdate(null)
+  }, [])
+
+  useEffect(() => {
+    if (selectedPatientId === null && copyLatestConfirmOpen) {
+      closeCopyLatestConfirm()
+    }
+  }, [closeCopyLatestConfirm, copyLatestConfirmOpen, selectedPatientId])
 
   const saveProfile = useCallback(
     async () => {
@@ -4136,7 +4162,7 @@ function App() {
                   <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
                   <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
                   <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
-                  <li>In FRICHMOND, pick the target date, then tap Copy latest entry if you want to carry forward the latest saved daily note before editing.</li>
+                  <li>In FRICHMOND, pick the target date, then tap Copy latest entry to carry forward the latest saved daily note. Confirm the overwrite prompt to replace the selected date&apos;s current entry with a duplicate of the latest saved date.</li>
                   <li>In FRICHMOND, use Saved entry dates to quickly jump to dates that already have entries; the selected date is highlighted.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
@@ -4149,7 +4175,7 @@ function App() {
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
-                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry to carry forward the latest saved daily note.</li>
+                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry with overwrite confirmation.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
@@ -4256,6 +4282,24 @@ function App() {
                 </div>
               </>
             ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={copyLatestConfirmOpen} onOpenChange={(open) => { if (!open) closeCopyLatestConfirm() }}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>Confirm copy latest entry</DialogTitle>
+            </DialogHeader>
+            <p className='text-sm text-espresso text-center'>
+              Are you sure you want to delete the current entry in
+              <strong className='block text-center'>{dailyDate}</strong>
+              and replace it with a duplicate of
+              <strong className='block text-center'>{pendingLatestDailyUpdate?.date ?? '-'}?</strong>
+            </p>
+            <div className='flex gap-2 flex-wrap justify-center'>
+              <Button variant='destructive' onClick={confirmCopyLatestDailyUpdate}>Yes, replace entry</Button>
+              <Button variant='secondary' onClick={closeCopyLatestConfirm}>Cancel</Button>
+            </div>
           </DialogContent>
         </Dialog>
 
