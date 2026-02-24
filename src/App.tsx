@@ -2144,32 +2144,70 @@ function App() {
 
   const toSelectedPatientCensusReport = (
     patient: Patient,
-    medicationEntries: MedicationEntry[],
+    vitalsEntries: VitalEntry[],
     selectedLabEntries: LabEntry[],
+    orderEntries: OrderEntry[],
   ) => {
-    const activeStructuredMeds = medicationEntries
-      .filter((entry) => entry.status === 'active')
-      .map(formatStructuredMedication)
-      .filter(Boolean)
-
-    const medsCombined = [profileForm.medications.trim(), ...activeStructuredMeds].filter(Boolean)
     const labBlocks = buildLabReportBlocks(
       selectedLabEntries.filter((entry) => entry.id !== undefined && selectedPatientLabReportIds.includes(entry.id)),
     )
+    const scopedVitals = vitalsEntries
+      .filter((entry) =>
+        isWithinDateTimeWindow(
+          entry.date,
+          entry.time,
+          reportVitalsDateFrom,
+          reportVitalsDateTo,
+          reportVitalsTimeFrom,
+          reportVitalsTimeTo,
+        ),
+      )
+      .sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date)
+        if (a.time !== b.time) return a.time.localeCompare(b.time)
+        return a.createdAt.localeCompare(b.createdAt)
+      })
+    const scopedOrders = orderEntries
+      .filter((entry) =>
+        isWithinDateTimeWindow(
+          entry.orderDate,
+          entry.orderTime,
+          reportOrdersDateFrom,
+          reportOrdersDateTo,
+          reportOrdersTimeFrom,
+          reportOrdersTimeTo,
+        ),
+      )
+      .sort((a, b) => {
+        if (a.orderDate !== b.orderDate) return a.orderDate.localeCompare(b.orderDate)
+        if (a.orderTime !== b.orderTime) return a.orderTime.localeCompare(b.orderTime)
+        return a.createdAt.localeCompare(b.createdAt)
+      })
     const diagnosis = profileForm.diagnosis.trim() || patient.diagnosis.trim() || '-'
+    const vitalsLines = scopedVitals.map((entry) => {
+      const base = `${formatDateMMDD(entry.date)} ${formatClockCompact(entry.time)} ${entry.bp.trim()} ${entry.hr.trim()} ${entry.rr.trim()} ${entry.temp.trim()} ${entry.spo2.trim()}`
+      return entry.note.trim() ? `${base} ${entry.note.trim()}` : base
+    })
+    const ordersLines = scopedOrders.map((entry) => {
+      const orderDateTime = `${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`
+      const orderLine = [orderDateTime, entry.orderText.trim()].filter(Boolean).join(' — ')
+      return entry.note.trim() ? `${orderLine} (${entry.note.trim()})` : orderLine
+    })
+    const vitalsWindowLabel = `Vitals (From ${formatDateMMDDYYYY(reportVitalsDateFrom)}, ${formatClock(reportVitalsTimeFrom)}, Until ${formatDateMMDDYYYY(reportVitalsDateTo)}, ${formatClock(reportVitalsTimeTo)})`
 
     return [
       `${patient.roomNumber} – ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
       `${patient.age} / ${patient.sex}`,
       diagnosis,
-      'Labs:',
+      '',
+      'Labs',
       labBlocks.length > 0 ? labBlocks.join('\n\n') : '-',
       '',
-      'Medications:',
-      medsCombined.length > 0 ? medsCombined.join('\n') : '-',
+      vitalsWindowLabel,
+      vitalsLines.length > 0 ? vitalsLines.join('\n') : '-',
       '',
-      'Pendings:',
-      profileForm.pendings.trim() || patient.pendings.trim() || '-',
+      'Orders',
+      ordersLines.length > 0 ? ordersLines.join('\n') : '-',
     ].join('\n')
   }
 
@@ -3181,7 +3219,6 @@ function App() {
     })
 
     setNotice('Sample patient "Juan Dela Cruz" added successfully.')
-    setSelectedPatientId(samplePatientId)
   }
 
   const reportingSections: ReportingSection[] = selectedPatient
@@ -3234,8 +3271,9 @@ function App() {
               buildText: () =>
                 toSelectedPatientCensusReport(
                   selectedPatient,
-                  selectedPatientStructuredMeds,
+                  patientVitals ?? [],
                   selectedPatientStructuredLabs,
+                  selectedPatientOrders,
                 ),
             },
           ],
@@ -4690,51 +4728,7 @@ function App() {
                           {section.id === 'patient-reporting' ? (
                             <div className='space-y-3 rounded-md border border-clay/40 bg-white p-2'>
                               <div className='space-y-2'>
-                                <p className='text-xs font-semibold text-espresso'>Vitals report filters</p>
-                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Date from</Label>
-                                    <Input type='date' value={reportVitalsDateFrom} onChange={(event) => setReportVitalsDateFrom(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Date to</Label>
-                                    <Input type='date' value={reportVitalsDateTo} onChange={(event) => setReportVitalsDateTo(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Time from</Label>
-                                    <Input type='time' value={reportVitalsTimeFrom} onChange={(event) => setReportVitalsTimeFrom(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Time to</Label>
-                                    <Input type='time' value={reportVitalsTimeTo} onChange={(event) => setReportVitalsTimeTo(event.target.value)} />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className='space-y-2'>
-                                <p className='text-xs font-semibold text-espresso'>Orders report filters</p>
-                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Date from</Label>
-                                    <Input type='date' value={reportOrdersDateFrom} onChange={(event) => setReportOrdersDateFrom(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Date to</Label>
-                                    <Input type='date' value={reportOrdersDateTo} onChange={(event) => setReportOrdersDateTo(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Time from</Label>
-                                    <Input type='time' value={reportOrdersTimeFrom} onChange={(event) => setReportOrdersTimeFrom(event.target.value)} />
-                                  </div>
-                                  <div className='space-y-1'>
-                                    <Label className='text-xs'>Time to</Label>
-                                    <Input type='time' value={reportOrdersTimeTo} onChange={(event) => setReportOrdersTimeTo(event.target.value)} />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className='space-y-2'>
-                                <p className='text-xs font-semibold text-espresso'>Selected patient labs</p>
+                                <p className='text-xs font-semibold text-espresso'>Labs</p>
                                 <div className='flex items-center gap-2 flex-wrap'>
                                   <Button
                                     size='sm'
@@ -4777,26 +4771,73 @@ function App() {
                                   <p className='text-xs text-clay'>No structured labs for selected patient.</p>
                                 )}
                               </div>
+
+                              <div className='space-y-2'>
+                                <p className='text-xs font-semibold text-espresso'>Vitals Filter</p>
+                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>From date</Label>
+                                    <Input type='date' value={reportVitalsDateFrom} onChange={(event) => setReportVitalsDateFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>From time</Label>
+                                    <Input type='time' value={reportVitalsTimeFrom} onChange={(event) => setReportVitalsTimeFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Until date</Label>
+                                    <Input type='date' value={reportVitalsDateTo} onChange={(event) => setReportVitalsDateTo(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Until time</Label>
+                                    <Input type='time' value={reportVitalsTimeTo} onChange={(event) => setReportVitalsTimeTo(event.target.value)} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className='space-y-2'>
+                                <p className='text-xs font-semibold text-espresso'>Orders Filter</p>
+                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>From date</Label>
+                                    <Input type='date' value={reportOrdersDateFrom} onChange={(event) => setReportOrdersDateFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>From time</Label>
+                                    <Input type='time' value={reportOrdersTimeFrom} onChange={(event) => setReportOrdersTimeFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Until date</Label>
+                                    <Input type='date' value={reportOrdersDateTo} onChange={(event) => setReportOrdersDateTo(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Until time</Label>
+                                    <Input type='time' value={reportOrdersTimeTo} onChange={(event) => setReportOrdersTimeTo(event.target.value)} />
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           ) : null}
-                          <div className='flex gap-2 flex-wrap'>
-                            {section.actions.map((action) => (
-                              <Button
-                                key={action.id}
-                                type='button'
-                                disabled={action.id === 'all-census' && selectedCensusPatients.length === 0}
-                                onClick={() => {
-                                  try {
-                                    openCopyModal(action.buildText(), action.outputTitle)
-                                  } catch (error) {
-                                    const message = error instanceof Error ? error.message : 'Unable to generate report.'
-                                    setNotice(message)
-                                  }
-                                }}
-                              >
-                                {action.label}
-                              </Button>
-                            ))}
+                          <div className='space-y-1'>
+                            <p className='text-xs text-clay'>Generate and open text preview:</p>
+                            <div className='flex gap-2 flex-wrap'>
+                              {section.actions.map((action) => (
+                                <Button
+                                  key={action.id}
+                                  type='button'
+                                  disabled={action.id === 'all-census' && selectedCensusPatients.length === 0}
+                                  onClick={() => {
+                                    try {
+                                      openCopyModal(action.buildText(), action.outputTitle)
+                                    } catch (error) {
+                                      const message = error instanceof Error ? error.message : 'Unable to generate report.'
+                                      setNotice(message)
+                                    }
+                                  }}
+                                >
+                                  {action.label}
+                                </Button>
+                              ))}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -4868,7 +4909,7 @@ function App() {
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with grouped multi-photo upload blocks, count badges, and in-app carousel preview.</li>
-                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with lab instance selection, compare mode (exactly 2 instances per lab template), and date/time filtering for vitals/orders.</li>
+                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with clearer Current patient sections ordered as Labs &rarr; Vitals (From/Until date-time) &rarr; Orders, plus lab instance selection and date/time filtering for vitals/orders.</li>
                   <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
                 </ul>
               </div>
@@ -4910,6 +4951,7 @@ function App() {
                 </ul>
               </div>
             </section>
+            <p className='text-sm text-clay'>Version: v{__APP_VERSION__} ({__GIT_SHA__})</p>
             </CardContent>
           </Card>
         )}
@@ -5122,7 +5164,6 @@ function App() {
               </>
             ) : null}
           </div>
-          <p className='ml-auto'>Version: v{__APP_VERSION__} ({__GIT_SHA__})</p>
         </div>
       </footer>
     </div>
