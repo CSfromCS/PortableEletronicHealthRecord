@@ -540,7 +540,7 @@ type ReportingSection = {
 const LAB_TEMPLATES: LabTemplate[] = [
   {
     id: 'ust-cbc',
-    name: 'UST - CBC',
+    name: 'CBC',
     tests: [
       { key: 'RBC', fullName: 'RBC count', unit: 'x10^12/L' },
       { key: 'Hgb', fullName: 'Hemoglobin', unit: 'g/L' },
@@ -567,7 +567,7 @@ const LAB_TEMPLATES: LabTemplate[] = [
   },
   {
     id: 'ust-urinalysis',
-    name: 'UST - Urinalysis',
+    name: 'Urinalysis',
     formatReport: formatUrinalysis,
     tests: [
       // Physical
@@ -609,7 +609,7 @@ const LAB_TEMPLATES: LabTemplate[] = [
   },
   {
     id: UST_BLOOD_CHEM_TEMPLATE_ID,
-    name: 'UST - Blood Chemistry',
+    name: 'Blood Chemistry',
     formatReport: formatBloodChemistry,
     tests: [
       { key: 'Sodium' },
@@ -647,7 +647,7 @@ const LAB_TEMPLATES: LabTemplate[] = [
   },
   {
     id: UST_ABG_TEMPLATE_ID,
-    name: 'UST - ABG (Arterial Blood Gas)',
+    name: 'ABG (Arterial Blood Gas)',
     tests: [
       { key: 'pH' },
       { key: 'pCO2', unit: 'mmHg' },
@@ -3927,7 +3927,7 @@ function App() {
                               <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] gap-2 items-center'>
                                 <p className='text-sm text-espresso font-medium'>Desired PaO2 (mmHg)</p>
                                 <Input
-                                  aria-label='UST - ABG (Arterial Blood Gas) Desired PaO2 value'
+                                  aria-label='ABG (Arterial Blood Gas) Desired PaO2 value'
                                   placeholder='Whole or decimal mmHg (e.g., 60)'
                                   value={labTemplateValues[ABG_DESIRED_PAO2_KEY] ?? ''}
                                   onChange={(event) => updateLabTemplateValue(ABG_DESIRED_PAO2_KEY, event.target.value)}
