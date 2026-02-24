@@ -1920,11 +1920,11 @@ function App() {
       `${patient.age}/${patient.sex} • ${patient.service}`,
       `Admit date: ${patient.admitDate}`,
       `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
+      `Clinical summary: ${profile.clinicalSummary.trim() || '-'}`,
       `Chief complaint: ${profile.chiefComplaint.trim() || '-'}`,
       `History of present illness: ${profile.hpiText.trim() || '-'}`,
       `Past medical history: ${profile.pmhText.trim() || '-'}`,
       `Physical examination: ${profile.peText.trim() || '-'}`,
-      `Clinical summary: ${profile.clinicalSummary.trim() || '-'}`,
       `Plans: ${profile.plans.trim() || '-'}`,
       `Meds: ${medsCombined || '-'}`,
       `Labs: ${labsCombined || '-'}`,
@@ -3303,6 +3303,19 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
+                      <Label htmlFor='profile-clinicalsummary'>Clinical Summary</Label>
+                      <PhotoMentionField
+                        ariaLabel='Clinical Summary'
+                        placeholder='Clinical Summary'
+                        className='min-h-32'
+                        value={profileForm.clinicalSummary}
+                        onChange={(nextValue) => updateProfileField('clinicalSummary', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
                       <Label htmlFor='profile-chiefcomplaint'>Chief Complaint</Label>
                       <PhotoMentionField
                         ariaLabel='Chief Complaint'
@@ -3349,19 +3362,6 @@ function App() {
                         className='min-h-32'
                         value={profileForm.peText}
                         onChange={(nextValue) => updateProfileField('peText', nextValue)}
-                        attachments={mentionableAttachments}
-                        attachmentByTitle={mentionableAttachmentByTitle}
-                        onOpenPhotoById={openPhotoById}
-                      />
-                    </div>
-                    <div className='space-y-1'>
-                      <Label htmlFor='profile-clinicalsummary'>Clinical Summary</Label>
-                      <PhotoMentionField
-                        ariaLabel='Clinical Summary'
-                        placeholder='Clinical Summary'
-                        className='min-h-32'
-                        value={profileForm.clinicalSummary}
-                        onChange={(nextValue) => updateProfileField('clinicalSummary', nextValue)}
                         attachments={mentionableAttachments}
                         attachmentByTitle={mentionableAttachmentByTitle}
                         onOpenPhotoById={openPhotoById}
@@ -4527,7 +4527,7 @@ function App() {
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
-                  <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
+                  <li>Profile tab: demographics plus case-review text boxes for diagnosis, clinical summary, chief complaint, HPI, PMH, physical exam, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry with overwrite confirmation.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends, including collection date/time fields.</li>
