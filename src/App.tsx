@@ -3059,7 +3059,7 @@ function App() {
         {
           patientId: samplePatientId,
           date: today,
-          time: '06:00',
+          time: '09:00',
           bp: '126/78',
           hr: '86',
           rr: '20',
@@ -3071,7 +3071,7 @@ function App() {
         {
           patientId: samplePatientId,
           date: today,
-          time: '14:00',
+          time: '13:00',
           bp: '128/76',
           hr: '84',
           rr: '18',
@@ -3173,7 +3173,7 @@ function App() {
         {
           patientId: samplePatientId,
           date: today,
-          time: '06:00',
+          time: '09:00',
           templateId: UST_BLOOD_CHEM_TEMPLATE_ID,
           results: {
             Sodium: '138',
@@ -3190,6 +3190,28 @@ function App() {
             '__uln:ALT': '41.1',
           },
           note: 'Blood chemistry with liver enzyme comparison vs ULN.',
+          createdAt: now,
+        },
+        {
+          patientId: samplePatientId,
+          date: today,
+          time: '13:00',
+          templateId: UST_BLOOD_CHEM_TEMPLATE_ID,
+          results: {
+            Sodium: '136',
+            Potassium: '3.9',
+            Chloride: '101',
+            Magnesium: '1.9',
+            'Ionized Calcium': '1.10',
+            BUN: '15',
+            Creatinine: '0.9',
+            eGFR: '92',
+            AST: '18',
+            ALT: '38.9',
+            '__uln:AST': '35',
+            '__uln:ALT': '41.1',
+          },
+          note: 'Repeat blood chemistry for same-day trend comparison.',
           createdAt: now,
         },
       ])
