@@ -504,6 +504,10 @@ type LabTemplate = {
   formatReport?: (results: Record<string, string>) => string
 }
 
+const OTHERS_LAB_TEMPLATE_ID = 'others'
+const OTHERS_LABEL_KEY = '__customLabel'
+const OTHERS_RESULT_KEY = '__freeformResult'
+
 type ReportingAction = {
   id: string
   label: string
@@ -600,6 +604,11 @@ const LAB_TEMPLATES: LabTemplate[] = [
       { key: 'Crea', unit: 'mg/dL' },
       { key: 'eGFR', unit: 'mL/min/1.73m²' },
     ],
+  },
+  {
+    id: OTHERS_LAB_TEMPLATE_ID,
+    name: 'Others',
+    tests: [],
   },
 ]
 
@@ -1337,6 +1346,37 @@ function App() {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
   }, [])
 
+  const isOthersLabTemplate = useCallback((templateId: string) => templateId === OTHERS_LAB_TEMPLATE_ID, [])
+
+  const buildLabEntryPayload = useCallback(() => {
+    if (isOthersLabTemplate(selectedLabTemplate.id)) {
+      const customLabel = (labTemplateValues[OTHERS_LABEL_KEY] ?? '').trim()
+      const freeformResult = (labTemplateValues[OTHERS_RESULT_KEY] ?? '').trim()
+      if (!customLabel || !freeformResult) {
+        return null
+      }
+
+      return {
+        [OTHERS_LABEL_KEY]: customLabel,
+        [OTHERS_RESULT_KEY]: freeformResult,
+      }
+    }
+
+    const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
+      const value = (labTemplateValues[test.key] ?? '').trim()
+      if (value) {
+        accumulator[test.key] = value
+      }
+      return accumulator
+    }, {})
+
+    if (Object.keys(filteredResults).length === 0) {
+      return null
+    }
+
+    return filteredResults
+  }, [isOthersLabTemplate, labTemplateValues, selectedLabTemplate.id, selectedLabTemplate.tests])
+
   const addPhotoAttachment = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || selectedPatientId === null) {
@@ -1449,8 +1489,17 @@ function App() {
   const buildStructuredLabLines = (entries: LabEntry[]) => {
     return entries.map((entry) => {
       const template = labTemplatesById.get(entry.templateId)
-      const label = template?.name ?? entry.templateId
+      const isOthersTemplate = entry.templateId === OTHERS_LAB_TEMPLATE_ID
+      const customLabel = (entry.results?.[OTHERS_LABEL_KEY] ?? '').trim()
+      const label = isOthersTemplate
+        ? customLabel || 'Others'
+        : template?.name ?? entry.templateId
       const note = entry.note ? ` — ${entry.note}` : ''
+
+      if (isOthersTemplate) {
+        const freeformResult = (entry.results?.[OTHERS_RESULT_KEY] ?? '').trim()
+        return `${entry.date} ${label}: ${freeformResult || '-'}${note}`
+      }
 
       // Use custom formatter when available
       if (template?.formatReport) {
@@ -2064,16 +2113,14 @@ function App() {
     if (selectedPatientId === null) return
 
     const entryDate = labTemplateDate || toLocalISODate()
-    const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
-      const value = (labTemplateValues[test.key] ?? '').trim()
-      if (value) {
-        accumulator[test.key] = value
-      }
-      return accumulator
-    }, {})
+    const resultsPayload = buildLabEntryPayload()
 
-    if (Object.keys(filteredResults).length === 0) {
-      setNotice('Enter at least one lab value.')
+    if (!resultsPayload) {
+      if (isOthersLabTemplate(selectedLabTemplate.id)) {
+        setNotice('Enter both Label and Lab Result for Others.')
+      } else {
+        setNotice('Enter at least one lab value.')
+      }
       return
     }
 
@@ -2081,7 +2128,7 @@ function App() {
       patientId: selectedPatientId,
       date: entryDate,
       templateId: selectedLabTemplate.id,
-      results: filteredResults,
+      results: resultsPayload,
       note: labTemplateNote.trim(),
       createdAt: new Date().toISOString(),
     })
@@ -2118,23 +2165,21 @@ function App() {
   const saveEditingLab = async () => {
     if (editingLabId === null) return
 
-    const filteredResults = selectedLabTemplate.tests.reduce<Record<string, string>>((accumulator, test) => {
-      const value = (labTemplateValues[test.key] ?? '').trim()
-      if (value) {
-        accumulator[test.key] = value
-      }
-      return accumulator
-    }, {})
+    const resultsPayload = buildLabEntryPayload()
 
-    if (Object.keys(filteredResults).length === 0) {
-      setNotice('Enter at least one lab value.')
+    if (!resultsPayload) {
+      if (isOthersLabTemplate(selectedLabTemplate.id)) {
+        setNotice('Enter both Label and Lab Result for Others.')
+      } else {
+        setNotice('Enter at least one lab value.')
+      }
       return
     }
 
     await db.labs.update(editingLabId, {
       date: labTemplateDate || toLocalISODate(),
       templateId: selectedLabTemplate.id,
-      results: filteredResults,
+      results: resultsPayload,
       note: labTemplateNote.trim(),
     })
 
@@ -3497,33 +3542,59 @@ function App() {
                           </div>
                         </div>
                         <div className='space-y-2'>
-                          {(() => {
-                            let lastSection: string | undefined
-                            return selectedLabTemplate.tests.map((test) => {
-                              const showSection = test.section && test.section !== lastSection
-                              lastSection = test.section
-                              return (
-                                <div key={test.key}>
-                                  {showSection && (
-                                    <p className='text-xs font-semibold text-clay uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
-                                  )}
-                                  <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
-                                    <p className='text-sm text-espresso font-medium'>
-                                      {test.key}
-                                      {test.fullName ? ` - ${test.fullName}` : ''}
-                                      {test.unit ? ` (${test.unit})` : ''}
-                                    </p>
-                                    <Input
-                                      aria-label={`${selectedLabTemplate.name} ${test.key} value`}
-                                      placeholder='Value'
-                                      value={labTemplateValues[test.key] ?? ''}
-                                      onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
-                                    />
+                          {selectedLabTemplate.id === OTHERS_LAB_TEMPLATE_ID ? (
+                            <div className='space-y-2'>
+                              <div className='space-y-1'>
+                                <Label>Label</Label>
+                                <Input
+                                  aria-label='Other lab label'
+                                  placeholder='Example: ABG, Troponin, Coagulation Profile'
+                                  value={labTemplateValues[OTHERS_LABEL_KEY] ?? ''}
+                                  onChange={(event) => updateLabTemplateValue(OTHERS_LABEL_KEY, event.target.value)}
+                                />
+                              </div>
+                              <div className='space-y-1'>
+                                <Label>Lab Result</Label>
+                                <PhotoMentionField
+                                  ariaLabel='Other lab result'
+                                  placeholder='Enter full lab result as freeform text'
+                                  value={labTemplateValues[OTHERS_RESULT_KEY] ?? ''}
+                                  onChange={(nextValue) => updateLabTemplateValue(OTHERS_RESULT_KEY, nextValue)}
+                                  attachments={mentionableAttachments}
+                                  attachmentByTitle={mentionableAttachmentByTitle}
+                                  onOpenPhotoById={openPhotoById}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            (() => {
+                              let lastSection: string | undefined
+                              return selectedLabTemplate.tests.map((test) => {
+                                const showSection = test.section && test.section !== lastSection
+                                lastSection = test.section
+                                return (
+                                  <div key={test.key}>
+                                    {showSection && (
+                                      <p className='text-xs font-semibold text-clay uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
+                                    )}
+                                    <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                                      <p className='text-sm text-espresso font-medium'>
+                                        {test.key}
+                                        {test.fullName ? ` - ${test.fullName}` : ''}
+                                        {test.unit ? ` (${test.unit})` : ''}
+                                      </p>
+                                      <Input
+                                        aria-label={`${selectedLabTemplate.name} ${test.key} value`}
+                                        placeholder='Value'
+                                        value={labTemplateValues[test.key] ?? ''}
+                                        onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                              )
-                            })
-                          })()}
+                                )
+                              })
+                            })()
+                          )}
                         </div>
                         <div className='space-y-1'>
                           <Label>Note</Label>
@@ -4015,7 +4086,8 @@ function App() {
                 <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
-                  <li>Use Structured labs templates (example: UST - CBC), then fill values in order and add all at once.</li>
+                  <li>Use Structured labs templates (CBC, Urinalysis, Electrolytes, or Others), then fill values and add.</li>
+                  <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
                   <li>Use Reporting tab when you need handoff-ready text output from any section.</li>
