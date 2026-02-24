@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
   ({ className, type, onKeyDown, ...props }, ref) => {
     const isDateOrTimeInput = type === 'date' || type === 'time' || type === 'datetime-local'
-    const isEnterNavigationInputType =
+    const isEnterNavigationEnabled =
       type === undefined ||
       type === 'text' ||
       type === 'number' ||
@@ -18,7 +18,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
       onKeyDown?.(event)
       if (event.defaultPrevented) return
-      if (!isEnterNavigationInputType) return
+      if (!isEnterNavigationEnabled) return
       if (event.nativeEvent.isComposing || event.key !== 'Enter') return
       if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
 
