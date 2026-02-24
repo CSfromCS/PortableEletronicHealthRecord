@@ -4932,6 +4932,7 @@ function App() {
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
                   <li>Use Structured labs templates (CBC, Urinalysis, Blood Chemistry, ABG, or Others), then fill values and add.</li>
+                  <li>In single-line text boxes, pressing Enter jumps to the next text box; multi-line note fields still keep Enter for new lines.</li>
                   <li>For Blood Chemistry, enter collection time when needed; AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP can include ULN values to auto-show xULN, while TSH/FT4/FT3 can include NV ranges.</li>
                   <li>ABG template auto-calculates pO2/FiO2 and Desired FiO2 from pO2 and Actual FiO2 (with optional Desired PaO2 override; default is 60).</li>
                   <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>

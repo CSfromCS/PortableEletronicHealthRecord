@@ -3,8 +3,39 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+  ({ className, type, onKeyDown, ...props }, ref) => {
     const isDateOrTimeInput = type === 'date' || type === 'time' || type === 'datetime-local'
+    const isEnterNavigationInputType =
+      type === undefined ||
+      type === 'text' ||
+      type === 'number' ||
+      type === 'search' ||
+      type === 'email' ||
+      type === 'url' ||
+      type === 'tel' ||
+      type === 'password'
+
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+      onKeyDown?.(event)
+      if (event.defaultPrevented) return
+      if (!isEnterNavigationInputType) return
+      if (event.nativeEvent.isComposing || event.key !== 'Enter') return
+      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
+
+      const allFocusableInputs = Array.from(
+        document.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not([disabled])')
+      ).filter((input) => !input.readOnly && input.tabIndex >= 0)
+
+      const currentIndex = allFocusableInputs.indexOf(event.currentTarget)
+      if (currentIndex < 0) return
+
+      const nextInput = allFocusableInputs[currentIndex + 1]
+      if (!nextInput) return
+
+      event.preventDefault()
+      nextInput.focus()
+      nextInput.select()
+    }
 
     return (
       <input
@@ -17,6 +48,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
         )}
         ref={ref}
         {...props}
+        onKeyDown={handleKeyDown}
       />
     )
   }
