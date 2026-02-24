@@ -4900,7 +4900,7 @@ function App() {
                 <Button variant='secondary' onClick={() => backupFileInputRef.current?.click()}>Import backup JSON</Button>
                 <Button variant='secondary' onClick={() => setShowOnboarding(true)}>Show onboarding page / install app</Button>
                 <Button variant='secondary' onClick={() => void addSamplePatient()}>Add sample patient (Juan Dela Cruz)</Button>
-                <Button variant='secondary' onClick={() => window.open('https://github.com/CSfromCS/PortableEletronicHealthRecord/issues/new?title=Suggestion%20Title&body=Your%20suggestion%20here...', '_blank', 'noopener,noreferrer')}>Send feedback / suggestion</Button>
+                <Button variant='secondary' onClick={() => window.open('https://github.com/CSfromCS/PortableEletronicHealthRecord/issues/new/choose', '_blank', 'noopener,noreferrer')}>Send feedback / suggestion</Button>
                 <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
               </div>
 
