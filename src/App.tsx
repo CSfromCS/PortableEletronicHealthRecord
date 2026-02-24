@@ -34,7 +34,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { formatBloodChemistry, formatUrinalysis } from './labFormatters'
+import {
+  formatBloodChemistry,
+  formatLabComparisonReport,
+  formatLabSingleReport,
+  formatUrinalysis,
+} from './labFormatters'
 import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 
 type PatientFormState = {
@@ -844,7 +849,18 @@ function App() {
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<number | null>(null)
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
   const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
+  const [selectedVitalsPatientIds, setSelectedVitalsPatientIds] = useState<number[]>([])
+  const [reportVitalsDateFrom, setReportVitalsDateFrom] = useState(() => toLocalISODate())
+  const [reportVitalsDateTo, setReportVitalsDateTo] = useState(() => toLocalISODate())
+  const [reportVitalsTimeFrom, setReportVitalsTimeFrom] = useState('00:00')
+  const [reportVitalsTimeTo, setReportVitalsTimeTo] = useState('23:59')
+  const [reportOrdersDateFrom, setReportOrdersDateFrom] = useState(() => toLocalISODate())
+  const [reportOrdersDateTo, setReportOrdersDateTo] = useState(() => toLocalISODate())
+  const [reportOrdersTimeFrom, setReportOrdersTimeFrom] = useState('00:00')
+  const [reportOrdersTimeTo, setReportOrdersTimeTo] = useState('23:59')
+  const [selectedPatientLabReportIds, setSelectedPatientLabReportIds] = useState<number[]>([])
   const censusSelectionInitializedRef = useRef(false)
+  const vitalsSelectionInitializedRef = useRef(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const onboardingAutoInstallAttemptedRef = useRef(false)
   const [deferredInstallPromptEvent, setDeferredInstallPromptEvent] = useState<InstallPromptEvent | null>(null)
@@ -894,6 +910,7 @@ function App() {
       return a.createdAt.localeCompare(b.createdAt)
     })
   }, [selectedPatientId])
+  const allVitals = useLiveQuery(() => db.vitals.toArray(), [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1019,6 +1036,24 @@ function App() {
     })
   }, [activePatientIds])
 
+  useEffect(() => {
+    if (activePatientIds.length === 0) {
+      setSelectedVitalsPatientIds([])
+      vitalsSelectionInitializedRef.current = false
+      return
+    }
+
+    setSelectedVitalsPatientIds((previous) => {
+      if (!vitalsSelectionInitializedRef.current) {
+        vitalsSelectionInitializedRef.current = true
+        return activePatientIds
+      }
+
+      const activeIdSet = new Set(activePatientIds)
+      return previous.filter((id) => activeIdSet.has(id))
+    })
+  }, [activePatientIds])
+
   const selectedCensusPatients = useMemo(() => {
     const patientsById = new Map<number, Patient>()
     reportingSelectablePatients.forEach((patient) => {
@@ -1030,6 +1065,18 @@ function App() {
       .map((id) => patientsById.get(id))
       .filter((patient): patient is Patient => patient !== undefined)
   }, [reportingSelectablePatients, selectedCensusPatientIds])
+
+  const selectedVitalsPatients = useMemo(() => {
+    const patientsById = new Map<number, Patient>()
+    reportingSelectablePatients.forEach((patient) => {
+      if (patient.id === undefined) return
+      patientsById.set(patient.id, patient)
+    })
+
+    return selectedVitalsPatientIds
+      .map((id) => patientsById.get(id))
+      .filter((patient): patient is Patient => patient !== undefined)
+  }, [reportingSelectablePatients, selectedVitalsPatientIds])
 
   const toggleCensusPatientSelection = (patientId: number) => {
     setSelectedCensusPatientIds((previous) =>
@@ -1059,6 +1106,30 @@ function App() {
       ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
       return next
     })
+  }
+
+  const toggleVitalsPatientSelection = (patientId: number) => {
+    setSelectedVitalsPatientIds((previous) =>
+      previous.includes(patientId)
+        ? previous.filter((id) => id !== patientId)
+        : [...previous, patientId],
+    )
+  }
+
+  const selectAllVitalsPatients = () => {
+    setSelectedVitalsPatientIds(activePatientIds)
+  }
+
+  const clearVitalsPatientSelection = () => {
+    setSelectedVitalsPatientIds([])
+  }
+
+  const toggleSelectedPatientLabReportId = (labId: number) => {
+    setSelectedPatientLabReportIds((previous) =>
+      previous.includes(labId)
+        ? previous.filter((id) => id !== labId)
+        : [...previous, labId],
+    )
   }
 
   const structuredMedsByPatient = useMemo(() => {
@@ -1116,10 +1187,45 @@ function App() {
     return structuredLabsByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredLabsByPatient])
 
+  const vitalsByPatient = useMemo(() => {
+    const grouped = new Map<number, VitalEntry[]>()
+    ;(allVitals ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+    return grouped
+  }, [allVitals])
+
+  useEffect(() => {
+    const entryIds = selectedPatientStructuredLabs
+      .map((entry) => entry.id)
+      .filter((id): id is number => id !== undefined)
+    setSelectedPatientLabReportIds(entryIds)
+  }, [selectedPatientId, selectedPatientStructuredLabs])
+
   const labTemplatesById = useMemo(
     () => new Map(LAB_TEMPLATES.map((template) => [template.id, template] as const)),
     [],
   )
+
+  const selectedPatientLabGroupsForReporting = useMemo(() => {
+    const grouped = new Map<string, LabEntry[]>()
+    selectedPatientStructuredLabs.forEach((entry) => {
+      const list = grouped.get(entry.templateId) ?? []
+      list.push(entry)
+      grouped.set(entry.templateId, list)
+    })
+    return Array.from(grouped.entries()).map(([templateId, entries]) => {
+      const template = labTemplatesById.get(templateId)
+      const templateName = template?.name ?? templateId
+      return {
+        templateId,
+        templateName,
+        entries,
+      }
+    })
+  }, [labTemplatesById, selectedPatientStructuredLabs])
 
   const selectedLabTemplate = useMemo(
     () => LAB_TEMPLATES.find((template) => template.id === selectedLabTemplateId) ?? LAB_TEMPLATES[0],
@@ -1809,6 +1915,135 @@ function App() {
     return withNote
   }
 
+  const parseServiceLines = (service: string) => {
+    const lines = service
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+    return {
+      main: lines[0] ?? '-',
+      referrals: lines.slice(1),
+    }
+  }
+
+  const formatPatientHeader = (patient: Patient) => `${patient.roomNumber} - ${patient.lastName.toUpperCase()}, ${patient.firstName}`
+
+  const formatDateMMDDYYYY = (isoDate: string) => {
+    const [year, month, day] = isoDate.split('-')
+    if (!year || !month || !day) return isoDate
+    return `${month}-${day}-${year}`
+  }
+
+  const formatDateMMDD = (isoDate: string) => {
+    const [, month, day] = isoDate.split('-')
+    if (!month || !day) return isoDate
+    return `${month}-${day}`
+  }
+
+  const formatClock = (time: string) => {
+    const [hourText, minuteText = '00'] = time.split(':')
+    const hour = Number.parseInt(hourText, 10)
+    const minute = Number.parseInt(minuteText, 10)
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return time
+    const suffix = hour >= 12 ? 'PM' : 'AM'
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12
+    return `${hour12}:${minute.toString().padStart(2, '0')} ${suffix}`
+  }
+
+  const formatClockCompact = (time: string) => {
+    const [hourText, minuteText = '00'] = time.split(':')
+    const hour = Number.parseInt(hourText, 10)
+    const minute = Number.parseInt(minuteText, 10)
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return time
+    const suffix = hour >= 12 ? 'PM' : 'AM'
+    const hour12 = hour % 12 === 0 ? 12 : hour % 12
+    if (minute === 0) return `${hour12}${suffix}`
+    return `${hour12}:${minute.toString().padStart(2, '0')}${suffix}`
+  }
+
+  const toDateTimeStamp = (date: string, time?: string, fallback?: string) => {
+    const safeTime = time && time.trim().length > 0 ? time : '00:00'
+    const iso = `${date}T${safeTime}`
+    const parsed = Date.parse(iso)
+    if (Number.isFinite(parsed)) return parsed
+    if (fallback) {
+      const fallbackParsed = Date.parse(fallback)
+      if (Number.isFinite(fallbackParsed)) return fallbackParsed
+    }
+    return Number.NaN
+  }
+
+  const isWithinDateTimeWindow = (
+    date: string,
+    time: string,
+    dateFrom: string,
+    dateTo: string,
+    timeFrom: string,
+    timeTo: string,
+  ) => {
+    if (date < dateFrom || date > dateTo) return false
+    if (date === dateFrom && time < timeFrom) return false
+    if (date === dateTo && time > timeTo) return false
+    return true
+  }
+
+  const formatRange = (values: number[]) => {
+    if (values.length === 0) return ''
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    if (min === max) return `${min}`
+    return `${min}-${max}`
+  }
+
+  const formatDecimalRange = (values: number[]) => {
+    if (values.length === 0) return ''
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const formatValue = (value: number) => Number.parseFloat(value.toFixed(1)).toString()
+    if (min === max) return formatValue(min)
+    return `${formatValue(min)}-${formatValue(max)}`
+  }
+
+  const buildDailyVitalsRangeLine = (entries: VitalEntry[], targetDate: string) => {
+    const scoped = entries
+      .filter((entry) => entry.date === targetDate)
+      .sort((a, b) => a.time.localeCompare(b.time))
+    if (scoped.length === 0) return ''
+
+    const systolic: number[] = []
+    const diastolic: number[] = []
+    const hrs: number[] = []
+    const rrs: number[] = []
+    const temps: number[] = []
+    const spo2s: number[] = []
+
+    scoped.forEach((entry) => {
+      const bpMatch = entry.bp.match(/(\d+)\s*\/\s*(\d+)/)
+      if (bpMatch) {
+        systolic.push(Number.parseInt(bpMatch[1], 10))
+        diastolic.push(Number.parseInt(bpMatch[2], 10))
+      }
+      const hr = parseNumericInput(entry.hr)
+      if (hr !== null) hrs.push(hr)
+      const rr = parseNumericInput(entry.rr)
+      if (rr !== null) rrs.push(rr)
+      const temp = parseNumericInput(entry.temp)
+      if (temp !== null) temps.push(temp)
+      const spo2 = parseNumericInput(entry.spo2)
+      if (spo2 !== null) spo2s.push(spo2)
+    })
+
+    const bpText = systolic.length > 0 && diastolic.length > 0
+      ? `${formatRange(systolic)}/${formatRange(diastolic)}`
+      : '-'
+    const hrText = formatRange(hrs) || '-'
+    const rrText = formatRange(rrs) || '-'
+    const tempText = formatDecimalRange(temps) || '-'
+    const spo2Text = `${formatRange(spo2s) || '-'}%`
+
+    return `Vitals: ${bpText} ${hrText} ${rrText} ${tempText} ${spo2Text}`
+  }
+
   const formatOrderStatus = (status: OrderEntry['status']) => {
     if (status === 'carriedOut') return 'carried out'
     return status
@@ -1838,24 +2073,95 @@ function App() {
         return `${dateTimeLabel} ${label}: ${freeformResult || '-'}${note}`
       }
 
-      // Use custom formatter when available
-      if (template?.formatReport) {
-        const formatted = template.formatReport(entry.results ?? {})
-        return `${dateTimeLabel} ${label}: ${formatted}${note}`
+      let details = isOthersTemplate
+        ? ((entry.results?.[OTHERS_RESULT_KEY] ?? '').trim() || '-')
+        : '-'
+      if (!isOthersTemplate) {
+        try {
+          details = formatLabSingleReport(
+            entry.templateId as 'ust-cbc' | 'ust-urinalysis' | 'ust-electrolytes' | 'ust-abg' | 'others',
+            entry.results ?? {},
+          )
+        } catch (error) {
+          details = error instanceof Error ? `Validation error: ${error.message}` : 'Validation error'
+        }
       }
-
-      // Default: key: value concatenation
-      const resultTexts = (template?.tests ?? [])
-        .map((test) => {
-          const value = (entry.results?.[test.key] ?? '').trim()
-          if (!value) return null
-          return `${test.key}: ${value}${test.unit ? ` ${test.unit}` : ''}`
-        })
-        .filter((text): text is string => text !== null)
-
-      const details = resultTexts.length > 0 ? resultTexts.join(', ') : '-'
       return `${dateTimeLabel} ${label}: ${details}${note}`
     })
+  }
+
+  const buildLabReportBlocks = (entries: LabEntry[]) => {
+    const sorted = [...entries].sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date)
+      const aTime = a.time ?? ''
+      const bTime = b.time ?? ''
+      if (aTime !== bTime) return bTime.localeCompare(aTime)
+      return b.createdAt.localeCompare(a.createdAt)
+    })
+
+    const byTemplate = new Map<string, LabEntry[]>()
+    sorted.forEach((entry) => {
+      const list = byTemplate.get(entry.templateId) ?? []
+      list.push(entry)
+      byTemplate.set(entry.templateId, list)
+    })
+
+    const consumedIds = new Set<number>()
+    const blocks: string[] = []
+
+    sorted.forEach((entry) => {
+      if (entry.id !== undefined && consumedIds.has(entry.id)) return
+      const sameTemplateEntries = byTemplate.get(entry.templateId) ?? []
+
+      if (sameTemplateEntries.length === 2) {
+        const newer = sameTemplateEntries[0]
+        const older = sameTemplateEntries[1]
+        if (entry.id !== newer.id) return
+
+        const template = labTemplatesById.get(entry.templateId)
+        const label = entry.templateId === OTHERS_LAB_TEMPLATE_ID
+          ? ((newer.results?.[OTHERS_LABEL_KEY] ?? '').trim() || 'Others')
+          : (template?.name ?? entry.templateId)
+
+        const newerTime = formatClock(newer.time ?? '00:00')
+        const olderTime = formatClock(older.time ?? '00:00')
+        const headerLine = newer.date === older.date
+          ? `${formatDateMMDD(newer.date)} ${olderTime} vs ${newerTime}`
+          : `${formatDateMMDD(older.date)} ${olderTime} vs ${formatDateMMDD(newer.date)} ${newerTime}`
+
+        const newerStamp = toDateTimeStamp(newer.date, newer.time, newer.createdAt)
+        const olderStamp = toDateTimeStamp(older.date, older.time, older.createdAt)
+        const elapsedHours = Number.isFinite(newerStamp) && Number.isFinite(olderStamp)
+          ? Math.abs(newerStamp - olderStamp) / 3_600_000
+          : 0
+
+        const body = formatLabComparisonReport(
+          entry.templateId as 'ust-cbc' | 'ust-urinalysis' | 'ust-electrolytes' | 'ust-abg' | 'others',
+          newer.results ?? {},
+          older.results ?? {},
+          elapsedHours,
+        )
+
+        blocks.push([label, headerLine, body].join('\n'))
+        if (newer.id !== undefined) consumedIds.add(newer.id)
+        if (older.id !== undefined) consumedIds.add(older.id)
+        return
+      }
+
+      const template = labTemplatesById.get(entry.templateId)
+      const label = entry.templateId === OTHERS_LAB_TEMPLATE_ID
+        ? ((entry.results?.[OTHERS_LABEL_KEY] ?? '').trim() || 'Others')
+        : (template?.name ?? entry.templateId)
+      const dateLine = `${formatDateMMDD(entry.date)} ${formatClock(entry.time ?? '00:00')}`
+      const body = formatLabSingleReport(
+        entry.templateId as 'ust-cbc' | 'ust-urinalysis' | 'ust-electrolytes' | 'ust-abg' | 'others',
+        entry.results ?? {},
+      )
+      blocks.push([label, dateLine, body].join('\n'))
+      if (entry.id !== undefined) consumedIds.add(entry.id)
+    })
+
+    return blocks
   }
 
   const toCensusEntry = (
@@ -1895,104 +2201,77 @@ function App() {
     ].join('\n')
   }
 
-  const toProfileSummary = (
+  const toSelectedPatientCensusReport = (
     patient: Patient,
-    profile: ProfileFormState,
     medicationEntries: MedicationEntry[],
-    labEntries: LabEntry[],
-    orderEntries: OrderEntry[],
+    selectedLabEntries: LabEntry[],
   ) => {
     const activeStructuredMeds = medicationEntries
       .filter((entry) => entry.status === 'active')
       .map(formatStructuredMedication)
       .filter(Boolean)
-    const medsCombined = [profile.medications.trim(), ...activeStructuredMeds].filter(Boolean).join('\n')
 
-    const structuredLabLines = buildStructuredLabLines(labEntries)
-    const labsCombined = [profile.labs.trim(), ...structuredLabLines].filter(Boolean).join('\n')
-
-    const ordersCombined = orderEntries.length
-      ? orderEntries.map((entry) => formatOrderEntry(entry)).join('\n')
-      : ''
+    const medsCombined = [profileForm.medications.trim(), ...activeStructuredMeds].filter(Boolean)
+    const labBlocks = buildLabReportBlocks(
+      selectedLabEntries.filter((entry) => entry.id !== undefined && selectedPatientLabReportIds.includes(entry.id)),
+    )
+    const diagnosis = profileForm.diagnosis.trim() || patient.diagnosis.trim() || '-'
 
     return [
-      `PROFILE — ${patient.lastName}, ${patient.firstName} (${patient.roomNumber})`,
-      `${patient.age}/${patient.sex} • ${patient.service}`,
-      `Admit date: ${patient.admitDate}`,
-      `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
-      `Clinical summary: ${profile.clinicalSummary.trim() || '-'}`,
-      `Chief complaint: ${profile.chiefComplaint.trim() || '-'}`,
-      `History of present illness: ${profile.hpiText.trim() || '-'}`,
-      `Past medical history: ${profile.pmhText.trim() || '-'}`,
-      `Physical examination: ${profile.peText.trim() || '-'}`,
-      `Plans: ${profile.plans.trim() || '-'}`,
-      `Meds: ${medsCombined || '-'}`,
-      `Labs: ${labsCombined || '-'}`,
-      `Orders: ${ordersCombined || '-'}`,
-      `Pendings: ${profile.pendings.trim() || '-'}`,
-      `Clerk notes: ${profile.clerkNotes.trim() || '-'}`,
+      `${patient.roomNumber} – ${patient.lastName.toUpperCase()}, ${patient.firstName}`,
+      `${patient.age} / ${patient.sex}`,
+      diagnosis,
+      'Labs:',
+      labBlocks.length > 0 ? labBlocks.join('\n\n') : '-',
+      '',
+      'Medications:',
+      medsCombined.length > 0 ? medsCombined.join('\n') : '-',
+      '',
+      'Pendings:',
+      profileForm.pendings.trim() || patient.pendings.trim() || '-',
     ].join('\n')
   }
 
-  const formatVitalEntry = (entry: VitalEntry) => {
-    const [hourText, minuteText = '00'] = entry.time.split(':')
-    const parsedHour = Number.parseInt(hourText, 10)
-    const parsedMinute = Number.parseInt(minuteText, 10)
-
-    const formattedTime = Number.isNaN(parsedHour) || Number.isNaN(parsedMinute)
-      ? entry.time
-      : (() => {
-          const suffix = parsedHour >= 12 ? 'PM' : 'AM'
-          const hour12 = parsedHour % 12 === 0 ? 12 : parsedHour % 12
-          if (parsedMinute === 0) {
-            return `${hour12}${suffix}`
-          }
-          return `${hour12}:${parsedMinute.toString().padStart(2, '0')}${suffix}`
-        })()
-
-    const values = [
-      entry.bp.trim(),
-      entry.hr.trim(),
-      entry.rr.trim(),
-      entry.temp.trim(),
-      entry.spo2.trim(),
-    ]
+  const toProfileSummary = (
+    patient: Patient,
+    profile: ProfileFormState,
+  ) => {
+    const { main, referrals } = parseServiceLines(profile.service || patient.service)
+    const diagnosis = profile.diagnosis.trim() || patient.diagnosis.trim() || '-'
+    const pendingItems = (profile.pendings || patient.pendings || '')
+      .split('\n')
+      .map((line) => line.trim())
       .filter(Boolean)
-      .join(' ')
+    const notes = (profile.clerkNotes || patient.clerkNotes || '').trim()
 
-    return [formattedTime, values].filter(Boolean).join(' ')
+    const lines = [
+      formatPatientHeader(patient),
+      `${patient.age} / ${patient.sex}`,
+      `Main: ${main}`,
+      `Referrals: ${referrals.length > 0 ? referrals.join(', ') : '-'}`,
+      `Dx: ${diagnosis}`,
+      'Pendings:',
+      pendingItems.length > 0 ? pendingItems.join('\n\n') : '-',
+    ]
+
+    if (notes) {
+      lines.push('Notes:')
+      lines.push(notes)
+    }
+
+    return lines.join('\n')
   }
 
   const toDailySummary = (
     patient: Patient,
     update: DailyUpdateFormState,
     vitalsEntries: VitalEntry[],
-    orderEntries: OrderEntry[],
   ) => {
-    const hasAnyUpdate =
-      vitalsEntries.length > 0 ||
-      update.fluid ||
-      update.respiratory ||
-      update.infectious ||
-      update.cardio ||
-      update.hema ||
-      update.metabolic ||
-      update.output ||
-      update.neuro ||
-      update.drugs ||
-      update.other ||
-      update.assessment ||
-      update.plans
-
-    const vitalsLines: string[] = []
-    vitalsEntries.forEach((entry) => vitalsLines.push(`Vitals (${entry.date}): ${formatVitalEntry(entry)}`))
-    if (vitalsLines.length === 0 && !hasAnyUpdate) {
-      vitalsLines.push('No update yet.')
-    }
+    const vitalsLine = buildDailyVitalsRangeLine(vitalsEntries, dailyDate)
 
     const lines = [
-      `DAILY UPDATE — ${patient.lastName} (${patient.roomNumber}) — ${dailyDate}`,
-      ...vitalsLines,
+      `${formatPatientHeader(patient)} — ${formatDateMMDDYYYY(dailyDate)}`,
+      vitalsLine,
       update.fluid ? `F: ${update.fluid}` : '',
       update.respiratory ? `R: ${update.respiratory}` : '',
       update.infectious ? `I: ${update.infectious}` : '',
@@ -2003,12 +2282,6 @@ function App() {
       update.neuro ? `N: ${update.neuro}` : '',
       update.drugs ? `D: ${update.drugs}` : '',
       update.other ? `Other: ${update.other}` : '',
-      orderEntries.filter((entry) => entry.status === 'active').length > 0
-        ? `Orders: ${orderEntries
-            .filter((entry) => entry.status === 'active')
-            .map((entry) => entry.orderText)
-            .join('; ')}`
-        : '',
       update.assessment ? `Assessment: ${update.assessment}` : '',
       update.plans ? `Plan: ${update.plans}` : '',
     ]
@@ -2016,30 +2289,76 @@ function App() {
     return lines.filter(Boolean).join('\n')
   }
 
-  const toVitalsLogSummary = (patient: Patient, vitalsEntries: VitalEntry[]) => {
-    const lines = [
-      `VITALS LOG — ${patient.lastName} (${patient.roomNumber})`,
-      ...vitalsEntries.map((entry) => `Vitals (${entry.date}): ${formatVitalEntry(entry)}`),
-    ]
+  const toVitalsLogSummary = (patientsToPrint: Patient[], vitalsByPatientId: Map<number, VitalEntry[]>) => {
+    const sections: string[] = []
 
-    if (vitalsEntries.length === 0) {
-      lines.push('No structured vitals yet.')
+    patientsToPrint.forEach((patient) => {
+      if (patient.id === undefined) return
+      const scoped = (vitalsByPatientId.get(patient.id) ?? [])
+        .filter((entry) =>
+          isWithinDateTimeWindow(
+            entry.date,
+            entry.time,
+            reportVitalsDateFrom,
+            reportVitalsDateTo,
+            reportVitalsTimeFrom,
+            reportVitalsTimeTo,
+          ),
+        )
+        .sort((a, b) => {
+          if (a.date !== b.date) return a.date.localeCompare(b.date)
+          if (a.time !== b.time) return a.time.localeCompare(b.time)
+          return a.createdAt.localeCompare(b.createdAt)
+        })
+
+      if (scoped.length === 0) return
+      const lines = [formatPatientHeader(patient)]
+      scoped.forEach((entry) => {
+        const base = `${formatClockCompact(entry.time)} ${entry.bp.trim()} ${entry.hr.trim()} ${entry.rr.trim()} ${entry.temp.trim()} ${entry.spo2.trim()}`
+        lines.push(entry.note.trim() ? `${base} ${entry.note.trim()}` : base)
+      })
+      sections.push(lines.join('\n'))
+    })
+
+    if (sections.length === 0) {
+      return 'No vitals in selected window.'
     }
 
-    return lines.join('\n')
+    return sections.join('\n\n')
   }
 
   const toOrdersSummary = (patient: Patient, orderEntries: OrderEntry[]) => {
-    const lines = [
-      `ORDERS — ${patient.lastName} (${patient.roomNumber})`,
-      ...orderEntries.map((entry) => formatOrderEntry(entry)),
-    ]
+    const scoped = orderEntries
+      .filter((entry) =>
+        isWithinDateTimeWindow(
+          entry.orderDate,
+          entry.orderTime,
+          reportOrdersDateFrom,
+          reportOrdersDateTo,
+          reportOrdersTimeFrom,
+          reportOrdersTimeTo,
+        ),
+      )
+      .sort((a, b) => {
+        if (a.orderDate !== b.orderDate) return a.orderDate.localeCompare(b.orderDate)
+        if (a.orderTime !== b.orderTime) return a.orderTime.localeCompare(b.orderTime)
+        return a.createdAt.localeCompare(b.createdAt)
+      })
 
-    if (orderEntries.length === 0) {
-      lines.push('No orders yet.')
+    if (scoped.length === 0) {
+      return `${formatPatientHeader(patient)}\nNo orders in selected window.`
     }
 
-    return lines.join('\n')
+    const { main } = parseServiceLines(patient.service)
+
+    return scoped
+      .map((entry) => [
+        formatPatientHeader(patient),
+        `${main} – ${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`,
+        '',
+        entry.orderText,
+      ].join('\n'))
+      .join('\n\n')
   }
 
   const toMedicationsSummary = (patient: Patient, medicationEntries: MedicationEntry[]) => {
@@ -2063,16 +2382,12 @@ function App() {
   }
 
   const toLabsSummary = (patient: Patient, labEntries: LabEntry[]) => {
-    const lines = [
-      `LABS — ${patient.lastName} (${patient.roomNumber})`,
-      ...buildStructuredLabLines(labEntries),
-    ]
-
-    if (labEntries.length === 0) {
-      lines.push('No labs yet.')
+    const selectedEntries = labEntries.filter((entry) => entry.id !== undefined && selectedPatientLabReportIds.includes(entry.id))
+    const blocks = buildLabReportBlocks(selectedEntries)
+    if (blocks.length === 0) {
+      return `${formatPatientHeader(patient)}\nNo selected labs.`
     }
-
-    return lines.join('\n')
+    return [formatPatientHeader(patient), ...blocks].join('\n\n')
   }
 
   const openCopyModal = (text: string, title: string) => {
@@ -2946,32 +3261,19 @@ function App() {
               id: 'profile-summary',
               label: 'Profile',
               outputTitle: 'Profile summary',
-              buildText: () =>
-                toProfileSummary(
-                  selectedPatient,
-                  profileForm,
-                  selectedPatientStructuredMeds,
-                  selectedPatientStructuredLabs,
-                  selectedPatientOrders,
-                ),
+              buildText: () => toProfileSummary(selectedPatient, profileForm),
             },
             {
               id: 'daily-summary',
               label: 'FRICHMOND',
               outputTitle: 'FRICHMOND',
-              buildText: () =>
-                toDailySummary(
-                  selectedPatient,
-                  dailyUpdateForm,
-                  patientVitals ?? [],
-                  selectedPatientOrders,
-                ),
+              buildText: () => toDailySummary(selectedPatient, dailyUpdateForm, patientVitals ?? []),
             },
             {
               id: 'vitals-log',
               label: 'Vitals',
               outputTitle: 'Vitals log',
-              buildText: () => toVitalsLogSummary(selectedPatient, patientVitals ?? []),
+              buildText: () => toVitalsLogSummary(selectedVitalsPatients, vitalsByPatient),
             },
             {
               id: 'labs-summary',
@@ -2996,11 +3298,10 @@ function App() {
               label: 'Census',
               outputTitle: 'Census entry',
               buildText: () =>
-                toCensusEntry(
+                toSelectedPatientCensusReport(
                   selectedPatient,
                   selectedPatientStructuredMeds,
                   selectedPatientStructuredLabs,
-                  selectedPatientOrders,
                 ),
             },
           ],
@@ -4380,7 +4681,7 @@ function App() {
                                     Select all
                                   </Button>
                                   <Button size='sm' variant='secondary' onClick={clearCensusPatientsSelection}>
-                                    Clear
+                                    Unselect
                                   </Button>
                                 </div>
                               </div>
@@ -4452,13 +4753,132 @@ function App() {
                               ) : null}
                             </div>
                           ) : null}
+                          {section.id === 'patient-reporting' ? (
+                            <div className='space-y-3 rounded-md border border-clay/40 bg-white p-2'>
+                              <div className='space-y-2'>
+                                <p className='text-xs font-semibold text-espresso'>Vitals report filters</p>
+                                <div className='flex items-center gap-2 flex-wrap'>
+                                  <Button size='sm' variant='secondary' onClick={selectAllVitalsPatients}>Select all patients</Button>
+                                  <Button size='sm' variant='secondary' onClick={clearVitalsPatientSelection}>Clear patients</Button>
+                                </div>
+                                <div className='flex gap-2 flex-wrap'>
+                                  {reportingSelectablePatients.map((patient) => {
+                                    if (patient.id === undefined) return null
+                                    const selected = selectedVitalsPatientIds.includes(patient.id)
+                                    return (
+                                      <Button
+                                        key={`vitals-patient-${patient.id}`}
+                                        size='sm'
+                                        variant={selected ? 'default' : 'secondary'}
+                                        onClick={() => toggleVitalsPatientSelection(patient.id as number)}
+                                      >
+                                        {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                                      </Button>
+                                    )
+                                  })}
+                                </div>
+                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Date from</Label>
+                                    <Input type='date' value={reportVitalsDateFrom} onChange={(event) => setReportVitalsDateFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Date to</Label>
+                                    <Input type='date' value={reportVitalsDateTo} onChange={(event) => setReportVitalsDateTo(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Time from</Label>
+                                    <Input type='time' value={reportVitalsTimeFrom} onChange={(event) => setReportVitalsTimeFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Time to</Label>
+                                    <Input type='time' value={reportVitalsTimeTo} onChange={(event) => setReportVitalsTimeTo(event.target.value)} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className='space-y-2'>
+                                <p className='text-xs font-semibold text-espresso'>Orders report filters</p>
+                                <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Date from</Label>
+                                    <Input type='date' value={reportOrdersDateFrom} onChange={(event) => setReportOrdersDateFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Date to</Label>
+                                    <Input type='date' value={reportOrdersDateTo} onChange={(event) => setReportOrdersDateTo(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Time from</Label>
+                                    <Input type='time' value={reportOrdersTimeFrom} onChange={(event) => setReportOrdersTimeFrom(event.target.value)} />
+                                  </div>
+                                  <div className='space-y-1'>
+                                    <Label className='text-xs'>Time to</Label>
+                                    <Input type='time' value={reportOrdersTimeTo} onChange={(event) => setReportOrdersTimeTo(event.target.value)} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className='space-y-2'>
+                                <p className='text-xs font-semibold text-espresso'>Selected patient labs</p>
+                                <div className='flex items-center gap-2 flex-wrap'>
+                                  <Button
+                                    size='sm'
+                                    variant='secondary'
+                                    onClick={() => setSelectedPatientLabReportIds(
+                                      selectedPatientStructuredLabs
+                                        .map((entry) => entry.id)
+                                        .filter((id): id is number => id !== undefined),
+                                    )}
+                                  >
+                                    Select all labs
+                                  </Button>
+                                  <Button size='sm' variant='secondary' onClick={() => setSelectedPatientLabReportIds([])}>Unselect labs</Button>
+                                </div>
+                                {selectedPatientLabGroupsForReporting.length > 0 ? (
+                                  <div className='space-y-2'>
+                                    {selectedPatientLabGroupsForReporting.map((group) => (
+                                      <div key={`lab-group-${group.templateId}`} className='space-y-1'>
+                                        <p className='text-xs text-clay'>{group.templateName}</p>
+                                        <div className='flex gap-1 flex-wrap'>
+                                          {group.entries.map((entry) => {
+                                            if (entry.id === undefined) return null
+                                            const checked = selectedPatientLabReportIds.includes(entry.id)
+                                            return (
+                                              <Button
+                                                key={`lab-pick-${entry.id}`}
+                                                size='sm'
+                                                variant={checked ? 'default' : 'secondary'}
+                                                onClick={() => toggleSelectedPatientLabReportId(entry.id as number)}
+                                              >
+                                                {formatDateMMDD(entry.date)} {formatClock(entry.time ?? '00:00')}
+                                              </Button>
+                                            )
+                                          })}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className='text-xs text-clay'>No structured labs for selected patient.</p>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
                           <div className='flex gap-2 flex-wrap'>
                             {section.actions.map((action) => (
                               <Button
                                 key={action.id}
                                 type='button'
                                 disabled={action.id === 'all-census' && selectedCensusPatients.length === 0}
-                                onClick={() => openCopyModal(action.buildText(), action.outputTitle)}
+                                onClick={() => {
+                                  try {
+                                    openCopyModal(action.buildText(), action.outputTitle)
+                                  } catch (error) {
+                                    const message = error instanceof Error ? error.message : 'Unable to generate report.'
+                                    setNotice(message)
+                                  }
+                                }}
                               >
                                 {action.label}
                               </Button>
@@ -4534,7 +4954,7 @@ function App() {
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with grouped multi-photo upload blocks, count badges, and in-app carousel preview.</li>
-                  <li>Reporting tab: all text exports (profile, census, daily summary, vitals log, and orders) plus all-census output.</li>
+                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with lab instance selection, compare mode (exactly 2 instances per lab template), and date/time filtering for vitals/orders.</li>
                   <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
                 </ul>
               </div>
@@ -4560,7 +4980,7 @@ function App() {
                   <li>For Blood Chemistry, enter collection time when needed; AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP can include ULN values to auto-show xULN, while TSH/FT4/FT3 can include NV ranges.</li>
                   <li>ABG template auto-calculates pO2/FiO2 and Desired FiO2 from pO2 and Actual FiO2 (with optional Desired PaO2 override; default is 60).</li>
                   <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
-                  <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
+                  <li>FRICHMOND exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
                   <li>Use Reporting tab when you need handoff-ready text output from any section.</li>
                   <li>Orders text box supports multi-line notes and @photo title linking.</li>
@@ -4581,7 +5001,7 @@ function App() {
         )}
 
         <Dialog open={!!outputPreview} onOpenChange={(open) => { if (!open) closeCopyModal() }}>
-          <DialogContent className='flex flex-col gap-3 p-4 max-h-[92vh] max-w-3xl'>
+          <DialogContent className='flex flex-col gap-3 p-4 w-[95vw] max-w-[95vw] h-[80vh] max-h-[80vh] md:w-[90vw] md:max-w-5xl md:h-[88vh] md:max-h-[88vh]'>
             <DialogHeader>
               <DialogTitle>{outputPreviewTitle}</DialogTitle>
             </DialogHeader>
@@ -4593,14 +5013,12 @@ function App() {
               <Button variant='secondary' onClick={() => void copyPreviewToClipboard()}>Copy full text</Button>
               <Button variant='destructive' onClick={closeCopyModal}>Close</Button>
             </div>
-            <ScrollArea className='flex-1'>
-              <textarea
-                className='w-full min-h-64 font-mono bg-white resize-none p-2 rounded border border-clay text-sm'
-                aria-label='Generated text preview'
-                readOnly
-                value={outputPreview}
-              />
-            </ScrollArea>
+            <textarea
+              className='flex-1 min-h-0 w-full font-mono bg-white resize-none p-2 rounded border border-clay text-sm overflow-auto'
+              aria-label='Generated text preview'
+              readOnly
+              value={outputPreview}
+            />
           </DialogContent>
         </Dialog>
 

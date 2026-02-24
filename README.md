@@ -59,11 +59,15 @@ Each open patient has eight focused tabs:
 | **Medications** | Active medication list with status tracking |
 | **Orders** | Doctor's orders — add, edit status, remove in one place |
 | **Photos** | Camera capture or gallery pick, organized by section category |
-| **Reporting** | All text export actions (profile, census, daily summary, vitals log, orders, all-census) |
+| **Reporting** | Profile/FRICHMOND/vitals/labs/orders/census exports with lab instance selection and comparison support |
 
 ### Reporting & Export
 
-- **Census entry** and **daily summary** formatted for copy-paste into chat apps.
+- **Profile summary** follows room/name header, main/referral service split, `Dx`, and optional `Notes` blocks.
+- **FRICHMOND summary** uses `ROOM - LASTNAME, First — MM-DD-YYYY`, removes orders, and includes daily vitals min–max ranges.
+- **Vitals summary** supports multi-patient selection and date/time window filtering.
+- **Labs summary** supports arbitrary instance selection per patient; comparison mode runs only when exactly 2 instances of a lab type are selected.
+- **Orders summary** supports date/time filtering using order date/time fields and preserves order text exactly as entered.
 - **All patient exports** — choose exactly which active patients to include and reorder them before generating.
 - Text output opens in a popup with full-select and **Copy full text** button.
 
