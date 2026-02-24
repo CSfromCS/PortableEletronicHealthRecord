@@ -63,6 +63,11 @@ type ProfileFormState = {
   sex: 'M' | 'F' | 'O'
   service: string
   diagnosis: string
+  chiefComplaint: string
+  hpiText: string
+  pmhText: string
+  peText: string
+  clinicalSummary: string
   plans: string
   medications: string
   labs: string
@@ -78,6 +83,11 @@ const initialProfileForm: ProfileFormState = {
   sex: 'M',
   service: '',
   diagnosis: '',
+  chiefComplaint: '',
+  hpiText: '',
+  pmhText: '',
+  peText: '',
+  clinicalSummary: '',
   plans: '',
   medications: '',
   labs: '',
@@ -309,6 +319,7 @@ type PhotoMentionFieldProps = {
   onChange: (nextValue: string) => void
   ariaLabel: string
   placeholder?: string
+  className?: string
   attachments: MentionablePhoto[]
   attachmentByTitle: Map<string, MentionablePhoto>
   onOpenPhotoById: (attachmentId: number) => void
@@ -320,6 +331,7 @@ const PhotoMentionField = ({
   onChange,
   ariaLabel,
   placeholder,
+  className,
   attachments,
   attachmentByTitle,
   onOpenPhotoById,
@@ -402,6 +414,7 @@ const PhotoMentionField = ({
             ref={textareaRef}
             aria-label={ariaLabel}
             placeholder={placeholder}
+            className={className}
             value={value}
             onChange={(event) => applyValueChange(event.target.value, event.target)}
             onSelect={handleTextareaSelect}
@@ -413,6 +426,7 @@ const PhotoMentionField = ({
             ref={inputRef}
             aria-label={ariaLabel}
             placeholder={placeholder}
+            className={className}
             value={value}
             onChange={(event) => applyValueChange(event.target.value, event.target)}
             onSelect={handleInputSelect}
@@ -1141,6 +1155,7 @@ function App() {
       hpiText: '',
       pmhText: '',
       peText: '',
+      clinicalSummary: '',
       plans: '',
       medications: '',
       labs: '',
@@ -1198,6 +1213,11 @@ function App() {
           sex: profileForm.sex,
           service: profileForm.service.trim(),
           diagnosis: profileForm.diagnosis,
+          chiefComplaint: profileForm.chiefComplaint,
+          hpiText: profileForm.hpiText,
+          pmhText: profileForm.pmhText,
+          peText: profileForm.peText,
+          clinicalSummary: profileForm.clinicalSummary,
           plans: profileForm.plans,
           medications: profileForm.medications,
           labs: profileForm.labs,
@@ -1241,6 +1261,11 @@ function App() {
       sex: patient.sex,
       service: patient.service,
       diagnosis: patient.diagnosis,
+      chiefComplaint: patient.chiefComplaint ?? '',
+      hpiText: patient.hpiText ?? '',
+      pmhText: patient.pmhText ?? '',
+      peText: patient.peText ?? '',
+      clinicalSummary: patient.clinicalSummary ?? '',
       plans: patient.plans,
       medications: patient.medications,
       labs: patient.labs,
@@ -1509,6 +1534,11 @@ function App() {
       `${patient.age}/${patient.sex} • ${patient.service}`,
       `Admit date: ${patient.admitDate}`,
       `Diagnosis: ${profile.diagnosis.trim() || '-'}`,
+      `Chief complaint: ${profile.chiefComplaint.trim() || '-'}`,
+      `History of present illness: ${profile.hpiText.trim() || '-'}`,
+      `Past medical history: ${profile.pmhText.trim() || '-'}`,
+      `Physical examination: ${profile.peText.trim() || '-'}`,
+      `Clinical summary: ${profile.clinicalSummary.trim() || '-'}`,
       `Plans: ${profile.plans.trim() || '-'}`,
       `Meds: ${medsCombined || '-'}`,
       `Labs: ${labsCombined || '-'}`,
@@ -2295,6 +2325,7 @@ function App() {
         hpiText: '57-year-old male with productive cough and intermittent fever for 5 days, associated with mild dyspnea on exertion. No chest pain. Symptoms improved after IV antibiotics.',
         pmhText: 'Hypertension (8 years), Type 2 Diabetes Mellitus (5 years), ex-smoker',
         peText: 'Awake and coherent, speaks in full sentences.\nVS: BP 128/76, HR 84, RR 18, Temp 37.3°C, SpO2 96% room air.\nChest: bibasal crackles right greater than left, no retractions.\nCVS: adynamic precordium, regular rhythm.\nAbdomen: soft, non-tender.',
+        clinicalSummary: 'CAP improving on empiric antibiotics with stable hemodynamics and improving respiratory symptoms. Continue monitoring trends and prepare for oral step-down when afebrile and clinically stable.',
         plans: 'Continue IV to oral antibiotic step-down tomorrow if afebrile.\nPulmonary hygiene and ambulation as tolerated.\nRepeat CBC and electrolytes in AM.',
         medications: 'Nebulization PRN for dyspnea episodes.',
         labs: 'Follow-up trends: CBC improving, renal panel stable.',
@@ -2866,8 +2897,74 @@ function App() {
                       <PhotoMentionField
                         ariaLabel='Diagnosis'
                         placeholder='Diagnosis'
+                        className='min-h-24'
                         value={profileForm.diagnosis}
                         onChange={(nextValue) => updateProfileField('diagnosis', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-chiefcomplaint'>Chief Complaint</Label>
+                      <PhotoMentionField
+                        ariaLabel='Chief Complaint'
+                        placeholder='Chief Complaint'
+                        className='min-h-32'
+                        value={profileForm.chiefComplaint}
+                        onChange={(nextValue) => updateProfileField('chiefComplaint', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-hpi'>History of Present Illness</Label>
+                      <PhotoMentionField
+                        ariaLabel='History of Present Illness'
+                        placeholder='History of Present Illness'
+                        className='min-h-32'
+                        value={profileForm.hpiText}
+                        onChange={(nextValue) => updateProfileField('hpiText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-pmh'>Past Medical History</Label>
+                      <PhotoMentionField
+                        ariaLabel='Past Medical History'
+                        placeholder='Past Medical History'
+                        className='min-h-32'
+                        value={profileForm.pmhText}
+                        onChange={(nextValue) => updateProfileField('pmhText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-pe'>Physical Examination</Label>
+                      <PhotoMentionField
+                        ariaLabel='Physical Examination'
+                        placeholder='Physical Examination'
+                        className='min-h-32'
+                        value={profileForm.peText}
+                        onChange={(nextValue) => updateProfileField('peText', nextValue)}
+                        attachments={mentionableAttachments}
+                        attachmentByTitle={mentionableAttachmentByTitle}
+                        onOpenPhotoById={openPhotoById}
+                      />
+                    </div>
+                    <div className='space-y-1'>
+                      <Label htmlFor='profile-clinicalsummary'>Clinical Summary</Label>
+                      <PhotoMentionField
+                        ariaLabel='Clinical Summary'
+                        placeholder='Clinical Summary'
+                        className='min-h-32'
+                        value={profileForm.clinicalSummary}
+                        onChange={(nextValue) => updateProfileField('clinicalSummary', nextValue)}
                         attachments={mentionableAttachments}
                         attachmentByTitle={mentionableAttachmentByTitle}
                         onOpenPhotoById={openPhotoById}
@@ -2878,6 +2975,7 @@ function App() {
                       <PhotoMentionField
                         ariaLabel='Plans'
                         placeholder='Plans'
+                        className='min-h-24'
                         value={profileForm.plans}
                         onChange={(nextValue) => updateProfileField('plans', nextValue)}
                         attachments={mentionableAttachments}
@@ -2890,6 +2988,7 @@ function App() {
                       <PhotoMentionField
                         ariaLabel='Pendings'
                         placeholder='Pendings'
+                        className='min-h-24'
                         value={profileForm.pendings}
                         onChange={(nextValue) => updateProfileField('pendings', nextValue)}
                         attachments={mentionableAttachments}
@@ -2902,6 +3001,7 @@ function App() {
                       <PhotoMentionField
                         ariaLabel='Clerk notes'
                         placeholder='Clerk notes'
+                        className='min-h-24'
                         value={profileForm.clerkNotes}
                         onChange={(nextValue) => updateProfileField('clerkNotes', nextValue)}
                         attachments={mentionableAttachments}
@@ -3886,7 +3986,7 @@ function App() {
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
-                  <li>Profile tab: demographics, diagnosis, plans, pendings, and clerk notes.</li>
+                  <li>Profile tab: demographics plus case-review text boxes for diagnosis, chief complaint, HPI, PMH, physical exam, clinical summary, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan.</li>
                   <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends.</li>

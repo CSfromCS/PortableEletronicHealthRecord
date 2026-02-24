@@ -52,7 +52,7 @@ Each open patient has eight focused tabs:
 
 | Tab | Purpose |
 |---|---|
-| **Profile** | Demographics, admitting/working diagnosis, clinical details |
+| **Profile** | Demographics plus case-review notes (chief complaint, HPI, PMH, PE, clinical summary), diagnosis, and clinical details |
 | **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
 | **Labs** | CBC, electrolytes, liver/kidney function with trend comparison |
