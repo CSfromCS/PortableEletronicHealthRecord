@@ -507,6 +507,13 @@ type LabTemplate = {
 const OTHERS_LAB_TEMPLATE_ID = 'others'
 const OTHERS_LABEL_KEY = '__customLabel'
 const OTHERS_RESULT_KEY = '__freeformResult'
+const UST_ABG_TEMPLATE_ID = 'ust-abg'
+const ABG_DESIRED_PAO2_KEY = '__abgDesiredPaO2'
+const ABG_PO2_KEY = 'pO2'
+const ABG_ACTUAL_FIO2_KEY = 'Actual FiO2'
+const ABG_PF_RATIO_KEY = 'pO2/FiO2'
+const ABG_DESIRED_FIO2_KEY = 'Desired FiO2'
+const DEFAULT_ABG_DESIRED_PAO2 = 60
 
 type ReportingAction = {
   id: string
@@ -606,6 +613,21 @@ const LAB_TEMPLATES: LabTemplate[] = [
     ],
   },
   {
+    id: UST_ABG_TEMPLATE_ID,
+    name: 'UST - ABG (Arterial Blood Gas)',
+    tests: [
+      { key: 'pH' },
+      { key: 'pCO2', unit: 'mmHg' },
+      { key: 'pO2', unit: 'mmHg' },
+      { key: 'HCO3', unit: 'mmol/L' },
+      { key: 'a/A' },
+      { key: 'A-aDO2', unit: 'mmHg' },
+      { key: 'Actual FiO2', unit: '%' },
+      { key: 'pO2/FiO2' },
+      { key: 'Desired FiO2', unit: '%' },
+    ],
+  },
+  {
     id: OTHERS_LAB_TEMPLATE_ID,
     name: 'Others',
     tests: [],
@@ -638,6 +660,30 @@ const toLocalTime = (date = new Date()) => {
   const hours = date.getHours().toString().padStart(2, '0')
   const minutes = date.getMinutes().toString().padStart(2, '0')
   return `${hours}:${minutes}`
+}
+
+const parseNumericInput = (value: string | undefined): number | null => {
+  const sanitized = (value ?? '').trim().replaceAll(',', '').replaceAll('%', '')
+  if (!sanitized) return null
+
+  const parsed = Number.parseFloat(sanitized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const formatCalculatedNumber = (value: number, decimals = 2): string => {
+  if (!Number.isFinite(value)) return ''
+  const rounded = Number.parseFloat(value.toFixed(decimals))
+  return rounded.toString()
+}
+
+const getNormalAaDo2 = (age: number): number => {
+  const decadesAboveThirty = age > 30 ? Math.floor((age - 30) / 10) : 0
+  return 15 + decadesAboveThirty * 3
+}
+
+const getNormalPfRatio = (age: number): number => {
+  if (age <= 60) return 400
+  return 400 - (age - 60) * 5
 }
 
 const initialVitalForm = (): VitalFormState => ({
@@ -1021,6 +1067,51 @@ function App() {
     () => LAB_TEMPLATES.find((template) => template.id === selectedLabTemplateId) ?? LAB_TEMPLATES[0],
     [selectedLabTemplateId],
   )
+
+  const isAbgLabTemplate = selectedLabTemplate.id === UST_ABG_TEMPLATE_ID
+
+  const abgNormalAaDo2 = useMemo(() => {
+    if (!selectedPatient) return null
+    return getNormalAaDo2(selectedPatient.age)
+  }, [selectedPatient])
+
+  const abgNormalPfRatio = useMemo(() => {
+    if (!selectedPatient) return null
+    return getNormalPfRatio(selectedPatient.age)
+  }, [selectedPatient])
+
+  useEffect(() => {
+    if (!isAbgLabTemplate) return
+
+    setLabTemplateValues((previous) => {
+      const actualPaO2 = parseNumericInput(previous[ABG_PO2_KEY])
+      const actualFiO2Percent = parseNumericInput(previous[ABG_ACTUAL_FIO2_KEY])
+      const desiredPaO2 = parseNumericInput(previous[ABG_DESIRED_PAO2_KEY]) ?? DEFAULT_ABG_DESIRED_PAO2
+
+      const pfRatio =
+        actualPaO2 !== null && actualFiO2Percent !== null && actualFiO2Percent > 0
+          ? formatCalculatedNumber(actualPaO2 / (actualFiO2Percent / 100), 2)
+          : ''
+
+      const desiredFiO2 =
+        actualPaO2 !== null && actualPaO2 > 0 && actualFiO2Percent !== null
+          ? formatCalculatedNumber((actualFiO2Percent * desiredPaO2) / actualPaO2, 2)
+          : ''
+
+      const currentPfRatio = previous[ABG_PF_RATIO_KEY] ?? ''
+      const currentDesiredFiO2 = previous[ABG_DESIRED_FIO2_KEY] ?? ''
+
+      if (currentPfRatio === pfRatio && currentDesiredFiO2 === desiredFiO2) {
+        return previous
+      }
+
+      return {
+        ...previous,
+        [ABG_PF_RATIO_KEY]: pfRatio,
+        [ABG_DESIRED_FIO2_KEY]: desiredFiO2,
+      }
+    })
+  }, [isAbgLabTemplate, labTemplateValues])
 
   const structuredOrdersByPatient = useMemo(() => {
     const grouped = new Map<number, OrderEntry[]>()
@@ -3687,29 +3778,74 @@ function App() {
                               return selectedLabTemplate.tests.map((test) => {
                                 const showSection = test.section && test.section !== lastSection
                                 lastSection = test.section
+                                const isCalculatedAbgField =
+                                  isAbgLabTemplate && (test.key === ABG_PF_RATIO_KEY || test.key === ABG_DESIRED_FIO2_KEY)
+                                const abgPlaceholder = isAbgLabTemplate
+                                  ? (() => {
+                                      if (test.key === 'pH') return 'Decimal (e.g., 7.40)'
+                                      if (test.key === 'pCO2') return 'Whole or decimal (e.g., 40)'
+                                      if (test.key === 'pO2') return 'Whole or decimal (e.g., 80)'
+                                      if (test.key === 'HCO3') return 'Whole or decimal (e.g., 24)'
+                                      if (test.key === 'a/A') return 'Decimal ratio (e.g., 0.80)'
+                                      if (test.key === 'A-aDO2') return 'Whole or decimal (e.g., 15)'
+                                      if (test.key === ABG_ACTUAL_FIO2_KEY) return 'Whole % (e.g., 20, not 0.2)'
+                                      if (test.key === ABG_PF_RATIO_KEY) return 'pO2 ÷ (Actual FiO2/100)'
+                                      if (test.key === ABG_DESIRED_FIO2_KEY) return 'Actual FiO2 × Desired PaO2 ÷ pO2'
+                                      return 'Value'
+                                    })()
+                                  : 'Value'
                                 return (
                                   <div key={test.key}>
                                     {showSection && (
                                       <p className='text-xs font-semibold text-clay uppercase tracking-wide mt-2 mb-1'>{test.section}</p>
                                     )}
-                                    <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_8rem] gap-2 items-center'>
+                                    <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] gap-2 items-start'>
                                       <p className='text-sm text-espresso font-medium'>
                                         {test.key}
                                         {test.fullName ? ` - ${test.fullName}` : ''}
                                         {test.unit ? ` (${test.unit})` : ''}
                                       </p>
-                                      <Input
-                                        aria-label={`${selectedLabTemplate.name} ${test.key} value`}
-                                        placeholder='Value'
-                                        value={labTemplateValues[test.key] ?? ''}
-                                        onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
-                                      />
+                                      <div className='space-y-1'>
+                                        <Input
+                                          aria-label={`${selectedLabTemplate.name} ${test.key} value`}
+                                          placeholder={abgPlaceholder}
+                                          value={labTemplateValues[test.key] ?? ''}
+                                          readOnly={isCalculatedAbgField}
+                                          className={cn(isCalculatedAbgField && 'bg-warm-ivory text-clay')}
+                                          onChange={(event) => updateLabTemplateValue(test.key, event.target.value)}
+                                        />
+                                      </div>
                                     </div>
                                   </div>
                                 )
                               })
                             })()
                           )}
+
+                          {isAbgLabTemplate ? (
+                            <div className='space-y-2 rounded-md border border-clay/40 bg-warm-ivory p-2'>
+                              <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] gap-2 items-center'>
+                                <p className='text-sm text-espresso font-medium'>Desired PaO2 (mmHg)</p>
+                                <Input
+                                  aria-label='UST - ABG (Arterial Blood Gas) Desired PaO2 value'
+                                  placeholder='Whole or decimal mmHg (e.g., 60)'
+                                  value={labTemplateValues[ABG_DESIRED_PAO2_KEY] ?? ''}
+                                  onChange={(event) => updateLabTemplateValue(ABG_DESIRED_PAO2_KEY, event.target.value)}
+                                />
+                              </div>
+                              <div className='space-y-1 text-xs text-clay'>
+                                <p className='font-semibold text-espresso'>Oxygenation indices reviewer</p>
+                                <p>a/AO2 NV: ≥0.75</p>
+                                <p>A-aDO2 NV: 15+ [(# of decades above 30) *3]</p>
+                                <p>P/F ratio NV: &lt;60 yo: 400; &gt;60 yo: 400 – [(# of yrs above 60) *5]</p>
+                                {selectedPatient ? (
+                                  <p>
+                                    Age {selectedPatient.age}: A-aDO2 NV ≈ {abgNormalAaDo2} mmHg; P/F ratio NV ≈ {abgNormalPfRatio}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                         <div className='space-y-1'>
                           <Label>Note</Label>
@@ -4203,7 +4339,8 @@ function App() {
                 <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
                 <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
                   <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
-                  <li>Use Structured labs templates (CBC, Urinalysis, Electrolytes, or Others), then fill values and add.</li>
+                  <li>Use Structured labs templates (CBC, Urinalysis, Electrolytes, ABG, or Others), then fill values and add.</li>
+                  <li>ABG template auto-calculates pO2/FiO2 and Desired FiO2 from pO2 and Actual FiO2 (with optional Desired PaO2 override; default is 60).</li>
                   <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
                   <li>Structured vitals in copied daily summaries use compact value-only format (example: 3:30PM 130/80 88 20 37.8 95%).</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>

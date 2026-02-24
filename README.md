@@ -55,7 +55,7 @@ Each open patient has eight focused tabs:
 | **Profile** | Demographics plus case-review notes (chief complaint, HPI, PMH, PE, clinical summary), diagnosis, and clinical details |
 | **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) with a Copy latest entry action to carry forward all daily fields |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
-| **Labs** | CBC, urinalysis, electrolytes/renal, and Others (custom label + freeform result) with trend comparison |
+| **Labs** | CBC, urinalysis, electrolytes/renal, ABG (with auto-calculated pO2/FiO2 and Desired FiO2), and Others (custom label + freeform result) with trend comparison |
 | **Medications** | Active medication list with status tracking |
 | **Orders** | Doctor's orders — add, edit status, remove in one place |
 | **Photos** | Camera capture or gallery pick, organized by section category |
