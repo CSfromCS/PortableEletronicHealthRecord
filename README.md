@@ -55,7 +55,7 @@ Each open patient has eight focused tabs:
 | **Profile** | Demographics plus case-review notes (clinical summary, chief complaint, HPI, PMH, PE), diagnosis, and clinical details |
 | **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) with a Copy latest entry action to carry forward all daily fields |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
-| **Labs** | CBC, urinalysis, Blood Chemistry, ABG (with auto-calculated pO2/FiO2 and conditional Desired FiO2 when FiO2 > 21% or pO2 < 60; target PaO2 = 60), and Others (custom label + freeform result) with trend comparison |
+| **Labs** | CBC, urinalysis, Blood Chemistry, ABG (with auto-calculated pO2/FiO2 and conditional Desired FiO2 when FiO2 > 21% or pO2 < 60; target PaO2 = 60), and Others (custom label + freeform result); trend comparison applies to structured templates, while Others stays plain |
 | **Medications** | Active medication list with status tracking |
 | **Orders** | Doctor's orders — add, edit status, remove in one place |
 | **Photos** | Camera capture or gallery pick, organized by section category |
@@ -66,7 +66,7 @@ Each open patient has eight focused tabs:
 - **Profile summary** follows room/name header, main/referral service split, `Dx`, and optional `Notes` blocks.
 - **FRICHMOND summary** uses `ROOM - LASTNAME, First — MM-DD-YYYY`, removes orders, and includes daily vitals min–max ranges.
 - **Vitals summary** supports multi-patient selection and date/time window filtering.
-- **Labs summary** supports arbitrary instance selection per patient; comparison mode runs only when exactly 2 instances of a lab type are selected.
+- **Labs summary** supports arbitrary instance selection per patient; comparison mode runs only when exactly 2 instances of the same non-Others lab template are selected.
 - **Orders summary** supports date/time filtering using order date/time fields and preserves order text exactly as entered.
 - **All patient exports** — choose exactly which active patients to include and reorder them before generating Selected Census or Selected Vitals.
 - Text output opens in a popup with full-select and **Copy full text** button.

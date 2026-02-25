@@ -2077,7 +2077,7 @@ function App() {
       if (entry.id !== undefined && consumedIds.has(entry.id)) return
       const sameTemplateEntries = byTemplate.get(entry.templateId) ?? []
 
-      if (sameTemplateEntries.length === 2) {
+      if (sameTemplateEntries.length === 2 && entry.templateId !== OTHERS_LAB_TEMPLATE_ID) {
         const newer = sameTemplateEntries[0]
         const older = sameTemplateEntries[1]
         if (entry.id !== newer.id) return
@@ -5103,6 +5103,7 @@ function App() {
                     'Install to home screen for offline use and full-screen mode: Android → Chrome ⋮ menu → Install app; iPhone/iPad → Safari Share → Add to Home Screen.',
                     'Blood Chemistry: enter ULN for AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP to auto-show ×ULN; enter normal range for TSH/FT4/FT3.',
                     'ABG: pO2/FiO2 is auto-calculated from pO2 and Actual FiO2. Desired FiO2 only appears when FiO2 > 21% or pO2 < 60 mmHg.',
+                    'Report Labs: two entries from the same lab template are auto-compared, except Others entries which are always shown as separate plain results.',
                     'Type @ in any text field to link a photo by title — tap the highlighted @title to open the photo viewer.',
                     'FRICH exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.',
                     'All patient exports: select and reorder active patients before generating Multiple Census or Multiple Vitals.',
