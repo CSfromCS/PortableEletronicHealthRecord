@@ -39,7 +39,7 @@ import {
   formatLabSingleReport,
   formatUrinalysis,
 } from './labFormatters'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2 } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -840,6 +840,7 @@ function App() {
   const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos' | 'reporting'>('profile')
   const [notice, setNotice] = useState('')
   const [noticeIsDecaying, setNoticeIsDecaying] = useState(false)
+  const [clipboardCopied, setClipboardCopied] = useState(false)
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
   const [attachmentCategory, setAttachmentCategory] = useState<PhotoCategory>('profile')
@@ -2413,7 +2414,9 @@ function App() {
       return
     }
     await navigator.clipboard.writeText(outputPreview)
+    setClipboardCopied(true)
     setNotice('Copied full text to clipboard.')
+    window.setTimeout(() => setClipboardCopied(false), 2200)
   }
 
   const sharePreviewText = async () => {
@@ -2436,6 +2439,7 @@ function App() {
   const closeCopyModal = () => {
     setOutputPreview('')
     setOutputPreviewTitle('Generated text')
+    setClipboardCopied(false)
   }
 
   const addStructuredVital = async () => {
@@ -3454,30 +3458,32 @@ function App() {
 
             <Card className='bg-white/80 border-clay/30 mb-4 shadow-sm'>
               <CardContent className='px-3 py-2'>
-                <div className='flex gap-2 flex-wrap'>
+                <div className='flex flex-col gap-2'>
                   <Input
                     aria-label='Search patients'
-                    placeholder='Search room, name, service'
+                    placeholder='Search by room, name, or service…'
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    className='flex-1 min-w-0'
+                    className='w-full'
                   />
-                  <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'discharged' | 'all')}>
-                    <SelectTrigger className='w-32'><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='active'>Active</SelectItem>
-                      <SelectItem value='discharged'>Discharged</SelectItem>
-                      <SelectItem value='all'>All</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'room' | 'name' | 'admitDate')}>
-                    <SelectTrigger className='w-36'><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value='room'>Sort: Room</SelectItem>
-                      <SelectItem value='name'>Sort: Name</SelectItem>
-                      <SelectItem value='admitDate'>Sort: Admit date</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className='flex gap-2'>
+                    <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'active' | 'discharged' | 'all')}>
+                      <SelectTrigger className='flex-1'><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='active'>Active</SelectItem>
+                        <SelectItem value='discharged'>Discharged</SelectItem>
+                        <SelectItem value='all'>All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'room' | 'name' | 'admitDate')}>
+                      <SelectTrigger className='flex-1'><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value='room'>Sort: Room</SelectItem>
+                        <SelectItem value='name'>Sort: Name</SelectItem>
+                        <SelectItem value='admitDate'>Sort: Admit date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -3529,7 +3535,7 @@ function App() {
             {view === 'patient' ? (
               selectedPatient ? (
               <Card className='border-0 bg-transparent shadow-none sm:bg-white/80 sm:border-clay/25 sm:shadow-md sm:ring-1 sm:ring-clay/10'>
-                <CardHeader className='py-3 px-0 pb-0 sm:px-4'>
+                <CardHeader className='sticky top-0 z-20 py-2 px-0 pb-2 bg-warm-ivory/97 backdrop-blur-sm border-b border-clay/15 -mx-0 sm:static sm:py-3 sm:px-4 sm:pb-0 sm:bg-transparent sm:backdrop-blur-none sm:border-b-0'>
                   <Select
                     value={selectedPatient.id?.toString() ?? ''}
                     onValueChange={(value) => {
@@ -3561,12 +3567,7 @@ function App() {
                 </CardHeader>
                 <CardContent className='px-0 pb-5 sm:px-4 sm:pb-4'>
                 <Tabs value={selectedTab} onValueChange={(v) => setSelectedTab(v as typeof selectedTab)}>
-                  <TabsList className={cn(
-                    'fixed inset-x-2 z-30 mb-0 mt-0 h-auto w-auto grid grid-cols-4 gap-0.5 px-1 sm:static sm:inset-auto sm:mb-4 sm:mt-2 sm:w-full sm:grid-cols-4 lg:grid-cols-8',
-                    isStandaloneDisplayMode
-                      ? 'bottom-[calc(3.25rem+env(safe-area-inset-bottom))]'
-                      : 'bottom-14',
-                  )}>
+                  <TabsList className='hidden sm:grid sm:grid-cols-4 lg:grid-cols-8 h-auto w-full gap-0.5 px-1 mb-4 mt-2'>
                     <TabsTrigger className='w-full text-xs px-2.5' value='profile'>Profile</TabsTrigger>
                     <TabsTrigger className='w-full text-xs px-2.5' value='frichmond'>FRICH</TabsTrigger>
                     <TabsTrigger className='w-full text-xs px-2.5' value='vitals'>Vitals</TabsTrigger>
@@ -4939,95 +4940,201 @@ function App() {
           </>
         ) : (
           <Card className='bg-white/80 border-clay/25 shadow-sm'>
-            <CardHeader className='py-3 px-4 pb-0'>
-              <CardTitle className='text-base text-espresso'>Settings</CardTitle>
+            <CardHeader className='py-3 px-4 pb-2'>
+              <CardTitle className='text-base text-espresso flex items-center gap-2'>
+                <Settings className='h-4 w-4 text-action-primary' />
+                Settings
+              </CardTitle>
             </CardHeader>
-            <CardContent className='px-4 pb-4 space-y-3'>
-              <p className='text-sm text-clay'>Export/import backup JSON, reopen onboarding, add sample data, and clear discharged patients. Photos stay local and are excluded from JSON backup.</p>
-              <div className='flex flex-col gap-2'>
-                <Button variant='secondary' onClick={() => void exportBackup()}>Export backup JSON</Button>
-                <input
-                  ref={backupFileInputRef}
-                  type='file'
-                  accept='application/json'
-                  className='hidden'
-                  onChange={(event) => void importBackup(event)}
-                />
-                <Button variant='secondary' onClick={() => backupFileInputRef.current?.click()}>Import backup JSON</Button>
-                <Button variant='secondary' onClick={() => setShowOnboarding(true)}>Show onboarding page / install app</Button>
-                <Button variant='secondary' onClick={() => void addSamplePatient()}>Add sample patient (Juan Dela Cruz)</Button>
-                <Button variant='secondary' onClick={() => window.open('https://github.com/CSfromCS/PortableEletronicHealthRecord/issues/new/choose', '_blank', 'noopener,noreferrer')}>Send feedback / suggestion</Button>
-                <Button variant='destructive' onClick={() => void clearDischargedPatients()}>Clear discharged patients</Button>
+            <CardContent className='px-4 pb-4 space-y-5'>
+              {/* Data management */}
+              <div className='space-y-2'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-clay/55'>Data Management</p>
+                <div className='flex flex-col gap-2'>
+                  <button
+                    type='button'
+                    onClick={() => void exportBackup()}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-action-edit/10 flex items-center justify-center shrink-0'>
+                      <Upload className='h-4 w-4 text-action-edit' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Export backup</p>
+                      <p className='text-xs text-clay mt-0.5'>Download all patient data as JSON (photos excluded)</p>
+                    </div>
+                  </button>
+                  <input
+                    ref={backupFileInputRef}
+                    type='file'
+                    accept='application/json'
+                    className='hidden'
+                    onChange={(event) => void importBackup(event)}
+                  />
+                  <button
+                    type='button'
+                    onClick={() => backupFileInputRef.current?.click()}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-action-primary/10 flex items-center justify-center shrink-0'>
+                      <Download className='h-4 w-4 text-action-primary' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Import backup</p>
+                      <p className='text-xs text-clay mt-0.5'>Restore from a backup JSON file — replaces all current data</p>
+                    </div>
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => void clearDischargedPatients()}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-red-50 hover:bg-red-100 border border-action-danger/25 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-action-danger/10 flex items-center justify-center shrink-0'>
+                      <Trash2 className='h-4 w-4 text-action-danger' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-action-danger'>Clear discharged patients</p>
+                      <p className='text-xs text-clay mt-0.5'>Permanently removes all discharged patient records</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              {/* App */}
+              <div className='space-y-2'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-clay/55'>App</p>
+                <div className='flex flex-col gap-2'>
+                  <button
+                    type='button'
+                    onClick={() => setShowOnboarding(true)}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-blush-sand flex items-center justify-center shrink-0 border border-clay/20'>
+                      <Info className='h-4 w-4 text-clay' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Show onboarding / install</p>
+                      <p className='text-xs text-clay mt-0.5'>Reopen the welcome screen and app install prompt</p>
+                    </div>
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => void addSamplePatient()}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-blush-sand flex items-center justify-center shrink-0 border border-clay/20'>
+                      <UserRound className='h-4 w-4 text-clay' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Add sample patient</p>
+                      <p className='text-xs text-clay mt-0.5'>Load a demo patient (Juan Dela Cruz) with sample data</p>
+                    </div>
+                  </button>
+                  <button
+                    type='button'
+                    onClick={() => window.open('https://github.com/CSfromCS/PortableEletronicHealthRecord/issues/new/choose', '_blank', 'noopener,noreferrer')}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-blush-sand flex items-center justify-center shrink-0 border border-clay/20'>
+                      <ChevronRight className='h-4 w-4 text-clay' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Send feedback</p>
+                      <p className='text-xs text-clay mt-0.5'>Report issues or suggest features on GitHub</p>
+                    </div>
+                  </button>
+                </div>
               </div>
 
-            <section className='space-y-3 rounded-lg border border-clay bg-blush-sand p-3'>
-              <h3 className='text-base font-semibold text-espresso'>How to use</h3>
-              <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-espresso'>Main workflow</h4>
-                <ol className='list-decimal pl-5 text-sm text-espresso space-y-1'>
-                  <li>Add/admit a patient from the Patients form.</li>
-                  <li>On mobile, switch top-level sections using the sticky bottom bar (Patients, Patient, Settings).</li>
-                  <li>When Patient is open on mobile, the Profile/FRICHMOND/Vitals/etc tab row stays fixed just above the nav bar and can wrap into multiple lines.</li>
-                  <li>In Patients, tap Open, then use the focused patient dropdown in the patient header to jump between patients while staying on Profile, FRICHMOND, Vitals, Labs, Medications, Orders, and Photos.</li>
-                  <li>In FRICHMOND, pick the target date, then tap Copy latest entry to carry forward the latest saved daily note. Confirm the overwrite prompt to replace the selected date&apos;s current entry with a duplicate of the latest saved date.</li>
-                  <li>In FRICHMOND, use Saved entry dates to quickly jump to dates that already have entries; the selected date is highlighted.</li>
-                  <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
-                  <li>In All patient exports, use Selected Vitals to generate multi-patient vitals using the same Vitals Filter date/time window from Current patient exports.</li>
-                  <li>Repeat daily using the date picker in FRICHMOND.</li>
+            <section className='rounded-xl border border-clay/25 bg-blush-sand/40 overflow-hidden'>
+              {/* Header */}
+              <div className='px-4 py-3 border-b border-clay/20 flex items-center gap-2 bg-blush-sand/60'>
+                <Info className='h-4 w-4 text-action-primary shrink-0' />
+                <h3 className='text-sm font-bold text-espresso'>How to use PUHRR</h3>
+              </div>
+
+              {/* Getting started */}
+              <div className='px-4 py-3 space-y-2.5 border-b border-clay/15'>
+                <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Getting started</p>
+                <ol className='space-y-2'>
+                  {([
+                    ['Add a patient', 'Fill in the form on the Patients tab (room, name, age, sex, service) and tap Add patient.'],
+                    ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
+                    ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
+                    ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields and plan. Tap Copy latest entry to carry forward yesterday\'s note.'],
+                    ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
+                    ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
+                  ] as [string, string][]).map(([title, detail], i) => (
+                    <li key={i} className='flex gap-2.5 items-start'>
+                      <span className='shrink-0 w-5 h-5 rounded-full bg-action-primary/15 text-action-primary text-[10px] font-bold flex items-center justify-center mt-0.5'>{i + 1}</span>
+                      <span className='text-xs text-espresso leading-relaxed'><strong>{title}:</strong> {detail}</span>
+                    </li>
+                  ))}
                 </ol>
               </div>
 
-              <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-espresso'>Parts of the app</h4>
-                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
-                  <li>Patients: add, edit, search/filter/sort, discharge/reactivate (sex supports M/F/O).</li>
-                  <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
-                  <li>Profile tab: demographics plus case-review text boxes for diagnosis, clinical summary, chief complaint, HPI, PMH, physical exam, plans, pendings, and clerk notes.</li>
-                  <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry with overwrite confirmation.</li>
-                  <li>Vitals tab: structured vitals with date/time entry plus BP/HR/RR/Temp/SpO2/Note tracking across all dates, earliest entries first.</li>
-                  <li>Labs tab: free-text labs plus structured lab templates and trends, including collection date/time fields.</li>
-                  <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
-                  <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
-                  <li>Photos tab: categorized image attachments with grouped multi-photo upload blocks, count badges, and in-app carousel preview.</li>
-                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with clearer Current patient sections ordered as Labs &rarr; Vitals (From/Until date-time) &rarr; Orders, plus lab instance selection and date/time filtering for vitals/orders; All patient exports include Selected Census and Selected Vitals.</li>
-                  <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
+              {/* Patient tabs quick reference */}
+              <div className='px-4 py-3 space-y-2.5 border-b border-clay/15'>
+                <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Patient tabs</p>
+                <div className='grid grid-cols-2 gap-1.5'>
+                  {([
+                    ['Profile', 'Demographics, diagnosis, clinical summary, HPI, PMH, PE, plans, pendings'],
+                    ['FRICH', 'Date-based F-R-I-C-H-M-O-N-D daily notes, assessment & plan'],
+                    ['Vitals', 'Structured BP/HR/RR/Temp/SpO2 log with date & time entries'],
+                    ['Labs', 'CBC, UA, Blood Chem, ABG templates + free-text with date/time'],
+                    ['Meds', 'Structured medication list: drug, dose, route, frequency, status'],
+                    ['Orders', "Doctor's orders with date, time, service & status tracking"],
+                    ['Photos', 'Categorized image attachments with grouped uploads & carousel'],
+                    ['Report', 'Copy-ready text exports for handoffs, census, vitals & labs'],
+                  ] as [string, string][]).map(([name, desc]) => (
+                    <div key={name} className='rounded-lg bg-warm-ivory border border-clay/20 px-2.5 py-2'>
+                      <p className='text-xs font-bold text-espresso'>{name}</p>
+                      <p className='text-[11px] text-clay leading-snug mt-0.5'>{desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Quick tips */}
+              <div className='px-4 py-3 space-y-2.5 border-b border-clay/15'>
+                <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Quick tips</p>
+                <ul className='space-y-2'>
+                  {([
+                    'Install to home screen for offline use and full-screen mode: Android → Chrome ⋮ menu → Install app; iPhone/iPad → Safari Share → Add to Home Screen.',
+                    'Blood Chemistry: enter ULN for AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP to auto-show ×ULN; enter normal range for TSH/FT4/FT3.',
+                    'ABG: pO2/FiO2 is auto-calculated from pO2 and Actual FiO2. Desired FiO2 only appears when FiO2 > 21% or pO2 < 60 mmHg.',
+                    'Type @ in any text field to link a photo by title — tap the highlighted @title to open the photo viewer.',
+                    'FRICH exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.',
+                    'All patient exports: select and reorder active patients before generating Multiple Census or Multiple Vitals.',
+                    'Photos: upload multiple images at once — they are grouped into one block. Tap the block to open a swipeable carousel.',
+                    'Orders: use Edit on any order to update its status (active, carried out, discontinued) or remove it.',
+                    'The report preview popup supports manual text selection — select only what you need, or use Copy full text.',
+                  ] as string[]).map((tip, i) => (
+                    <li key={i} className='flex gap-2 items-start text-xs text-espresso'>
+                      <span className='text-action-primary font-bold shrink-0 mt-px leading-relaxed'>›</span>
+                      <span className='leading-relaxed'>{tip}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
-              <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-espresso'>Saving and persistence</h4>
-                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
-                  <li>Patient and clinical data are stored in IndexedDB on this device/browser.</li>
-                  <li>Attached photos are stored as compressed copies inside the app database and remain available offline.</li>
-                  <li>Profile, daily update, structured vitals, and orders auto-save shortly after typing stops.</li>
-                  <li>The top sticky alert is used for meaningful action/error feedback and fades out automatically.</li>
-                  <li>Use Save now near the top to force an immediate save for all pending edits; it changes to Saved when no edits are pending.</li>
-                  <li>App files are cached by the PWA service worker for offline loading.</li>
-                  <li>Data remains after page refresh or browser restart on the same browser profile.</li>
-                </ul>
-              </div>
-
-              <div className='space-y-1'>
-                <h4 className='text-sm font-semibold text-espresso'>Quick tips</h4>
-                <ul className='list-disc pl-5 text-sm text-espresso space-y-1'>
-                  <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
-                  <li>Use Structured labs templates (CBC, Urinalysis, Blood Chemistry, ABG, or Others), then fill values and add.</li>
-                  <li>For Blood Chemistry, enter collection time when needed; AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP can include ULN values to auto-show xULN, while TSH/FT4/FT3 can include NV ranges.</li>
-                  <li>ABG template auto-calculates pO2/FiO2 from pO2 and Actual FiO2, and only shows Desired FiO2 when FiO2 &gt; 21% or pO2 &lt; 60 (target PaO2 fixed at 60).</li>
-                  <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
-                  <li>FRICHMOND exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.</li>
-                  <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
-                  <li>Use Reporting tab when you need handoff-ready text output from any section.</li>
-                  <li>Orders text box supports multi-line notes and @photo title linking.</li>
-                  <li>Use Reporting tab&apos;s All patient exports to select active patients and reorder them before generating Selected Census or Selected Vitals output.</li>
-                  <li>The text popup is almost full-page so you can manually select only what you need.</li>
-                  <li>If your browser supports it, Share appears only inside the text popup.</li>
-                  <li>Export backup JSON regularly if you switch devices or browsers.</li>
-                  <li>In Photos tab, use Take photo(s) or Choose existing photo(s) to upload multiple images at once under one shared title/category block.</li>
-                  <li>Each upload block shows a small count badge; tap the block to open a carousel and move through the set using Previous/Next.</li>
-                  <li>In notes/text fields, type @ to pick an uploaded photo title; tap the linked @title to open the same photo modal.</li>
-                  <li>Photo attachment delete only removes the app copy; it does not delete the original file in your phone gallery.</li>
-                  <li>In Settings, tap Show onboarding any time to re-open the Welcome modal and retry the install prompt when your browser offers it.</li>
+              {/* Data & saving */}
+              <div className='px-4 py-3 space-y-2.5'>
+                <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Data & saving</p>
+                <ul className='space-y-2'>
+                  {([
+                    'All data is stored locally on this device — no account or internet connection required.',
+                    'Profile, daily notes, vitals, and orders auto-save a moment after you stop typing.',
+                    'Photos are compressed and stored in the app; they are excluded from JSON backup exports.',
+                    'Use the Save now button in the footer to force-save all pending changes immediately.',
+                    'Data persists across page refreshes and browser restarts on the same browser profile.',
+                    'Export backup JSON regularly when switching devices or browsers to avoid data loss.',
+                  ] as string[]).map((item, i) => (
+                    <li key={i} className='flex gap-2 items-start text-xs text-espresso'>
+                      <span className='text-action-primary font-bold shrink-0 mt-px leading-relaxed'>›</span>
+                      <span className='leading-relaxed'>{item}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
             </section>
@@ -5046,7 +5153,18 @@ function App() {
               {canUseWebShare ? (
                 <Button variant='secondary' onClick={() => void sharePreviewText()}>Share</Button>
               ) : null}
-              <Button variant='secondary' onClick={() => void copyPreviewToClipboard()}>Copy full text</Button>
+              <Button
+                variant='secondary'
+                onClick={() => void copyPreviewToClipboard()}
+                style={clipboardCopied ? { backgroundColor: '#16a34a', color: '#ffffff', borderColor: '#16a34a' } : undefined}
+                className='transition-all duration-300'
+              >
+                {clipboardCopied ? (
+                  <><CheckCircle2 className='h-4 w-4 mr-1.5' />Copied!</>
+                ) : (
+                  'Copy full text'
+                )}
+              </Button>
               <Button variant='destructive' onClick={closeCopyModal}>Close</Button>
             </div>
             <textarea
@@ -5184,54 +5302,87 @@ function App() {
         </Dialog>
       </main>
       <nav className={cn(
-        'fixed inset-x-0 bottom-0 z-40 border-t border-clay/25 bg-warm-ivory/97 px-3 pt-1.5 backdrop-blur-md sm:hidden',
+        'fixed inset-x-0 bottom-0 z-40 border-t border-clay/25 bg-warm-ivory/97 backdrop-blur-md sm:hidden',
         isStandaloneDisplayMode ? 'pb-[calc(0.375rem+env(safe-area-inset-bottom))]' : 'pb-1.5',
       )}>
-        <div className='mx-auto flex w-full max-w-xl justify-around gap-1'>
-          <button
-            className={cn(
-              'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
-              view === 'patients'
-                ? 'text-action-primary bg-action-primary/10'
-                : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
-            )}
-            onClick={() => setView('patients')}
-          >
-            <Users className='h-5 w-5' />
-            <span>Patients</span>
-          </button>
-          {canShowFocusedPatientNavButton ? (
+        {view === 'patient' && selectedPatient ? (
+          /* Patient tab navigation — 4×2 grid, no scrolling */
+          <div className='flex items-stretch'>
+            <button
+              className='shrink-0 flex flex-col items-center justify-center gap-0.5 px-2.5 text-clay/70 hover:text-espresso hover:bg-clay/5 border-r border-clay/20 transition-colors'
+              onClick={() => setView('patients')}
+              aria-label='Back to patients list'
+            >
+              <ChevronLeft className='h-3.5 w-3.5' />
+              <span className='text-[9px] font-bold leading-none'>Back</span>
+            </button>
+            <div className='flex-1 grid grid-cols-4 gap-px p-1'>
+              {((['profile', 'frichmond', 'vitals', 'labs', 'medications', 'orders', 'photos', 'reporting'] as const)).map((tab) => {
+                const tabLabels: Record<typeof tab, string> = {
+                  profile: 'Profile',
+                  frichmond: 'FRICH',
+                  vitals: 'Vitals',
+                  labs: 'Labs',
+                  medications: 'Meds',
+                  orders: 'Orders',
+                  photos: 'Photos',
+                  reporting: 'Report',
+                }
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setSelectedTab(tab)}
+                    className={cn(
+                      'flex items-center justify-center py-1.5 text-[11px] font-semibold rounded-md transition-all duration-150',
+                      selectedTab === tab
+                        ? 'text-action-primary bg-action-primary/10'
+                        : 'text-clay/70 hover:text-espresso hover:bg-clay/5',
+                    )}
+                  >
+                    {tabLabels[tab]}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          /* Main navigation — Patients / [Patient] / Settings */
+          <div className='mx-auto flex w-full max-w-xl justify-around gap-1 px-3 pt-1.5 pb-1'>
             <button
               className={cn(
-                'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 min-w-0 max-w-[42%]',
-                view === 'patient'
+                'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
+                view === 'patients'
                   ? 'text-action-primary bg-action-primary/10'
-                  : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
+                  : 'text-clay/70 hover:text-espresso hover:bg-clay/5',
               )}
-              onClick={() => setView('patient')}
+              onClick={() => setView('patients')}
             >
-              <UserRound className='h-5 w-5' />
-              <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
+              <Users className='h-5 w-5' />
+              <span>Patients</span>
             </button>
-          ) : (
-            <div className='flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs text-clay/30 rounded-xl'>
-              <UserRound className='h-5 w-5' />
-              <span>Patient</span>
-            </div>
-          )}
-          <button
-            className={cn(
-              'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
-              view === 'settings'
-                ? 'text-action-primary bg-action-primary/10'
-                : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
-            )}
-            onClick={() => setView('settings')}
-          >
-            <Settings className='h-5 w-5' />
-            <span>Settings</span>
-          </button>
-        </div>
+            {canShowFocusedPatientNavButton ? (
+              <button
+                className='flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 min-w-0 max-w-[42%] text-clay/70 hover:text-espresso hover:bg-clay/5'
+                onClick={() => setView('patient')}
+              >
+                <UserRound className='h-5 w-5' />
+                <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
+              </button>
+            ) : null}
+            <button
+              className={cn(
+                'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
+                view === 'settings'
+                  ? 'text-action-primary bg-action-primary/10'
+                  : 'text-clay/70 hover:text-espresso hover:bg-clay/5',
+              )}
+              onClick={() => setView('settings')}
+            >
+              <Settings className='h-5 w-5' />
+              <span>Settings</span>
+            </button>
+          </div>
+        )}
       </nav>
       <footer className='mt-4 mb-3 border-t border-clay/20 pt-3 text-sm text-clay'>
         <div className='flex items-center justify-between gap-2 flex-wrap'>
