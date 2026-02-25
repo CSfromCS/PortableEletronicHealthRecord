@@ -39,7 +39,9 @@ import {
   formatLabSingleReport,
   formatUrinalysis,
 } from './labFormatters'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2 } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Sun, Moon, Monitor } from 'lucide-react'
+
+type Theme = 'light' | 'dark' | 'system'
 
 type PatientFormState = {
   roomNumber: string
@@ -863,6 +865,37 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const onboardingAutoInstallAttemptedRef = useRef(false)
   const [deferredInstallPromptEvent, setDeferredInstallPromptEvent] = useState<InstallPromptEvent | null>(null)
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const stored = localStorage.getItem('puhrr-theme')
+    return (stored === 'light' || stored === 'dark' || stored === 'system') ? stored : 'system'
+  })
+
+  const setTheme = useCallback((next: Theme) => {
+    localStorage.setItem('puhrr-theme', next)
+    setThemeState(next)
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const applyDark = (dark: boolean) => {
+      if (dark) root.classList.add('dark')
+      else root.classList.remove('dark')
+    }
+    if (theme === 'dark') {
+      applyDark(true)
+      return
+    }
+    if (theme === 'light') {
+      applyDark(false)
+      return
+    }
+    // system
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    applyDark(mq.matches)
+    const handler = (e: MediaQueryListEvent) => applyDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [theme])
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const isStandaloneDisplayMode = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -5001,6 +5034,33 @@ function App() {
               <div className='space-y-2'>
                 <p className='text-[11px] font-bold uppercase tracking-widest text-clay/55'>App</p>
                 <div className='flex flex-col gap-2'>
+                  {/* Theme */}
+                  <div className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 border border-clay/20'>
+                    <div className='w-9 h-9 rounded-lg bg-blush-sand flex items-center justify-center shrink-0 border border-clay/20'>
+                      {theme === 'dark' ? <Moon className='h-4 w-4 text-clay' /> : theme === 'light' ? <Sun className='h-4 w-4 text-clay' /> : <Monitor className='h-4 w-4 text-clay' />}
+                    </div>
+                    <div className='min-w-0 flex-1'>
+                      <p className='text-sm font-semibold text-espresso'>Appearance</p>
+                      <div className='flex gap-1.5 mt-1.5'>
+                        {([['light', 'Light', Sun], ['dark', 'Dark', Moon], ['system', 'System', Monitor]] as [Theme, string, typeof Sun][]).map(([value, label, Icon]) => (
+                          <button
+                            key={value}
+                            type='button'
+                            onClick={() => setTheme(value)}
+                            className={cn(
+                              'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors',
+                              theme === value
+                                ? 'bg-action-primary text-white border-action-primary'
+                                : 'bg-white/60 dark:bg-white/10 text-clay border-clay/25 hover:bg-blush-sand'
+                            )}
+                          >
+                            <Icon className='h-3 w-3' />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                   <button
                     type='button'
                     onClick={() => setShowOnboarding(true)}

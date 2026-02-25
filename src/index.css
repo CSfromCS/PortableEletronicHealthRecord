@@ -81,6 +81,51 @@
   }
 }
 
+/* Dark mode overrides — applied when <html class="dark"> */
+.dark {
+  --color-background: #1A1210;
+  --color-foreground: #F5DDD0;
+  --color-card: #241714;
+  --color-card-foreground: #F5DDD0;
+  --color-popover: #1E1411;
+  --color-popover-foreground: #F5DDD0;
+  --color-primary: var(--color-action-primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #3D2B24;
+  --color-secondary-foreground: #F5DDD0;
+  --color-muted: #2D1F1A;
+  --color-muted-foreground: #A88070;
+  --color-accent: #2D1F1A;
+  --color-accent-foreground: #F5DDD0;
+  --color-destructive: var(--color-action-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-border: #4D342B;
+  --color-input: #5D4035;
+  --color-ring: var(--color-action-primary);
+
+  --background: #1A1210;
+  --foreground: #F5DDD0;
+  --card: #241714;
+  --card-foreground: #F5DDD0;
+  --popover: #1E1411;
+  --popover-foreground: #F5DDD0;
+  --primary: var(--color-action-primary);
+  --primary-foreground: #ffffff;
+  --secondary: #3D2B24;
+  --secondary-foreground: #F5DDD0;
+  --muted: #2D1F1A;
+  --muted-foreground: #A88070;
+  --accent: #2D1F1A;
+  --accent-foreground: #F5DDD0;
+  --destructive: var(--color-action-danger);
+  --destructive-foreground: #ffffff;
+  --border: #4D342B;
+  --input: #5D4035;
+  --ring: var(--color-action-primary);
+
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -90,6 +135,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: "kern" 1, "liga" 1;
+}
+
+.dark body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
 h1, h2, h3, h4, h5, h6 {
