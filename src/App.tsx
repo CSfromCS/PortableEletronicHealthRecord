@@ -2360,16 +2360,15 @@ function App() {
       return `${formatPatientHeader(patient)}\nNo orders in selected window.`
     }
 
-    const { main } = parseServiceLines(patient.service)
+    const header = formatPatientHeader(patient)
+    const orderLines = scoped.map((entry) => {
+      const serviceLabel = entry.service.trim()
+      const orderDateTime = `${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`
+      const orderHeader = [serviceLabel, orderDateTime].filter(Boolean).join(' – ')
+      return [orderHeader || orderDateTime, entry.orderText.trim()].filter(Boolean).join('\n')
+    })
 
-    return scoped
-      .map((entry) => [
-        formatPatientHeader(patient),
-        `${main} – ${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`,
-        '',
-        entry.orderText,
-      ].join('\n'))
-      .join('\n\n')
+    return [header, ...orderLines].join('\n\n')
   }
 
   const toMedicationsSummary = (patient: Patient, medicationEntries: MedicationEntry[]) => {
