@@ -24,7 +24,6 @@ import type {
 } from './types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -40,7 +39,7 @@ import {
   formatLabSingleReport,
   formatUrinalysis,
 } from './labFormatters'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -459,18 +458,18 @@ const PhotoMentionField = ({
           />
         )}
         {activeMention !== null && filteredSuggestions.length > 0 ? (
-          <div className='absolute left-0 right-0 z-20 mt-1 rounded-md border border-clay/40 bg-white shadow-sm'>
+          <div className='absolute left-0 right-0 z-20 mt-1 rounded-lg border border-clay/25 bg-white/97 shadow-lg shadow-espresso/8 backdrop-blur-sm overflow-hidden'>
             <ul className='max-h-44 overflow-auto py-1'>
               {filteredSuggestions.map((entry) => (
                 <li key={entry.id}>
                   <button
                     type='button'
-                    className='w-full px-3 py-1.5 text-left text-sm hover:bg-warm-ivory'
+                    className='w-full px-3 py-2 text-left text-sm hover:bg-blush-sand/50 transition-colors'
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectSuggestion(entry)}
                   >
-                    <span className='font-medium text-espresso'>{entry.title}</span>
-                    <span className='ml-2 text-xs text-clay'>{formatPhotoCategory(entry.category)}</span>
+                    <span className='font-semibold text-espresso'>@{entry.title}</span>
+                    <span className='ml-2 text-xs text-clay/70 bg-blush-sand px-1.5 py-0.5 rounded-full'>{formatPhotoCategory(entry.category)}</span>
                   </button>
                 </li>
               ))}
@@ -3376,54 +3375,60 @@ function App() {
 
   return (
     <div className='min-h-screen pb-20 sm:pb-0'>
+      {/* Brand accent bar */}
+      <div className='fixed inset-x-0 top-0 z-60 h-[3px] bg-linear-to-r from-action-primary/40 via-action-primary to-orange-400/70 pointer-events-none' aria-hidden='true' />
       {notice ? (
-        <div className='fixed top-2 left-1/2 z-50 w-[min(92vw,40rem)] -translate-x-1/2 px-1 pointer-events-none'>
+        <div className='fixed top-3 left-1/2 z-50 w-[min(92vw,38rem)] -translate-x-1/2 px-1 pointer-events-none'>
           <Alert
             className={cn(
-              'border-action-primary/30 bg-peach-cream/95 pointer-events-auto transition-opacity duration-5000 ease-linear',
+              'border-action-primary/25 bg-white/95 shadow-lg shadow-espresso/8 pointer-events-auto transition-opacity duration-5000 ease-linear backdrop-blur-sm',
               noticeIsDecaying ? 'opacity-0' : 'opacity-100',
             )}
           >
+            <Info className='h-4 w-4 text-action-primary shrink-0' />
             <AlertDescription className='text-espresso font-semibold'>{notice}</AlertDescription>
           </Alert>
         </div>
       ) : null}
       <main>
-        <div className='mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='flex items-center gap-1'>
-            <img src="/assets/puhr-v1/puhr-v1.svg" alt="PUHRR logo" className='h-10 w-10 sm:h-12 sm:w-12 shrink-0' />
+        <div className='mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex items-center gap-3'>
+            <div className='relative shrink-0'>
+              <div className='absolute -inset-2 rounded-2xl bg-action-primary/10 blur-lg pointer-events-none' aria-hidden='true' />
+              <img src="/assets/puhr-v1/puhr-v1.svg" alt="PUHRR logo" className='relative h-10 w-10 sm:h-12 sm:w-12 drop-shadow-sm' />
+            </div>
             <div>
               <div className='flex items-baseline gap-2'>
-                <h1 className='text-2xl sm:text-3xl font-bold tracking-tight text-espresso'>PUHRR</h1>
-                <p className='text-xs sm:text-sm font-medium text-clay hidden sm:block'>Portable Unofficial Health Record, Really!</p>
+                <h1 className='text-2xl sm:text-3xl font-extrabold tracking-tight text-espresso leading-none'>PUHRR</h1>
+                <span className='hidden sm:inline-block text-[10px] font-bold uppercase tracking-widest text-clay/55 bg-blush-sand px-2 py-0.5 rounded-full border border-clay/20'>Beta</span>
               </div>
-              <p className='text-sm text-clay/80 italic'>The puhrrfect tool for clerk admin work.</p>
+              <p className='text-xs text-clay/65 mt-0.5 font-medium'>Portable Unofficial Health Record, Really!</p>
             </div>
           </div>
-          <div className='hidden sm:flex justify-end gap-2 flex-wrap'>
-            <div className='flex gap-2 flex-wrap justify-end'>
-              <Button variant={view === 'patients' ? 'default' : 'secondary'} onClick={() => setView('patients')}>Patients</Button>
+          <div className='hidden sm:flex justify-end'>
+            <div className='flex gap-0.5 bg-blush-sand/60 rounded-xl p-1 border border-clay/15 shadow-sm'>
+              <Button variant={view === 'patients' ? 'default' : 'ghost'} size='sm' onClick={() => setView('patients')}>Patients</Button>
               {canShowFocusedPatientNavButton ? (
-                <Button variant={view === 'patient' ? 'default' : 'secondary'} onClick={() => setView('patient')}>
+                <Button variant={view === 'patient' ? 'default' : 'ghost'} size='sm' onClick={() => setView('patient')}>
                   {focusedPatientNavLabel}
                 </Button>
               ) : null}
-              <Button variant={view === 'settings' ? 'default' : 'secondary'} onClick={() => setView('settings')}>Settings</Button>
+              <Button variant={view === 'settings' ? 'default' : 'ghost'} size='sm' onClick={() => setView('settings')}>Settings</Button>
             </div>
           </div>
         </div>
 
         {view === 'patient' && selectedPatient ? (
-          <div className='mb-3 h-px bg-clay/25 sm:hidden' aria-hidden='true' />
+          <div className='mb-3 h-px bg-linear-to-r from-transparent via-clay/20 to-transparent sm:hidden' aria-hidden='true' />
         ) : null}
 
         {view !== 'settings' ? (
           <>
             {view === 'patients' ? (
               <>
-            <Card className='bg-warm-ivory border-clay mb-4'>
-              <CardHeader className='py-2 px-3 pb-0'>
-                <CardTitle className='text-sm text-espresso'>Add patient</CardTitle>
+            <Card className='bg-white/80 border-clay/30 mb-4 shadow-sm'>
+              <CardHeader className='py-2.5 px-3 pb-0'>
+                <CardTitle className='text-sm font-semibold text-espresso'>Add patient</CardTitle>
               </CardHeader>
               <CardContent className='px-3 pb-3'>
                 <form className='grid grid-cols-2 gap-2 sm:grid-cols-3' onSubmit={handleSubmit}>
@@ -3445,7 +3450,7 @@ function App() {
               </CardContent>
             </Card>
 
-            <Card className='bg-warm-ivory border-clay mb-4'>
+            <Card className='bg-white/80 border-clay/30 mb-4 shadow-sm'>
               <CardContent className='px-3 py-2'>
                 <div className='flex gap-2 flex-wrap'>
                   <Input
@@ -3477,32 +3482,41 @@ function App() {
 
             <div className='flex flex-col gap-2'>
               {visiblePatients.map((patient) => (
-                <Card key={patient.id} className={cn('bg-peach-cream border-clay/40 hover:shadow-md hover:border-clay/60 transition-all duration-200 overflow-hidden', patient.status === 'active' ? 'border-l-4 border-l-action-primary' : 'border-l-4 border-l-clay/40')}>
-                  <CardContent className='flex items-center justify-between gap-3 py-3 px-4'>
-                    <div className='flex-1 min-w-0'>
-                      <p className='font-semibold text-espresso truncate text-base'>
-                        {patient.roomNumber} — {patient.lastName}, {patient.firstName}
-                      </p>
-                      <p className='text-sm text-clay mt-0.5'>
-                        {patient.age}/{patient.sex} • {patient.service.split('\n')[0]}
-                      </p>
-                      <div className='flex items-center gap-2 mt-1.5 flex-wrap'>
-                        <Badge className={cn(
-                          'text-xs',
-                          patient.status === 'active'
-                            ? 'bg-[#3AA766] text-white'
-                            : 'bg-action-secondary/20 text-action-secondary'
-                        )}>
-                          {patient.status}
-                        </Badge>
-                        {patient.diagnosis && (
-                          <span className='text-xs text-espresso/80 truncate'>
-                            {patient.diagnosis.split('\n')[0]}
-                          </span>
-                        )}
-                      </div>
+                <Card key={patient.id} className={cn(
+                  'border-clay/20 hover:shadow-md hover:border-clay/35 transition-all duration-200 overflow-hidden bg-white/75',
+                  patient.status === 'active'
+                    ? 'border-l-[3px] border-l-action-primary shadow-sm'
+                    : 'border-l-[3px] border-l-clay/25 opacity-70'
+                )}>
+                  <CardContent className='flex items-center gap-3 py-3 px-4'>
+                    <div className={cn(
+                      'shrink-0 flex items-center justify-center w-11 h-11 rounded-xl text-xs font-bold leading-tight text-center px-1',
+                      patient.status === 'active'
+                        ? 'bg-action-primary/10 text-action-primary'
+                        : 'bg-clay/10 text-clay'
+                    )}>
+                      <span className='truncate max-w-full'>{patient.roomNumber}</span>
                     </div>
-                    <Button size='sm' onClick={() => selectPatient(patient)}>Open</Button>
+                    <div className='flex-1 min-w-0'>
+                      <p className='font-semibold text-espresso truncate text-sm leading-snug'>
+                        {patient.lastName}, {patient.firstName}
+                      </p>
+                      <p className='text-xs text-clay mt-0.5 truncate'>
+                        {patient.age}/{patient.sex} · {patient.service.split('\n')[0]}
+                      </p>
+                      {patient.diagnosis && (
+                        <p className='text-xs text-espresso/50 truncate mt-0.5'>
+                          {patient.diagnosis.split('\n')[0]}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size='sm'
+                      variant={patient.status === 'active' ? 'default' : 'secondary'}
+                      onClick={() => selectPatient(patient)}
+                    >
+                      Open
+                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -3512,7 +3526,7 @@ function App() {
 
             {view === 'patient' ? (
               selectedPatient ? (
-              <Card className='border-0 bg-transparent shadow-none sm:bg-warm-ivory sm:border-clay sm:shadow-md sm:ring-1 sm:ring-clay/20'>
+              <Card className='border-0 bg-transparent shadow-none sm:bg-white/80 sm:border-clay/25 sm:shadow-md sm:ring-1 sm:ring-clay/10'>
                 <CardHeader className='py-3 px-0 pb-0 sm:px-4'>
                   <Select
                     value={selectedPatient.id?.toString() ?? ''}
@@ -4906,7 +4920,7 @@ function App() {
                 </CardContent>
               </Card>
               ) : (
-                <Card className='bg-warm-ivory border-clay'>
+                <Card className='bg-white/80 border-clay/25 shadow-sm'>
                   <CardHeader className='py-3 px-4 pb-0'>
                     <CardTitle className='text-base text-espresso'>Focused patient</CardTitle>
                   </CardHeader>
@@ -4918,7 +4932,7 @@ function App() {
             ) : null}
           </>
         ) : (
-          <Card className='bg-warm-ivory border-clay'>
+          <Card className='bg-white/80 border-clay/25 shadow-sm'>
             <CardHeader className='py-3 px-4 pb-0'>
               <CardTitle className='text-base text-espresso'>Settings</CardTitle>
             </CardHeader>
@@ -5030,7 +5044,7 @@ function App() {
               <Button variant='destructive' onClick={closeCopyModal}>Close</Button>
             </div>
             <textarea
-              className='flex-1 min-h-0 w-full font-mono bg-white resize-none p-2 rounded border border-clay text-sm overflow-auto'
+              className='flex-1 min-h-0 w-full font-mono bg-white/90 resize-none p-3 rounded-lg border border-clay/30 text-sm overflow-auto leading-relaxed'
               aria-label='Generated text preview'
               readOnly
               value={outputPreview}
@@ -5164,13 +5178,16 @@ function App() {
         </Dialog>
       </main>
       <nav className={cn(
-        'fixed inset-x-0 bottom-0 z-40 border-t border-clay/40 bg-warm-ivory/95 px-2 pt-1.5 backdrop-blur-md sm:hidden',
-        isStandaloneDisplayMode ? 'pb-[calc(0.25rem+env(safe-area-inset-bottom))]' : 'pb-1',
+        'fixed inset-x-0 bottom-0 z-40 border-t border-clay/25 bg-warm-ivory/97 px-3 pt-1.5 backdrop-blur-md sm:hidden',
+        isStandaloneDisplayMode ? 'pb-[calc(0.375rem+env(safe-area-inset-bottom))]' : 'pb-1.5',
       )}>
-        <div className='mx-auto flex w-full max-w-xl justify-around'>
+        <div className='mx-auto flex w-full max-w-xl justify-around gap-1'>
           <button
-            className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors',
-              view === 'patients' ? 'text-action-primary' : 'text-clay'
+            className={cn(
+              'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
+              view === 'patients'
+                ? 'text-action-primary bg-action-primary/10'
+                : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
             )}
             onClick={() => setView('patients')}
           >
@@ -5179,8 +5196,11 @@ function App() {
           </button>
           {canShowFocusedPatientNavButton ? (
             <button
-              className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors min-w-0 max-w-[40%]',
-                view === 'patient' ? 'text-action-primary' : 'text-clay'
+              className={cn(
+                'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 min-w-0 max-w-[42%]',
+                view === 'patient'
+                  ? 'text-action-primary bg-action-primary/10'
+                  : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
               )}
               onClick={() => setView('patient')}
             >
@@ -5188,14 +5208,17 @@ function App() {
               <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
             </button>
           ) : (
-            <div className='flex flex-col items-center gap-0.5 px-3 py-1 text-xs text-clay/40'>
+            <div className='flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs text-clay/30 rounded-xl'>
               <UserRound className='h-5 w-5' />
               <span>Patient</span>
             </div>
           )}
           <button
-            className={cn('flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium rounded-lg transition-colors',
-              view === 'settings' ? 'text-action-primary' : 'text-clay'
+            className={cn(
+              'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
+              view === 'settings'
+                ? 'text-action-primary bg-action-primary/10'
+                : 'text-clay/70 hover:text-espresso hover:bg-clay/5'
             )}
             onClick={() => setView('settings')}
           >
@@ -5204,7 +5227,7 @@ function App() {
           </button>
         </div>
       </nav>
-      <footer className='mt-3 mb-3 border-t border-clay/40 pt-3 text-sm text-clay'>
+      <footer className='mt-4 mb-3 border-t border-clay/20 pt-3 text-sm text-clay'>
         <div className='flex items-center justify-between gap-2 flex-wrap'>
           <div className='flex items-center gap-2 flex-wrap min-h-9'>
             {selectedPatientId !== null ? (
@@ -5219,7 +5242,9 @@ function App() {
                     : '—'}
                 </p>
                 <Button variant='secondary' size='sm' disabled={isSaving || !hasUnsavedChanges} onClick={() => void saveAllChanges()}>
-                  {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save now' : 'Saved'}
+                  {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save now' : (
+                    <><CheckCircle2 className='h-3.5 w-3.5 text-[#3AA766]' /> Saved</>
+                  )}
                 </Button>
               </>
             ) : null}

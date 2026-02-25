@@ -37,28 +37,20 @@
   --color-accent-foreground: var(--color-espresso);
   --color-destructive: var(--color-action-danger);
   --color-destructive-foreground: #ffffff;
-  --color-border: var(--color-clay);
-  --color-input: var(--color-clay);
+  --color-border: #CBA98B;
+  --color-input: #B09080;
   --color-ring: var(--color-action-primary);
 
-  /* Typography */
+  /* Typography — Plus Jakarta Sans for everything */
   --font-sans:
-    "Inter",
+    "Plus Jakarta Sans Variable",
     "Segoe UI",
-    "Roboto",
-    "Helvetica Neue",
-    "Noto Sans",
-    "Liberation Sans",
-    "Arial",
     system-ui,
     -apple-system,
     sans-serif;
   --font-heading:
     "Plus Jakarta Sans Variable",
-    "Inter",
     "Segoe UI",
-    "Roboto",
-    "Helvetica Neue",
     system-ui,
     -apple-system,
     sans-serif;
@@ -82,8 +74,8 @@
     --accent-foreground: var(--color-espresso);
     --destructive: var(--color-action-danger);
     --destructive-foreground: #ffffff;
-    --border: var(--color-clay);
-    --input: var(--color-clay);
+    --border: #CBA98B;
+    --input: #B09080;
     --ring: var(--color-action-primary);
     --radius: 0.5rem;
   }
@@ -95,6 +87,9 @@ body {
   font-family: var(--font-sans);
   background-color: var(--color-warm-ivory);
   color: var(--color-espresso);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -120,4 +115,27 @@ h1, h2, h3, h4, h5, h6 {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Thin warm scrollbar for all scrollable areas */
+*:not(.hide-scrollbar)::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+*:not(.hide-scrollbar)::-webkit-scrollbar-track {
+  background: transparent;
+}
+*:not(.hide-scrollbar)::-webkit-scrollbar-thumb {
+  background-color: rgba(138, 99, 85, 0.22);
+  border-radius: 8px;
+}
+*:not(.hide-scrollbar)::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(138, 99, 85, 0.42);
+}
+
+/* Smooth interactive transitions */
+button, a, [role="button"] {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease;
 }
