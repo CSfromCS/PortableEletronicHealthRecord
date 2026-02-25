@@ -68,7 +68,7 @@ Each open patient has eight focused tabs:
 - **Vitals summary** supports multi-patient selection and date/time window filtering.
 - **Labs summary** supports arbitrary instance selection per patient; comparison mode runs only when exactly 2 instances of a lab type are selected.
 - **Orders summary** supports date/time filtering using order date/time fields and preserves order text exactly as entered.
-- **All patient exports** — choose exactly which active patients to include and reorder them before generating.
+- **All patient exports** — choose exactly which active patients to include and reorder them before generating Selected Census or Selected Vitals.
 - Text output opens in a popup with full-select and **Copy full text** button.
 
 ### Photos

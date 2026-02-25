@@ -884,6 +884,7 @@ function App() {
     return 'other'
   }, [])
   const patients = useLiveQuery(() => db.patients.toArray(), [])
+  const allVitals = useLiveQuery(() => db.vitals.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
   const orders = useLiveQuery(() => db.orders.toArray(), [])
@@ -1241,6 +1242,25 @@ function App() {
 
     return grouped
   }, [orders])
+
+  const structuredVitalsByPatient = useMemo(() => {
+    const grouped = new Map<number, VitalEntry[]>()
+    ;(allVitals ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date)
+        if (a.time !== b.time) return a.time.localeCompare(b.time)
+        return a.createdAt.localeCompare(b.createdAt)
+      })
+    })
+
+    return grouped
+  }, [allVitals])
 
   const selectedPatientOrders = useMemo(() => {
     if (selectedPatientId === null) return []
@@ -2304,6 +2324,18 @@ function App() {
     return lines.join('\n')
   }
 
+  const toSelectedPatientsVitalsSummary = (patientsToInclude: Patient[]) => {
+    return patientsToInclude
+      .map((patient) => {
+        const summary = toVitalsLogSummary(patient, structuredVitalsByPatient.get(patient.id ?? -1) ?? [])
+        if (summary === 'No vitals in selected window.') {
+          return `${formatPatientHeader(patient)}\n${summary}`
+        }
+        return summary
+      })
+      .join('\n\n')
+  }
+
   const toOrdersSummary = (patient: Patient, orderEntries: OrderEntry[]) => {
     const scoped = orderEntries
       .filter((entry) =>
@@ -3311,8 +3343,14 @@ function App() {
           description: 'Generate census text for selected active patients in your chosen order.',
           actions: [
             {
+              id: 'all-vitals',
+              label: 'Multiple Vitals',
+              outputTitle: 'Selected Vitals',
+              buildText: () => toSelectedPatientsVitalsSummary(selectedCensusPatients),
+            },
+            {
               id: 'all-census',
-              label: 'Selected Census',
+              label: 'Multiple Census',
               outputTitle: 'Selected Census',
               buildText: () =>
                 selectedCensusPatients
@@ -4663,6 +4701,7 @@ function App() {
                           <p className='text-sm text-clay'>{section.description}</p>
                           {section.id === 'census-reporting' ? (
                             <div className='space-y-2 rounded-md border border-clay/40 bg-white p-2'>
+                              <p className='text-xs text-clay'>Selected Vitals uses the Vitals Filter above (same date/time window as Current patient exports).</p>
                               <div className='flex items-center justify-between gap-2 flex-wrap'>
                                 <p className='text-xs text-clay'>
                                   Included: {selectedCensusPatients.length} of {reportingSelectablePatients.length} active patients
@@ -4843,7 +4882,7 @@ function App() {
                                 <Button
                                   key={action.id}
                                   type='button'
-                                  disabled={action.id === 'all-census' && selectedCensusPatients.length === 0}
+                                  disabled={(action.id === 'all-census' || action.id === 'all-vitals') && selectedCensusPatients.length === 0}
                                   onClick={() => {
                                     try {
                                       openCopyModal(action.buildText(), action.outputTitle)
@@ -4913,6 +4952,7 @@ function App() {
                   <li>In FRICHMOND, pick the target date, then tap Copy latest entry to carry forward the latest saved daily note. Confirm the overwrite prompt to replace the selected date&apos;s current entry with a duplicate of the latest saved date.</li>
                   <li>In FRICHMOND, use Saved entry dates to quickly jump to dates that already have entries; the selected date is highlighted.</li>
                   <li>Go to Reporting tab for all text export/formatting actions, then copy or share from the preview popup.</li>
+                  <li>In All patient exports, use Selected Vitals to generate multi-patient vitals using the same Vitals Filter date/time window from Current patient exports.</li>
                   <li>Repeat daily using the date picker in FRICHMOND.</li>
                 </ol>
               </div>
@@ -4929,7 +4969,7 @@ function App() {
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
                   <li>Photos tab: categorized image attachments with grouped multi-photo upload blocks, count badges, and in-app carousel preview.</li>
-                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with clearer Current patient sections ordered as Labs &rarr; Vitals (From/Until date-time) &rarr; Orders, plus lab instance selection and date/time filtering for vitals/orders.</li>
+                  <li>Reporting tab: profile/frichmond/vitals/labs/orders/census exports with clearer Current patient sections ordered as Labs &rarr; Vitals (From/Until date-time) &rarr; Orders, plus lab instance selection and date/time filtering for vitals/orders; All patient exports include Selected Census and Selected Vitals.</li>
                   <li>Settings: backup export/import, reopen onboarding, and clear discharged records.</li>
                 </ul>
               </div>
@@ -4959,7 +4999,7 @@ function App() {
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
                   <li>Use Reporting tab when you need handoff-ready text output from any section.</li>
                   <li>Orders text box supports multi-line notes and @photo title linking.</li>
-                  <li>Use Reporting tab&apos;s All patient exports to select active patients and reorder them before generating all-census output.</li>
+                  <li>Use Reporting tab&apos;s All patient exports to select active patients and reorder them before generating Selected Census or Selected Vitals output.</li>
                   <li>The text popup is almost full-page so you can manually select only what you need.</li>
                   <li>If your browser supports it, Share appears only inside the text popup.</li>
                   <li>Export backup JSON regularly if you switch devices or browsers.</li>
