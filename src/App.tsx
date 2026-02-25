@@ -2360,16 +2360,18 @@ function App() {
       return `${formatPatientHeader(patient)}\nNo orders in selected window.`
     }
 
-    const { main } = parseServiceLines(patient.service)
-
-    return scoped
-      .map((entry) => [
-        formatPatientHeader(patient),
-        `${main} – ${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`,
-        '',
-        entry.orderText,
-      ].join('\n'))
+    const ordersList = scoped
+      .map((entry) => {
+        const { main } = parseServiceLines(entry.service)
+        return [
+          `${main} – ${formatDateMMDD(entry.orderDate)} ${formatClock(entry.orderTime)}`,
+          '',
+          entry.orderText,
+        ].join('\n')
+      })
       .join('\n\n')
+
+    return `${formatPatientHeader(patient)}\n\n${ordersList}`
   }
 
   const toMedicationsSummary = (patient: Patient, medicationEntries: MedicationEntry[]) => {
