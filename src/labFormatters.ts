@@ -56,6 +56,11 @@ const UA_MARKER_DEFAULTS: Record<string, string> = {
 
 const trimValue = (value: string | undefined) => (value ?? '').trim()
 
+const ABG_PO2_KEY = 'pO2'
+const ABG_ACTUAL_FIO2_KEY = 'Actual FiO2'
+const ABG_PF_RATIO_KEY = 'pO2/FiO2'
+const ABG_TARGET_PAO2 = 60
+
 const parseNumericInput = (value: string | undefined): number | null => {
   const sanitized = trimValue(value).replaceAll(',', '').replaceAll('%', '')
   if (!sanitized) return null
@@ -64,6 +69,7 @@ const parseNumericInput = (value: string | undefined): number | null => {
 }
 
 const format1 = (value: number) => Number.parseFloat(value.toFixed(1)).toString()
+const format2 = (value: number) => Number.parseFloat(value.toFixed(2)).toString()
 
 const valOr = (results: Record<string, string>, key: string, fallback = '') => {
   const value = trimValue(results[key])
@@ -306,8 +312,39 @@ const formatCbcComparison = (newer: Record<string, string>, older: Record<string
   return lines.length > 0 ? lines.join(', ') : '-'
 }
 
+const getAbgDerivedValues = (results: Record<string, string>) => {
+  const paO2Raw = trimValue(results[ABG_PO2_KEY])
+  const actualFiO2Raw = trimValue(results[ABG_ACTUAL_FIO2_KEY])
+  const paO2 = parseNumericInput(paO2Raw)
+  const actualFiO2 = parseNumericInput(actualFiO2Raw)
+
+  const pfRatio =
+    paO2 !== null && actualFiO2 !== null && actualFiO2 > 0
+      ? format2(paO2 / (actualFiO2 / 100))
+      : trimValue(results[ABG_PF_RATIO_KEY])
+
+  const shouldShowDesiredFiO2 =
+    paO2 !== null &&
+    paO2 > 0 &&
+    actualFiO2 !== null &&
+    (actualFiO2 > 21 || paO2 < 60)
+
+  const desiredFiO2 = shouldShowDesiredFiO2
+    ? format2((actualFiO2 * ABG_TARGET_PAO2) / paO2)
+    : ''
+
+  const desiredFiO2Line = shouldShowDesiredFiO2
+    ? `Desired FiO2 = (FiO2 × ${ABG_TARGET_PAO2}) / pO2 = (${actualFiO2Raw} × ${ABG_TARGET_PAO2}) / ${paO2Raw} = ${desiredFiO2}`
+    : ''
+
+  return {
+    pfRatio,
+    desiredFiO2Line,
+  }
+}
+
 const formatAbgSingle = (results: Record<string, string>) => {
-  const preferred = ['pH', 'pCO2', 'pO2', 'HCO3', 'a/A', 'A-aDO2', 'Actual FiO2', 'pO2/FiO2', 'Desired FiO2']
+  const preferred = ['pH', 'pCO2', 'pO2', 'HCO3', 'a/A', 'A-aDO2']
   const lines = preferred
     .map((field) => {
       const value = trimValue(results[field])
@@ -315,17 +352,25 @@ const formatAbgSingle = (results: Record<string, string>) => {
       return `${field} ${value}`
     })
     .filter((value): value is string => value !== null)
-  return lines.length > 0 ? lines.join(', ') : '-'
+
+  const { pfRatio, desiredFiO2Line } = getAbgDerivedValues(results)
+  if (pfRatio) {
+    lines.push(`${ABG_PF_RATIO_KEY} ${pfRatio}`)
+  }
+
+  const mainLine = lines.join(', ')
+  if (!mainLine && !desiredFiO2Line) return '-'
+  if (!mainLine) return desiredFiO2Line
+  if (!desiredFiO2Line) return mainLine
+  return `${mainLine}\n\n${desiredFiO2Line}`
 }
 
 const formatAbgComparison = (newer: Record<string, string>, older: Record<string, string>) => {
-  const newerDesired = trimValue(newer['Desired FiO2'])
-  const olderDesired = trimValue(older['Desired FiO2'])
-  const newerActual = trimValue(newer['Actual FiO2'])
-  const newerPaO2 = trimValue(newer['pO2'])
+  const newerDerived = getAbgDerivedValues(newer)
+  const olderDerived = getAbgDerivedValues(older)
   const lines: string[] = []
 
-  const ordered = ['pH', 'pCO2', 'pO2', 'HCO3', 'a/A', 'A-aDO2', 'Actual FiO2', 'pO2/FiO2']
+  const ordered = ['pH', 'pCO2', 'pO2', 'HCO3', 'a/A', 'A-aDO2']
   ordered.forEach((field) => {
     const newValue = trimValue(newer[field])
     if (!newValue) return
@@ -333,14 +378,16 @@ const formatAbgComparison = (newer: Record<string, string>, older: Record<string
     lines.push(oldValue ? `${field} ${newValue} (${oldValue})` : `${field} ${newValue}`)
   })
 
-  if (newerDesired) {
-    const left = newerActual && newerPaO2
-      ? `Desired FiO2 = FiO2 x 60 / PaO2 = ${newerActual} x 60 / ${newerPaO2} = ${newerDesired}`
-      : `Desired FiO2 ${newerDesired}`
-    lines.push(olderDesired ? `${left} (${olderDesired})` : left)
+  if (newerDerived.pfRatio) {
+    const olderPfRatio = olderDerived.pfRatio
+    lines.push(olderPfRatio ? `${ABG_PF_RATIO_KEY} ${newerDerived.pfRatio} (${olderPfRatio})` : `${ABG_PF_RATIO_KEY} ${newerDerived.pfRatio}`)
   }
 
-  return lines.length > 0 ? lines.join(', ') : '-'
+  const mainLine = lines.join(', ')
+  if (!mainLine && !newerDerived.desiredFiO2Line) return '-'
+  if (!mainLine) return newerDerived.desiredFiO2Line
+  if (!newerDerived.desiredFiO2Line) return mainLine
+  return `${mainLine}\n\n${newerDerived.desiredFiO2Line}`
 }
 
 export const formatLabSingleReport = (templateId: LabTemplateId, results: Record<string, string>) => {

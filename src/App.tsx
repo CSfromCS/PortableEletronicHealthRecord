@@ -535,7 +535,6 @@ const OTHERS_LABEL_KEY = '__customLabel'
 const OTHERS_RESULT_KEY = '__freeformResult'
 const UST_BLOOD_CHEM_TEMPLATE_ID = 'ust-electrolytes'
 const UST_ABG_TEMPLATE_ID = 'ust-abg'
-const ABG_DESIRED_PAO2_KEY = '__abgDesiredPaO2'
 const ABG_PO2_KEY = 'pO2'
 const ABG_ACTUAL_FIO2_KEY = 'Actual FiO2'
 const ABG_PF_RATIO_KEY = 'pO2/FiO2'
@@ -1191,7 +1190,6 @@ function App() {
     setLabTemplateValues((previous) => {
       const actualPaO2 = parseNumericInput(previous[ABG_PO2_KEY])
       const actualFiO2Percent = parseNumericInput(previous[ABG_ACTUAL_FIO2_KEY])
-      const desiredPaO2 = parseNumericInput(previous[ABG_DESIRED_PAO2_KEY]) ?? DEFAULT_ABG_DESIRED_PAO2
 
       const pfRatio =
         actualPaO2 !== null && actualFiO2Percent !== null && actualFiO2Percent > 0
@@ -1199,8 +1197,11 @@ function App() {
           : ''
 
       const desiredFiO2 =
-        actualPaO2 !== null && actualPaO2 > 0 && actualFiO2Percent !== null
-          ? formatCalculatedNumber((actualFiO2Percent * desiredPaO2) / actualPaO2, 2)
+        actualPaO2 !== null &&
+        actualPaO2 > 0 &&
+        actualFiO2Percent !== null &&
+        (actualFiO2Percent > 21 || actualPaO2 < 60)
+          ? formatCalculatedNumber((actualFiO2Percent * DEFAULT_ABG_DESIRED_PAO2) / actualPaO2, 2)
           : ''
 
       const currentPfRatio = previous[ABG_PF_RATIO_KEY] ?? ''
@@ -2062,6 +2063,8 @@ function App() {
         const template = labTemplatesById.get(entry.templateId)
         const label = entry.templateId === OTHERS_LAB_TEMPLATE_ID
           ? ((newer.results?.[OTHERS_LABEL_KEY] ?? '').trim() || 'Others')
+          : entry.templateId === UST_ABG_TEMPLATE_ID
+            ? 'ABG'
           : (template?.name ?? entry.templateId)
 
         const newerTime = formatClock(newer.time ?? '00:00')
@@ -2092,6 +2095,8 @@ function App() {
       const template = labTemplatesById.get(entry.templateId)
       const label = entry.templateId === OTHERS_LAB_TEMPLATE_ID
         ? ((entry.results?.[OTHERS_LABEL_KEY] ?? '').trim() || 'Others')
+        : entry.templateId === UST_ABG_TEMPLATE_ID
+          ? 'ABG'
         : (template?.name ?? entry.templateId)
       const dateLine = `${formatDateMMDD(entry.date)} ${formatClock(entry.time ?? '00:00')}`
       const body = formatLabSingleReport(
@@ -4329,20 +4334,12 @@ function App() {
 
                           {isAbgLabTemplate ? (
                             <div className='space-y-2 rounded-md border border-clay/40 bg-warm-ivory p-2'>
-                              <div className='grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_16rem] gap-2 items-center'>
-                                <p className='text-sm text-espresso font-medium'>Desired PaO2 (mmHg)</p>
-                                <Input
-                                  aria-label='ABG (Arterial Blood Gas) Desired PaO2 value'
-                                  placeholder='Whole or decimal mmHg (e.g., 60)'
-                                  value={labTemplateValues[ABG_DESIRED_PAO2_KEY] ?? ''}
-                                  onChange={(event) => updateLabTemplateValue(ABG_DESIRED_PAO2_KEY, event.target.value)}
-                                />
-                              </div>
                               <div className='space-y-1 text-xs text-clay'>
                                 <p className='font-semibold text-espresso'>Oxygenation indices reviewer</p>
                                 <p>a/AO2 NV: ≥0.75</p>
                                 <p>A-aDO2 NV: 15+ [(# of decades above 30) *3]</p>
                                 <p>P/F ratio NV: &lt;60 yo: 400; &gt;60 yo: 400 – [(# of yrs above 60) *5]</p>
+                                <p>Desired FiO2 target PaO2 is fixed at 60 mmHg.</p>
                                 {selectedPatient ? (
                                   <p>
                                     Age {selectedPatient.age}: A-aDO2 NV ≈ {abgNormalAaDo2} mmHg; P/F ratio NV ≈ {abgNormalPfRatio}
@@ -4956,7 +4953,7 @@ function App() {
                   <li>Install PUHRR to your phone home screen for faster rounds access (Android: Chrome menu &rarr; Install app/Add to Home screen; iPhone/iPad: Safari Share &rarr; Add to Home Screen).</li>
                   <li>Use Structured labs templates (CBC, Urinalysis, Blood Chemistry, ABG, or Others), then fill values and add.</li>
                   <li>For Blood Chemistry, enter collection time when needed; AST/ALT/bilirubin/LDH/D-Dimer/ESR/CRP can include ULN values to auto-show xULN, while TSH/FT4/FT3 can include NV ranges.</li>
-                  <li>ABG template auto-calculates pO2/FiO2 and Desired FiO2 from pO2 and Actual FiO2 (with optional Desired PaO2 override; default is 60).</li>
+                  <li>ABG template auto-calculates pO2/FiO2 from pO2 and Actual FiO2, and only shows Desired FiO2 when FiO2 &gt; 21% or pO2 &lt; 60 (target PaO2 fixed at 60).</li>
                   <li>For Others template, Label and Lab Result are both required; Label becomes the report heading.</li>
                   <li>FRICHMOND exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.</li>
                   <li>Use Edit on an order entry to update status or remove it from the same edit controls.</li>
