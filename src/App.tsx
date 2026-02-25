@@ -102,6 +102,7 @@ const initialProfileForm: ProfileFormState = {
 type DailyUpdateFormState = Omit<DailyUpdate, 'id' | 'patientId' | 'date' | 'lastUpdated'>
 
 type VitalFormState = {
+  date: string
   time: string
   bp: string
   hr: string
@@ -742,6 +743,7 @@ const getNormalPfRatio = (age: number): number => {
 }
 
 const initialVitalForm = (): VitalFormState => ({
+  date: toLocalISODate(),
   time: toLocalTime(),
   bp: '',
   hr: '',
@@ -2437,7 +2439,7 @@ function App() {
   }
 
   const addStructuredVital = async () => {
-    if (selectedPatientId === null || !vitalForm.time) return
+    if (selectedPatientId === null || !vitalForm.date || !vitalForm.time) return
 
     const saved = await saveVitalDraft()
     if (!saved) return
@@ -2469,6 +2471,7 @@ function App() {
     setVitalDraftId(null)
     setVitalDirty(false)
     setVitalForm({
+      date: entry.date,
       time: entry.time,
       bp: entry.bp,
       hr: entry.hr,
@@ -2480,7 +2483,7 @@ function App() {
   }
 
   const saveEditingVital = async () => {
-    if (editingVitalId === null || !vitalForm.time) return
+    if (editingVitalId === null || !vitalForm.date || !vitalForm.time) return
 
     const saved = await saveVitalDraft()
     if (!saved) return
@@ -2577,11 +2580,12 @@ function App() {
 
   const saveVitalDraft = useCallback(
     async () => {
-      if (selectedPatientId === null || !vitalForm.time) return false
+      if (selectedPatientId === null || !vitalForm.date || !vitalForm.time) return false
 
       setIsSaving(true)
 
       const payload = {
+        date: vitalForm.date,
         time: vitalForm.time,
         bp: vitalForm.bp.trim(),
         hr: vitalForm.hr.trim(),
@@ -2599,7 +2603,6 @@ function App() {
           if (updatedCount === 0) {
             const nextId = await db.vitals.add({
               patientId: selectedPatientId,
-              date: toLocalISODate(),
               ...payload,
               createdAt: new Date().toISOString(),
             })
@@ -2608,7 +2611,6 @@ function App() {
         } else {
           const nextId = await db.vitals.add({
             patientId: selectedPatientId,
-            date: toLocalISODate(),
             ...payload,
             createdAt: new Date().toISOString(),
           })
@@ -4018,6 +4020,10 @@ function App() {
                       <CardContent className='px-0 pb-3 space-y-3 sm:px-3'>
                         <div className='grid grid-cols-3 gap-2 sm:grid-cols-4'>
                           <div className='space-y-1'>
+                            <Label>Date</Label>
+                            <Input type='date' aria-label='Vital date' value={vitalForm.date} onChange={(event) => updateVitalField('date', event.target.value)} />
+                          </div>
+                          <div className='space-y-1'>
                             <Label>Time</Label>
                             <Input type='time' aria-label='Vital time' value={vitalForm.time} onChange={(event) => updateVitalField('time', event.target.value)} />
                           </div>
@@ -4978,7 +4984,7 @@ function App() {
                   <li>Focused patient dropdown (patient header): quickly switch to another patient by Room - Last name.</li>
                   <li>Profile tab: demographics plus case-review text boxes for diagnosis, clinical summary, chief complaint, HPI, PMH, physical exam, plans, pendings, and clerk notes.</li>
                   <li>FRICHMOND tab: date-based daily F-R-I-C-H-M-O-N-D notes, assessment, and plan, with Saved entry dates highlighting and Copy latest entry with overwrite confirmation.</li>
-                  <li>Vitals tab: structured vitals tracking across all dates, earliest entries first.</li>
+                  <li>Vitals tab: structured vitals with date/time entry plus BP/HR/RR/Temp/SpO2/Note tracking across all dates, earliest entries first.</li>
                   <li>Labs tab: free-text labs plus structured lab templates and trends, including collection date/time fields.</li>
                   <li>Medications tab: free-text meds plus structured medication entries with status tracking.</li>
                   <li>Orders tab: doctor&apos;s orders with long-form order text, date, time, service, and status tracking via Edit controls.</li>
