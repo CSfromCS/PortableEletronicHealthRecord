@@ -3482,7 +3482,7 @@ function App() {
                       {dailyUpdateForm.checklist.length > 0 ? (
                         <div className='space-y-1'>
                           {dailyUpdateForm.checklist.map((item, index) => (
-                            <div key={`${item.text}-${index}`} className='flex items-start gap-2 rounded-md border border-clay/20 bg-warm-ivory px-2 py-1.5'>
+                            <div key={index} className='flex items-start gap-2 rounded-md border border-clay/20 bg-warm-ivory px-2 py-1.5'>
                               <input
                                 type='checkbox'
                                 aria-label={`Mark checklist item ${item.text} as ${item.completed ? 'pending' : 'completed'}`}
