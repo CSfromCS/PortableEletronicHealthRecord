@@ -162,6 +162,7 @@ const initialProfileForm: ProfileFormState = {
 }
 
 type DailyUpdateFormState = Omit<DailyUpdate, 'id' | 'patientId' | 'date' | 'lastUpdated'>
+type DailyChecklistItem = DailyUpdateFormState['checklist'][number]
 
 type VitalFormState = {
   date: string
@@ -230,6 +231,41 @@ const initialDailyUpdateForm: DailyUpdateFormState = {
   other: '',
   assessment: '',
   plans: '',
+  checklist: [],
+}
+
+const normalizeChecklistItems = (items: DailyChecklistItem[] | undefined) =>
+  (items ?? [])
+    .map((item) => ({
+      text: item.text.trim(),
+      completed: Boolean(item.completed),
+    }))
+    .filter((item) => item.text.length > 0)
+
+const toPendingChecklistItems = (items: DailyChecklistItem[] | undefined) =>
+  normalizeChecklistItems(items)
+    .filter((item) => !item.completed)
+    .map((item) => ({ ...item, completed: false }))
+
+const selectLatestDailyUpdate = (updates: DailyUpdate[]) => {
+  if (updates.length === 0) return null
+
+  return updates.reduce((latest, candidate) => {
+    if (candidate.date > latest.date) {
+      return candidate
+    }
+    if (candidate.date < latest.date) {
+      return latest
+    }
+
+    const latestTimestamp = Date.parse(latest.lastUpdated)
+    const candidateTimestamp = Date.parse(candidate.lastUpdated)
+    if (Number.isFinite(candidateTimestamp) && Number.isFinite(latestTimestamp)) {
+      return candidateTimestamp >= latestTimestamp ? candidate : latest
+    }
+
+    return candidate
+  })
 }
 
 const getNormalAaDo2 = (age: number): number => {
@@ -327,6 +363,7 @@ function App() {
   const [dailyDate, setDailyDate] = useState(() => toLocalISODate())
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
+  const [dailyChecklistDraft, setDailyChecklistDraft] = useState('')
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
@@ -1118,8 +1155,15 @@ function App() {
   const loadDailyUpdate = async (patientId: number, date: string) => {
     const update = await db.dailyUpdates.where('[patientId+date]').equals([patientId, date]).first()
     if (!update) {
+      const priorUpdates = (await db.dailyUpdates.where('patientId').equals(patientId).toArray())
+        .filter((entry) => entry.date < date)
+      const latestPriorUpdate = selectLatestDailyUpdate(priorUpdates)
       setDailyUpdateId(undefined)
-      setDailyUpdateForm(initialDailyUpdateForm)
+      setDailyUpdateForm({
+        ...initialDailyUpdateForm,
+        checklist: toPendingChecklistItems(latestPriorUpdate?.checklist),
+      })
+      setDailyChecklistDraft('')
       setDailyDirty(false)
       return
     }
@@ -1138,7 +1182,9 @@ function App() {
       other: update.other,
       assessment: update.assessment,
       plans: update.plans,
+      checklist: normalizeChecklistItems(update.checklist),
     })
+    setDailyChecklistDraft('')
     setDailyDirty(false)
   }
 
@@ -1156,7 +1202,9 @@ function App() {
       other: update.other,
       assessment: update.assessment,
       plans: update.plans,
+      checklist: toPendingChecklistItems(update.checklist),
     })
+    setDailyChecklistDraft('')
     setDailyDirty(true)
   }, [])
 
@@ -1169,22 +1217,11 @@ function App() {
       return
     }
 
-    const latestUpdate = updates.reduce((latest, candidate) => {
-      if (candidate.date > latest.date) {
-        return candidate
-      }
-      if (candidate.date < latest.date) {
-        return latest
-      }
-
-      const latestTimestamp = Date.parse(latest.lastUpdated)
-      const candidateTimestamp = Date.parse(candidate.lastUpdated)
-      if (Number.isFinite(candidateTimestamp) && Number.isFinite(latestTimestamp)) {
-        return candidateTimestamp >= latestTimestamp ? candidate : latest
-      }
-
-      return candidate
-    })
+    const latestUpdate = selectLatestDailyUpdate(updates)
+    if (!latestUpdate) {
+      setNotice('No saved daily entry to copy yet.')
+      return
+    }
 
     setPendingLatestDailyUpdate(latestUpdate)
     setCopyLatestConfirmOpen(true)
@@ -1350,6 +1387,52 @@ function App() {
     setOrderForm((previous) => ({ ...previous, [field]: value }))
     setOrderDirty(true)
   }, [])
+
+  const addDailyChecklistItem = useCallback(() => {
+    const nextText = dailyChecklistDraft.trim()
+    if (!nextText) return
+
+    setDailyUpdateForm((previous) => ({
+      ...previous,
+      checklist: [...previous.checklist, { text: nextText, completed: false }],
+    }))
+    setDailyChecklistDraft('')
+    setDailyDirty(true)
+  }, [dailyChecklistDraft])
+
+  const updateDailyChecklistItemCompletion = useCallback((index: number, completed: boolean) => {
+    setDailyUpdateForm((previous) => ({
+      ...previous,
+      checklist: previous.checklist.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, completed } : item
+      )),
+    }))
+    setDailyDirty(true)
+  }, [])
+
+  const removeDailyChecklistItem = useCallback((index: number) => {
+    setDailyUpdateForm((previous) => ({
+      ...previous,
+      checklist: previous.checklist.filter((_, itemIndex) => itemIndex !== index),
+    }))
+    setDailyDirty(true)
+  }, [])
+
+  const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
+    <div key={`checklist-${index}`} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
+      <input
+        type='checkbox'
+        className='mt-1 h-4 w-4 accent-action-primary'
+        checked={item.completed}
+        onChange={(event) => updateDailyChecklistItemCompletion(index, event.target.checked)}
+        aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
+      />
+      <p className={`flex-1 whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
+        Remove
+      </Button>
+    </div>
+  ), [removeDailyChecklistItem, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -1551,6 +1634,7 @@ function App() {
           patientId: selectedPatientId,
           date: dailyDate,
           ...dailyUpdateForm,
+          checklist: normalizeChecklistItems(dailyUpdateForm.checklist),
           lastUpdated: new Date().toISOString(),
         })
         await touchPatientLastModified(selectedPatientId)
@@ -2506,6 +2590,10 @@ function App() {
         other: 'Ambulates with minimal assistance; tolerates soft diet.',
         assessment: 'CAP, clinically improving with stable cardiorespiratory parameters.',
         plans: 'Continue current antibiotics today then reassess de-escalation.\nRepeat CBC/electrolytes tomorrow.\nCoordinate discharge planning once clinically stable.',
+        checklist: [
+          { text: 'Repeat CBC/electrolytes tomorrow morning.', completed: false },
+          { text: 'Chest CT with contrast', completed: true },
+        ],
         lastUpdated: now,
       })
 
@@ -2777,6 +2865,16 @@ function App() {
     ? `${selectedPatient.roomNumber} - ${selectedPatient.lastName}`
     : 'Patient'
   const canShowFocusedPatientNavButton = selectedPatient?.status === 'active'
+  const dailyChecklistSections = useMemo(() =>
+    dailyUpdateForm.checklist.reduce<{ pending: Array<{ item: DailyChecklistItem; index: number }>; completed: Array<{ item: DailyChecklistItem; index: number }> }>((accumulator, item, index) => {
+      if (item.completed) {
+        accumulator.completed.push({ item, index })
+      } else {
+        accumulator.pending.push({ item, index })
+      }
+      return accumulator
+    }, { pending: [], completed: [] }),
+  [dailyUpdateForm.checklist])
 
   return (
     <div className='min-h-screen pb-20 sm:pb-0'>
@@ -3139,32 +3237,6 @@ function App() {
                       />
                     </div>
                     <div className='space-y-1'>
-                      <Label htmlFor='profile-plans'>Plans</Label>
-                      <PhotoMentionField
-                        ariaLabel='Plans'
-                        placeholder='Plans'
-                        className='min-h-24'
-                        value={profileForm.plans}
-                        onChange={(nextValue) => updateProfileField('plans', nextValue)}
-                        attachments={mentionableAttachments}
-                        attachmentByTitle={mentionableAttachmentByTitle}
-                        onOpenPhotoById={openPhotoById}
-                      />
-                    </div>
-                    <div className='space-y-1'>
-                      <Label htmlFor='profile-pendings'>Pendings</Label>
-                      <PhotoMentionField
-                        ariaLabel='Pendings'
-                        placeholder='Pendings'
-                        className='min-h-24'
-                        value={profileForm.pendings}
-                        onChange={(nextValue) => updateProfileField('pendings', nextValue)}
-                        attachments={mentionableAttachments}
-                        attachmentByTitle={mentionableAttachmentByTitle}
-                        onOpenPhotoById={openPhotoById}
-                      />
-                    </div>
-                    <div className='space-y-1'>
                       <Label htmlFor='profile-clerknotes'>Clerk notes</Label>
                       <PhotoMentionField
                         ariaLabel='Clerk notes'
@@ -3245,7 +3317,7 @@ function App() {
                         <p className='text-xs text-clay'>No saved daily entries yet.</p>
                       )}
                     </div>
-                    <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) from the latest saved date.</p>
+                    <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date.</p>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
                       <PhotoMentionField
@@ -3425,6 +3497,33 @@ function App() {
                         attachmentByTitle={mentionableAttachmentByTitle}
                         onOpenPhotoById={openPhotoById}
                       />
+                    </div>
+                    <div className='space-y-2'>
+                      <Label>Checklist</Label>
+                      <div className='flex flex-wrap gap-2'>
+                        <Input
+                          value={dailyChecklistDraft}
+                          onChange={(event) => setDailyChecklistDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              addDailyChecklistItem()
+                            }
+                          }}
+                          placeholder='Add checklist item'
+                          aria-label='Add checklist item'
+                        />
+                        <Button type='button' variant='secondary' onClick={addDailyChecklistItem}>
+                          Add item
+                        </Button>
+                      </div>
+                      <div className='space-y-2'>
+                        {dailyChecklistSections.pending.map(({ item, index }) => renderDailyChecklistItem(item, index))}
+                        {dailyChecklistSections.completed.map(({ item, index }) => renderDailyChecklistItem(item, index))}
+                        {dailyUpdateForm.checklist.length === 0 && (
+                          <p className='text-xs text-clay'>No checklist items yet.</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -4531,7 +4630,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields and plan. Tap Copy latest entry to carry forward yesterday\'s note.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -4548,8 +4647,8 @@ function App() {
                 <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Patient tabs</p>
                 <div className='grid grid-cols-2 gap-1.5'>
                   {([
-                    ['Profile', 'Demographics, diagnosis, clinical summary, HPI, PMH, PE, plans, pendings'],
-                    ['FRICH', 'Date-based F-R-I-C-H-M-O-N-D daily notes, assessment & plan'],
+                    ['Profile', 'Demographics, diagnosis, clinical summary, HPI, PMH, PE, meds, labs, and clerk notes'],
+                    ['FRICH', 'Date-based F-R-I-C-H-M-O-N-D daily notes, assessment, plan, and checklist'],
                     ['Vitals', 'Structured BP/HR/RR/Temp/SpO2 log with date & time entries'],
                     ['Labs', 'CBC, UA, Blood Chem, ABG templates + free-text with date/time'],
                     ['Meds', 'Structured medication list: drug, dose, route, frequency, status'],
@@ -4864,6 +4963,7 @@ function App() {
               <strong className='block text-center'>{dailyDate}</strong>
               and replace it with a duplicate of
               <strong className='block text-center'>{pendingLatestDailyUpdate?.date ?? '-'}?</strong>
+              <span className='mt-2 block text-xs text-clay'>Completed checklist items stay on their original date and are not copied.</span>
             </p>
             <div className='flex gap-2 flex-wrap justify-center'>
               <Button variant='destructive' onClick={confirmCopyLatestDailyUpdate}>Yes, replace entry</Button>
