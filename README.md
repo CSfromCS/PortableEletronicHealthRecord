@@ -84,7 +84,8 @@ Each open patient has eight focused tabs:
 ### Settings
 
 - **Backup / restore** — export all text data as JSON; import replaces text data while keeping current on-device photos.
-- **Encrypted sync (optional)** — link devices with a shared room code and device tag, then sync encrypted patients + FRICHMOND updates through the configured proxy endpoint.
+- **Encrypted sync (optional)** — link devices with a shared room code and distinct device names, then sync encrypted patients + FRICHMOND updates through the configured proxy endpoint.
+- **Sync status panel** — view latest room upload time/device and whether this device has local unsynced changes.
 - **Review all photos** — open a global photo manager that marks each photo as linked/orphan and supports reassign, delete, and export.
 - **Clear discharged patients** — bulk-remove patients marked as discharged.
 - **Show onboarding** — reopen the Welcome modal and retry the install prompt at any time.
@@ -254,6 +255,7 @@ Then do a quick manual smoke test:
 - JSON backup/restore covers **text data only** — photo attachments are not included.
 - Import keeps currently stored photos; it does not recreate photos from the backup file.
 - Sync currently covers `patients` and `dailyUpdates` tables only.
+- Conflict protection triggers whenever remote data is newer and local data also changed since last sync (including same-tag/device-name edge cases).
 - Offline support depends on the PWA service worker being registered on first load while online.
 
 ---

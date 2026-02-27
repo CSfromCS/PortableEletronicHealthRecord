@@ -89,6 +89,7 @@ import { VersionPickerDialog } from './features/sync/VersionPickerDialog'
 import {
   buildSyncConfig,
   getDefaultSyncEndpoint,
+  getSyncInsight,
   readSyncConfig,
   resolveConflictKeepLocal,
   resolveConflictWithVersion,
@@ -96,6 +97,7 @@ import {
   syncNow,
   type ConflictResult,
   type SyncConfig,
+  type SyncInsight,
   type SyncNowResult,
   type SyncVersion,
 } from './features/sync/syncService'
@@ -386,6 +388,8 @@ function App() {
   const [conflictVersions, setConflictVersions] = useState<SyncVersion[]>([])
   const [selectedConflictVersion, setSelectedConflictVersion] = useState('local')
   const [syncConflictOpen, setSyncConflictOpen] = useState(false)
+  const [syncInsight, setSyncInsight] = useState<SyncInsight | null>(null)
+  const [isSyncInsightLoading, setIsSyncInsightLoading] = useState(false)
   const touchPatientLastModified = useCallback(async (patientId?: number | null) => {
     if (patientId === undefined || patientId === null) return
     await db.patients.update(patientId, { lastModified: new Date().toISOString() })
@@ -413,11 +417,84 @@ function App() {
     return 'other'
   }, [])
   const patients = useLiveQuery(() => db.patients.toArray(), [])
+  const allDailyUpdates = useLiveQuery(() => db.dailyUpdates.toArray(), [])
   const allVitals = useLiveQuery(() => db.vitals.toArray(), [])
   const medications = useLiveQuery(() => db.medications.toArray(), [])
   const labs = useLiveQuery(() => db.labs.toArray(), [])
   const orders = useLiveQuery(() => db.orders.toArray(), [])
   const photoAttachments = useLiveQuery(() => db.photoAttachments.toArray(), [])
+  const refreshSyncInsight = useCallback(async (config: SyncConfig | null) => {
+    if (!config) {
+      setSyncInsight(null)
+      setIsSyncInsightLoading(false)
+      return
+    }
+
+    setIsSyncInsightLoading(true)
+    try {
+      const insight = await getSyncInsight(config)
+      setSyncInsight(insight)
+    } catch {
+      setSyncInsight(null)
+    } finally {
+      setIsSyncInsightLoading(false)
+    }
+  }, [])
+
+  const latestLocalChangeAt = useMemo(() => {
+    let latestTimestamp = 0
+
+    for (const patient of patients ?? []) {
+      const parsed = Date.parse(patient.lastModified ?? '')
+      if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+        latestTimestamp = parsed
+      }
+    }
+
+    for (const dailyUpdate of allDailyUpdates ?? []) {
+      const parsed = Date.parse(dailyUpdate.lastUpdated)
+      if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+        latestTimestamp = parsed
+      }
+    }
+
+    return latestTimestamp > 0 ? new Date(latestTimestamp).toISOString() : null
+  }, [allDailyUpdates, patients])
+
+  const hasLocalChangesSinceLastSync = useMemo(() => {
+    const lastSyncedMs = syncConfig?.lastSyncedAt ? Date.parse(syncConfig.lastSyncedAt) : Number.NaN
+    const latestLocalMs = latestLocalChangeAt ? Date.parse(latestLocalChangeAt) : Number.NaN
+
+    return Number.isFinite(lastSyncedMs)
+      ? Number.isFinite(latestLocalMs) && latestLocalMs > lastSyncedMs
+      : Number.isFinite(latestLocalMs)
+  }, [latestLocalChangeAt, syncConfig?.lastSyncedAt])
+
+  const formatSyncDateTime = useCallback((isoString: string | null | undefined) => {
+    if (!isoString) return '—'
+
+    const date = new Date(isoString)
+    if (Number.isNaN(date.getTime())) return '—'
+
+    return date.toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }, [])
+
+  const latestUploadOwnerLabel = useMemo(() => {
+    if (!syncInsight?.remoteLatestPushedBy) return '—'
+    return syncInsight.remoteLatestPushedBy === syncConfig?.deviceTag
+      ? `${syncInsight.remoteLatestPushedBy} (this device)`
+      : syncInsight.remoteLatestPushedBy
+  }, [syncConfig?.deviceTag, syncInsight?.remoteLatestPushedBy])
+
+  useEffect(() => {
+    void refreshSyncInsight(syncConfig)
+  }, [refreshSyncInsight, syncConfig])
+
   const savedDailyEntryDates = useLiveQuery(async () => {
     if (selectedPatientId === null) return [] as string[]
 
@@ -2041,10 +2118,11 @@ function App() {
     setSyncStatus('success')
     setNotice(message)
     resetFocusedEditorState()
+    void refreshSyncInsight(nextConfig)
     window.setTimeout(() => {
       setSyncStatus((currentStatus) => (currentStatus === 'success' ? 'idle' : currentStatus))
     }, 3000)
-  }, [resetFocusedEditorState])
+  }, [refreshSyncInsight, resetFocusedEditorState])
 
   const runSyncNow = useCallback(async () => {
     if (!syncConfig) {
@@ -2068,6 +2146,7 @@ function App() {
         setSyncConflictOpen(true)
         setSyncStatus('conflict')
         setNotice('Sync conflict detected. Pick a version to keep.')
+        void refreshSyncInsight(result.config)
         return
       }
 
@@ -2076,10 +2155,11 @@ function App() {
       const message = error instanceof Error ? error.message : 'Sync failed.'
       setSyncStatus('error')
       setNotice(message)
+      void refreshSyncInsight(syncConfig)
     } finally {
       setIsSyncBusy(false)
     }
-  }, [applySyncResult, isSyncBusy, syncConfig])
+  }, [applySyncResult, isSyncBusy, refreshSyncInsight, syncConfig])
 
   const handleSyncSetupSubmit = useCallback(async ({ roomCode, deviceName }: { roomCode: string; deviceName: SetupDeviceName }) => {
     const nextConfig = await buildSyncConfig(roomCode, deviceName, getDefaultSyncEndpoint())
@@ -2099,6 +2179,7 @@ function App() {
         setSyncConflictOpen(true)
         setSyncStatus('conflict')
         setNotice('Sync conflict detected. Pick a version to keep.')
+        void refreshSyncInsight(result.config)
         return
       }
 
@@ -2107,10 +2188,11 @@ function App() {
       const message = error instanceof Error ? error.message : 'Unable to set up sync.'
       setSyncStatus('error')
       setNotice(message)
+      void refreshSyncInsight(nextConfig)
     } finally {
       setIsSyncBusy(false)
     }
-  }, [applySyncResult])
+  }, [applySyncResult, refreshSyncInsight])
 
   const resolveSyncConflict = useCallback(async () => {
     if (!syncConfig || isSyncBusy) return
@@ -2131,10 +2213,11 @@ function App() {
       const message = error instanceof Error ? error.message : 'Unable to resolve conflict.'
       setSyncStatus('error')
       setNotice(message)
+      void refreshSyncInsight(syncConfig)
     } finally {
       setIsSyncBusy(false)
     }
-  }, [applySyncResult, isSyncBusy, selectedConflictVersion, syncConfig])
+  }, [applySyncResult, isSyncBusy, refreshSyncInsight, selectedConflictVersion, syncConfig])
 
   const exportBackup = async () => {
     const payload: BackupPayload = {
@@ -4260,6 +4343,31 @@ function App() {
               </CardTitle>
             </CardHeader>
             <CardContent className='px-4 pb-4 space-y-5'>
+              <div className='space-y-2'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-clay/55'>Sync Status</p>
+                <div className='rounded-xl border border-clay/25 bg-warm-ivory px-3.5 py-3 space-y-2'>
+                  <div className='flex flex-wrap gap-1.5'>
+                    <Badge className={hasLocalChangesSinceLastSync ? 'bg-action-primary/15 text-action-primary border-action-primary/30' : 'bg-action-edit/15 text-action-edit border-action-edit/30'}>
+                      {hasLocalChangesSinceLastSync ? 'Local changes pending upload' : 'No local pending changes'}
+                    </Badge>
+                    <Badge className={syncInsight?.remoteHasNewerData ? 'bg-blush-sand text-espresso border-clay/30' : 'bg-action-edit/15 text-action-edit border-action-edit/30'}>
+                      {syncInsight?.remoteHasNewerData ? 'Room has newer upload' : 'Room upload is up to date'}
+                    </Badge>
+                    {isSyncInsightLoading ? (
+                      <Badge className='bg-clay/15 text-clay border-clay/30'>Checking room status…</Badge>
+                    ) : null}
+                  </div>
+
+                  <div className='grid gap-1.5 text-xs text-espresso'>
+                    <p><strong>Device:</strong> {syncConfig?.deviceTag ?? 'Not configured'}</p>
+                    <p><strong>Last successful sync:</strong> {formatSyncDateTime(syncConfig?.lastSyncedAt)}</p>
+                    <p><strong>Latest local change:</strong> {formatSyncDateTime(latestLocalChangeAt)}</p>
+                    <p><strong>Latest room upload:</strong> {formatSyncDateTime(syncInsight?.remoteLatestPushAt)}</p>
+                    <p><strong>Latest upload by:</strong> {latestUploadOwnerLabel}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Data management */}
               <div className='space-y-2'>
                 <p className='text-[11px] font-bold uppercase tracking-widest text-clay/55'>Data Management</p>
@@ -4469,11 +4577,12 @@ function App() {
                 <ol className='space-y-2'>
                   {([
                     ['Prepare both devices', 'Open PUHRR on both devices and make sure both are connected to the internet during sync.'],
-                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop).'],
+                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop). Keep names distinct to avoid accidental overwrite behavior.'],
                     ['Edit sync identity', 'Open Settings → Edit sync settings any time to change this device\'s room code or device name.'],
                     ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
+                    ['Check sync status', 'Open Settings → Sync Status to confirm latest room upload time, which device uploaded it, and whether this device has local unsynced changes.'],
                     ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. The status indicator shows syncing, success, conflict, or error.'],
-                    ['If conflict appears', 'A version picker opens when both devices changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
+                    ['If conflict appears', 'A version picker opens whenever remote data is newer and this device also changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
                     ['Keep backup safety', 'Sync excludes photos. Continue exporting JSON backup regularly from Settings, especially before device/browser changes.'],
                   ] as [string, string][]).map(([title, detail], i) => (
                     <li key={i} className='flex gap-2.5 items-start'>

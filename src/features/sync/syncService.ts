@@ -43,6 +43,17 @@ export type SyncVersion = {
   sizeBytes: number
 }
 
+const isSyncVersion = (value: unknown): value is SyncVersion => {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Record<string, unknown>
+  return (
+    typeof candidate.sha === 'string'
+    && typeof candidate.pushedAt === 'string'
+    && typeof candidate.deviceTag === 'string'
+    && typeof candidate.sizeBytes === 'number'
+  )
+}
+
 export type SyncConfig = {
   roomCode: string
   roomHash: string
@@ -69,6 +80,14 @@ export type ConflictResult = {
 }
 
 export type SyncNowResult = SyncResult | ConflictResult
+
+export type SyncInsight = {
+  localLatestChangeAt: string | null
+  remoteLatestPushAt: string | null
+  remoteLatestPushedBy: string | null
+  hasLocalChangesSinceLastSync: boolean
+  remoteHasNewerData: boolean
+}
 
 const normalizeSyncEndpoint = (endpoint?: string): string => {
   if (!endpoint || !endpoint.trim()) {
@@ -223,7 +242,9 @@ const findRoomGist = async (config: SyncConfig): Promise<string | null> => {
     const response = await fetchJson<SyncPushResponse>(
       `${config.syncEndpoint}/api/sync/find?roomTag=${encodeURIComponent(config.roomTag)}`,
     )
-    return response.gistId
+    return typeof response.gistId === 'string' && response.gistId.length > 0
+      ? response.gistId
+      : null
   } catch {
     return null
   }
@@ -278,6 +299,10 @@ const pullSnapshot = async (config: SyncConfig, sha?: string): Promise<SyncPaylo
     throw new Error('Remote payload format is invalid.')
   }
 
+  if (payload.version !== SYNC_DATA_VERSION) {
+    throw new Error('Remote payload version is unsupported. Please update PUHRR on both devices.')
+  }
+
   return payload
 }
 
@@ -297,11 +322,70 @@ const getRemoteVersions = async (config: SyncConfig, count = 5): Promise<SyncVer
   if (!config.gistId) return []
 
   try {
-    return await fetchJson<SyncVersion[]>(
+    const response = await fetchJson<unknown>(
       `${config.syncEndpoint}/api/sync/versions?gistId=${encodeURIComponent(config.gistId)}&count=${count}`,
     )
+
+    if (!Array.isArray(response)) return []
+
+    return response
+      .filter(isSyncVersion)
+      .sort((first, second) => second.pushedAt.localeCompare(first.pushedAt))
   } catch {
     return []
+  }
+}
+
+export const getSyncInsight = async (currentConfig: SyncConfig): Promise<SyncInsight> => {
+  const config = {
+    ...currentConfig,
+    syncEndpoint: normalizeSyncEndpoint(currentConfig.syncEndpoint),
+  }
+
+  const localLatestChangeAt = await getLatestLocalChangeAt()
+  const localLatestMs = localLatestChangeAt ? Date.parse(localLatestChangeAt) : Number.NaN
+  const lastSyncedMs = config.lastSyncedAt ? Date.parse(config.lastSyncedAt) : Number.NaN
+
+  const hasLocalChangesSinceLastSync = Number.isFinite(lastSyncedMs)
+    ? Number.isFinite(localLatestMs) && localLatestMs > lastSyncedMs
+    : Number.isFinite(localLatestMs)
+
+  if (!config.gistId) {
+    return {
+      localLatestChangeAt,
+      remoteLatestPushAt: null,
+      remoteLatestPushedBy: null,
+      hasLocalChangesSinceLastSync,
+      remoteHasNewerData: false,
+    }
+  }
+
+  const remoteCheck = await checkRemote(config)
+  if (!remoteCheck) {
+    return {
+      localLatestChangeAt,
+      remoteLatestPushAt: null,
+      remoteLatestPushedBy: null,
+      hasLocalChangesSinceLastSync,
+      remoteHasNewerData: false,
+    }
+  }
+
+  const remoteDescription = parseDescription(remoteCheck.description)
+  const remoteLatestPushAt = remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt
+  const remoteLatestPushedBy = remoteDescription?.lastPushedBy ?? null
+  const remoteLatestMs = Date.parse(remoteLatestPushAt)
+
+  const remoteHasNewerData = Number.isFinite(lastSyncedMs)
+    ? Number.isFinite(remoteLatestMs) && remoteLatestMs > lastSyncedMs
+    : Number.isFinite(remoteLatestMs)
+
+  return {
+    localLatestChangeAt,
+    remoteLatestPushAt,
+    remoteLatestPushedBy,
+    hasLocalChangesSinceLastSync,
+    remoteHasNewerData,
   }
 }
 
@@ -401,9 +485,12 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
   }
 
   const remoteDescription = parseDescription(remoteCheck.description)
+  if (remoteDescription && remoteDescription.roomTag !== linkedConfig.roomTag) {
+    throw new Error('Remote sync room does not match this room code.')
+  }
+
   const remotePushedAt = remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt
   const remoteDeviceTag = remoteDescription?.lastPushedBy ?? ''
-  const remoteIsOtherDevice = remoteDeviceTag.length > 0 && remoteDeviceTag !== linkedConfig.deviceTag
 
   const lastSyncedMs = linkedConfig.lastSyncedAt ? Date.parse(linkedConfig.lastSyncedAt) : Number.NaN
   const remotePushedMs = Date.parse(remotePushedAt)
@@ -418,14 +505,14 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
     ? Number.isFinite(remotePushedMs) && remotePushedMs > lastSyncedMs
     : Number.isFinite(remotePushedMs)
 
-  if (remoteIsOtherDevice && remoteIsNewSinceLastSync) {
+  if (remoteIsNewSinceLastSync) {
     if (hasLocalChangesSinceLastSync) {
       const versions = await getRemoteVersions(linkedConfig, 5)
       return {
         kind: 'conflict',
         config: linkedConfig,
         versions,
-        remoteDeviceTag: remoteDeviceTag || 'another device',
+        remoteDeviceTag: remoteDeviceTag || 'remote room version',
         remotePushedAt,
       }
     }
