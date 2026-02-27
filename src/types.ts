@@ -1,5 +1,6 @@
 export interface Patient {
   id?: number
+  lastModified: string
   roomNumber: string
   lastName: string
   firstName: string

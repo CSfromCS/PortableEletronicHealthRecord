@@ -83,6 +83,20 @@ import {
   formatPhotoCategory,
   getPhotoGroupKey,
 } from './features/photos/photoUtils'
+import { SyncButton, type SyncStatus } from './features/sync/SyncButton'
+import { SyncSetupDialog, type SetupDeviceName } from './features/sync/SyncSetupDialog'
+import { VersionPickerDialog } from './features/sync/VersionPickerDialog'
+import {
+  buildSyncConfig,
+  getDefaultSyncEndpoint,
+  readSyncConfig,
+  resolveConflictKeepLocal,
+  resolveConflictWithVersion,
+  saveSyncConfig,
+  syncNow,
+  type SyncConfig,
+  type SyncVersion,
+} from './features/sync/syncService'
 import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Expand, Minimize2 } from 'lucide-react'
 
 type PatientFormState = {
@@ -351,6 +365,13 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const onboardingAutoInstallAttemptedRef = useRef(false)
   const [deferredInstallPromptEvent, setDeferredInstallPromptEvent] = useState<InstallPromptEvent | null>(null)
+  const [syncConfig, setSyncConfig] = useState<SyncConfig | null>(() => readSyncConfig())
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => (readSyncConfig() ? 'idle' : 'not-configured'))
+  const [syncSetupOpen, setSyncSetupOpen] = useState(false)
+  const [isSyncBusy, setIsSyncBusy] = useState(false)
+  const [conflictVersions, setConflictVersions] = useState<SyncVersion[]>([])
+  const [selectedConflictVersion, setSelectedConflictVersion] = useState('local')
+  const [syncConflictOpen, setSyncConflictOpen] = useState(false)
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const isStandaloneDisplayMode = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -959,6 +980,7 @@ function App() {
     if (!Number.isFinite(age)) return
 
     const patientPayload: Omit<Patient, 'id'> = {
+      lastModified: new Date().toISOString(),
       roomNumber: form.roomNumber.trim(),
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -1091,6 +1113,7 @@ function App() {
 
       try {
         await db.patients.update(selectedPatientId, {
+          lastModified: new Date().toISOString(),
           roomNumber: profileForm.roomNumber.trim(),
           firstName: profileForm.firstName.trim(),
           lastName: profileForm.lastName.trim(),
@@ -1945,6 +1968,135 @@ function App() {
     setLabTemplateValues({})
     setLabTemplateNote('')
   }
+
+  const resetFocusedEditorState = useCallback(() => {
+    setSelectedPatientId(null)
+    setView('patients')
+    setDailyUpdateId(undefined)
+    setDailyUpdateForm(initialDailyUpdateForm)
+    setVitalForm(initialVitalForm())
+    setEditingVitalId(null)
+    setVitalDraftId(null)
+    setVitalDirty(false)
+    setMedicationForm(initialMedicationForm())
+    setEditingMedicationId(null)
+    setOrderForm(initialOrderForm())
+    setEditingOrderId(null)
+    setOrderDraftId(null)
+    setOrderDirty(false)
+    setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
+    setLabTemplateDate(toLocalISODate())
+    setLabTemplateTime(toLocalTime())
+    setLabTemplateValues({})
+    setLabTemplateNote('')
+    setEditingLabId(null)
+    setAttachmentCategory('profile')
+    setAttachmentFilter('all')
+    setAttachmentTitle(buildDefaultPhotoTitle('profile'))
+    setSelectedAttachmentId(null)
+    setProfileForm(initialProfileForm)
+    setLastSavedAt(null)
+  }, [])
+
+  const applySyncResult = useCallback((nextConfig: SyncConfig, message: string) => {
+    saveSyncConfig(nextConfig)
+    setSyncConfig(nextConfig)
+    setSyncStatus('success')
+    setNotice(message)
+    resetFocusedEditorState()
+    window.setTimeout(() => {
+      setSyncStatus((currentStatus) => (currentStatus === 'success' ? 'idle' : currentStatus))
+    }, 3000)
+  }, [resetFocusedEditorState])
+
+  const runSyncNow = useCallback(async () => {
+    if (!syncConfig) {
+      setSyncSetupOpen(true)
+      return
+    }
+
+    if (isSyncBusy) return
+
+    setIsSyncBusy(true)
+    setSyncStatus('syncing')
+
+    try {
+      const result = await syncNow(syncConfig)
+
+      if ('kind' in result && result.kind === 'conflict') {
+        setSyncConfig(result.config)
+        setConflictVersions(result.versions)
+        setSelectedConflictVersion('local')
+        setSyncConflictOpen(true)
+        setSyncStatus('conflict')
+        setNotice('Sync conflict detected. Pick a version to keep.')
+        return
+      }
+
+      applySyncResult(result.config, result.message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync failed.'
+      setSyncStatus('error')
+      setNotice(message)
+    } finally {
+      setIsSyncBusy(false)
+    }
+  }, [applySyncResult, isSyncBusy, syncConfig])
+
+  const handleSyncSetupSubmit = useCallback(async ({ roomCode, deviceName }: { roomCode: string; deviceName: SetupDeviceName }) => {
+    const nextConfig = await buildSyncConfig(roomCode, deviceName, getDefaultSyncEndpoint())
+    saveSyncConfig(nextConfig)
+    setSyncConfig(nextConfig)
+    setSyncStatus('idle')
+    setNotice(`Sync configured for ${nextConfig.deviceTag}.`)
+
+    setIsSyncBusy(true)
+    setSyncStatus('syncing')
+    try {
+      const result = await syncNow(nextConfig)
+      if ('kind' in result && result.kind === 'conflict') {
+        setSyncConfig(result.config)
+        setConflictVersions(result.versions)
+        setSelectedConflictVersion('local')
+        setSyncConflictOpen(true)
+        setSyncStatus('conflict')
+        setNotice('Sync conflict detected. Pick a version to keep.')
+        return
+      }
+
+      applySyncResult(result.config, result.message)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to set up sync.'
+      setSyncStatus('error')
+      setNotice(message)
+    } finally {
+      setIsSyncBusy(false)
+    }
+  }, [applySyncResult])
+
+  const resolveSyncConflict = useCallback(async () => {
+    if (!syncConfig || isSyncBusy) return
+
+    setIsSyncBusy(true)
+    setSyncStatus('syncing')
+
+    try {
+      const result = selectedConflictVersion === 'local'
+        ? await resolveConflictKeepLocal(syncConfig)
+        : await resolveConflictWithVersion(syncConfig, selectedConflictVersion)
+
+      setSyncConflictOpen(false)
+      setConflictVersions([])
+      setSelectedConflictVersion('local')
+      applySyncResult(result.config, 'Conflict resolved and sync completed.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to resolve conflict.'
+      setSyncStatus('error')
+      setNotice(message)
+    } finally {
+      setIsSyncBusy(false)
+    }
+  }, [applySyncResult, isSyncBusy, selectedConflictVersion, syncConfig])
 
   const exportBackup = async () => {
     const payload: BackupPayload = {
@@ -4237,6 +4389,26 @@ function App() {
                     </li>
                   ))}
                 </ul>
+              </div>
+
+              {/* Sync between devices */}
+              <div className='px-4 py-3 space-y-2.5 border-b border-clay/15'>
+                <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Sync between devices</p>
+                <ol className='space-y-2'>
+                  {([
+                    ['Prepare both devices', 'Open PUHRR on both devices and make sure both are connected to the internet during sync.'],
+                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop).'],
+                    ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
+                    ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. The status indicator shows syncing, success, conflict, or error.'],
+                    ['If conflict appears', 'A version picker opens when both devices changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
+                    ['Keep backup safety', 'Sync excludes photos. Continue exporting JSON backup regularly from Settings, especially before device/browser changes.'],
+                  ] as [string, string][]).map(([title, detail], i) => (
+                    <li key={i} className='flex gap-2.5 items-start'>
+                      <span className='shrink-0 w-5 h-5 rounded-full bg-action-primary/15 text-action-primary text-[10px] font-bold flex items-center justify-center mt-0.5'>{i + 1}</span>
+                      <span className='text-xs text-espresso leading-relaxed'><strong>{title}:</strong> {detail}</span>
+                    </li>
+                  ))}
+                </ol>
               </div>
 
               {/* Data & saving */}
