@@ -2726,14 +2726,16 @@ function App() {
           </div>
         </div>
 
-        <div className='mb-3 flex sm:hidden justify-end'>
-          <SyncButton
-            status={syncStatus}
-            onClick={() => void runSyncNow()}
-            disabled={isSyncBusy}
-            lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
-          />
-        </div>
+        {view == 'settings' ? (
+          <div className='mb-3 flex sm:hidden justify-end'>
+            <SyncButton
+              status={syncStatus}
+              onClick={() => void runSyncNow()}
+              disabled={isSyncBusy}
+              lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
+            />
+          </div>
+        ) : null}
 
         {view === 'patient' && selectedPatient ? (
           <div className='mb-3 h-px bg-linear-to-r from-transparent via-clay/20 to-transparent sm:hidden' aria-hidden='true' />
