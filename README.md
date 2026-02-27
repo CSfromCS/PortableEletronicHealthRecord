@@ -84,6 +84,7 @@ Each open patient has eight focused tabs:
 ### Settings
 
 - **Backup / restore** — export all text data as JSON; import replaces text data while keeping current on-device photos.
+- **Review all photos** — open a global photo manager that marks each photo as linked/orphan and supports reassign, delete, and export.
 - **Clear discharged patients** — bulk-remove patients marked as discharged.
 - **Show onboarding** — reopen the Welcome modal and retry the install prompt at any time.
 

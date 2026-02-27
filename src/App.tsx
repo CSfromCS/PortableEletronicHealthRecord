@@ -23,6 +23,7 @@ import type {
   VitalEntry,
 } from './types'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -247,6 +248,8 @@ type PhotoAttachmentGroup = {
   entries: Array<PhotoAttachment & { id: number }>
   totalByteSize: number
 }
+
+type ReviewablePhotoAttachment = PhotoAttachment & { id: number }
 
 type ActivePhotoMention = {
   start: number
@@ -849,6 +852,9 @@ function App() {
   const [isPhotoSaving, setIsPhotoSaving] = useState(false)
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<number | null>(null)
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<number, string>>({})
+  const [allAttachmentPreviewUrls, setAllAttachmentPreviewUrls] = useState<Record<number, string>>({})
+  const [showPhotoReviewDialog, setShowPhotoReviewDialog] = useState(false)
+  const [reassignTargetsByAttachmentId, setReassignTargetsByAttachmentId] = useState<Record<number, string>>({})
   const [selectedCensusPatientIds, setSelectedCensusPatientIds] = useState<number[]>([])
   const [reportVitalsDateFrom, setReportVitalsDateFrom] = useState(() => toLocalISODate())
   const [reportVitalsDateTo, setReportVitalsDateTo] = useState(() => toLocalISODate())
@@ -1269,6 +1275,21 @@ function App() {
     return structuredOrdersByPatient.get(selectedPatientId) ?? []
   }, [selectedPatientId, structuredOrdersByPatient])
 
+  const patientsById = useMemo(() => {
+    const map = new Map<number, Patient>()
+    ;(patients ?? []).forEach((patient) => {
+      if (patient.id === undefined) return
+      map.set(patient.id, patient)
+    })
+    return map
+  }, [patients])
+
+  const reviewablePhotoAttachments = useMemo(() => {
+    return (photoAttachments ?? [])
+      .filter((entry): entry is ReviewablePhotoAttachment => entry.id !== undefined)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }, [photoAttachments])
+
   const selectedPatientAllAttachments = useMemo(() => {
     if (selectedPatientId === null) return [] as PhotoAttachment[]
 
@@ -1356,6 +1377,18 @@ function App() {
       Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
     }
   }, [selectedPatientAllAttachments])
+
+  useEffect(() => {
+    const urls: Record<number, string> = {}
+    reviewablePhotoAttachments.forEach((entry) => {
+      urls[entry.id] = URL.createObjectURL(entry.imageBlob)
+    })
+    setAllAttachmentPreviewUrls(urls)
+
+    return () => {
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [reviewablePhotoAttachments])
 
   const selectedAttachmentCarousel = useMemo(() => {
     if (selectedAttachmentId === null) return null
@@ -1809,6 +1842,63 @@ function App() {
     }
     setNotice('Photo removed from app record.')
   }
+
+  const exportPhotoAttachment = useCallback((attachment: ReviewablePhotoAttachment) => {
+    const extensionByMimeType: Record<string, string> = {
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'image/webp': 'webp',
+      'image/heic': 'heic',
+      'image/heif': 'heif',
+    }
+
+    const inferredExtension = extensionByMimeType[attachment.mimeType] ?? 'bin'
+    const title = attachment.title.trim().length > 0 ? attachment.title.trim() : `photo-${attachment.id}`
+    const safeTitle = title.replace(/[^a-zA-Z0-9-_]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase() || `photo-${attachment.id}`
+    const fileName = `${safeTitle}.${inferredExtension}`
+    const url = URL.createObjectURL(attachment.imageBlob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = fileName
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setNotice('Photo exported.')
+  }, [])
+
+  const setPhotoReassignTarget = useCallback((attachmentId: number, patientId: string) => {
+    setReassignTargetsByAttachmentId((previous) => ({
+      ...previous,
+      [attachmentId]: patientId,
+    }))
+  }, [])
+
+  const reassignPhotoAttachment = useCallback(async (attachment: ReviewablePhotoAttachment) => {
+    const selectedTarget = reassignTargetsByAttachmentId[attachment.id]
+    if (!selectedTarget || selectedTarget === 'none') {
+      setNotice('Choose a patient first.')
+      return
+    }
+
+    const nextPatientId = Number.parseInt(selectedTarget, 10)
+    if (!Number.isFinite(nextPatientId)) {
+      setNotice('Invalid patient selection.')
+      return
+    }
+
+    const targetPatientExists = patientsById.has(nextPatientId)
+    if (!targetPatientExists) {
+      setNotice('Selected patient no longer exists.')
+      return
+    }
+
+    await db.photoAttachments.update(attachment.id, { patientId: nextPatientId })
+
+    if (selectedAttachmentId === attachment.id && selectedPatientId !== null && selectedPatientId !== nextPatientId) {
+      setSelectedAttachmentId(null)
+    }
+
+    setNotice('Photo reassigned.')
+  }, [patientsById, reassignTargetsByAttachmentId, selectedAttachmentId, selectedPatientId])
 
   const deletePhotoAttachmentGroup = async (group: PhotoAttachmentGroup) => {
     const attachmentIds = group.entries.map((entry) => entry.id)
@@ -4983,6 +5073,19 @@ function App() {
                   </button>
                   <button
                     type='button'
+                    onClick={() => setShowPhotoReviewDialog(true)}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-action-edit/10 flex items-center justify-center shrink-0'>
+                      <Camera className='h-4 w-4 text-action-edit' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Review all photos</p>
+                      <p className='text-xs text-clay mt-0.5'>Manage linked or orphan photos across all patients</p>
+                    </div>
+                  </button>
+                  <button
+                    type='button'
                     onClick={() => void clearDischargedPatients()}
                     className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-red-50 hover:bg-red-100 border border-action-danger/25 text-left transition-colors active:scale-[0.98]'
                   >
@@ -5105,6 +5208,7 @@ function App() {
                     'FRICH exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.',
                     'All patient exports: select and reorder active patients before generating Multiple Census or Multiple Vitals.',
                     'Photos: upload multiple images at once — they are grouped into one block. Tap the block to open a swipeable carousel.',
+                    'Settings → Review all photos lets you find linked/orphan photos and reassign, delete, or export each photo.',
                     'Orders: use Edit on any order to update its status (active, carried out, discontinued) or remove it.',
                     'The report preview popup supports manual text selection — select only what you need, or use Copy full text.',
                   ] as string[]).map((tip, i) => (
@@ -5230,6 +5334,116 @@ function App() {
                 </div>
               </>
             ) : null}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showPhotoReviewDialog} onOpenChange={setShowPhotoReviewDialog}>
+          <DialogContent className='flex flex-col gap-3 p-4 w-[95vw] max-w-5xl h-[85vh] max-h-[85vh]'>
+            <DialogHeader>
+              <DialogTitle>Review all photos</DialogTitle>
+            </DialogHeader>
+            <p className='text-sm text-clay'>Review linked and orphan photos across all patients. Reassign, delete, or export any photo.</p>
+            <ScrollArea className='flex-1 min-h-0 rounded border border-clay/25 bg-warm-ivory p-2'>
+              {reviewablePhotoAttachments.length > 0 ? (
+                <div className='space-y-2'>
+                  {reviewablePhotoAttachments.map((attachment) => {
+                    const linkedPatient = patientsById.get(attachment.patientId)
+                    const isOrphan = !linkedPatient
+                    const previewUrl = allAttachmentPreviewUrls[attachment.id]
+                    const selectedTarget = reassignTargetsByAttachmentId[attachment.id] ?? (linkedPatient ? `${linkedPatient.id}` : 'none')
+
+                    return (
+                      <div key={`review-photo-${attachment.id}`} className='rounded-lg border border-clay/30 bg-white p-2.5 space-y-2'>
+                        <div className='flex items-start justify-between gap-2'>
+                          <div>
+                            <p className='text-sm font-semibold text-espresso'>{attachment.title || `(No title) #${attachment.id}`}</p>
+                            <p className='text-xs text-clay'>
+                              {formatPhotoCategory(attachment.category)} • {formatBytes(attachment.byteSize)} • {new Date(attachment.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={isOrphan ? 'destructive' : 'secondary'}
+                            className={isOrphan ? 'bg-action-danger/90 text-white border-action-danger/90' : 'bg-action-edit/15 text-action-edit border-action-edit/30'}
+                          >
+                            {isOrphan ? 'Orphan' : 'Linked'}
+                          </Badge>
+                        </div>
+
+                        <div className='grid grid-cols-1 sm:grid-cols-[150px_1fr] gap-2'>
+                          <div className='rounded border border-clay/25 bg-warm-ivory overflow-hidden h-30'>
+                            {previewUrl ? (
+                              <img
+                                src={previewUrl}
+                                alt={attachment.title || 'Photo preview'}
+                                className='h-full w-full object-cover'
+                                loading='lazy'
+                              />
+                            ) : (
+                              <div className='h-full w-full flex items-center justify-center text-xs text-clay'>No preview</div>
+                            )}
+                          </div>
+                          <div className='space-y-2'>
+                            <p className='text-xs text-espresso'>
+                              {linkedPatient
+                                ? `Current patient: ${linkedPatient.roomNumber} — ${linkedPatient.lastName}, ${linkedPatient.firstName}`
+                                : `Current patient link missing (patientId ${attachment.patientId})`}
+                            </p>
+                            <div className='grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-end'>
+                              <div className='space-y-1'>
+                                <Label className='text-xs'>Reassign to patient</Label>
+                                <Select
+                                  value={selectedTarget}
+                                  onValueChange={(value) => setPhotoReassignTarget(attachment.id, value)}
+                                >
+                                  <SelectTrigger aria-label={`Reassign photo ${attachment.id}`}>
+                                    <SelectValue placeholder='Select patient' />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value='none'>Select patient</SelectItem>
+                                    {(patients ?? [])
+                                      .filter((patient): patient is Patient & { id: number } => patient.id !== undefined)
+                                      .map((patient) => (
+                                        <SelectItem key={`reassign-${attachment.id}-${patient.id}`} value={`${patient.id}`}>
+                                          {patient.roomNumber} — {patient.lastName}, {patient.firstName}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Button
+                                size='sm'
+                                variant='edit'
+                                disabled={selectedTarget === 'none' || (linkedPatient?.id !== undefined && `${linkedPatient.id}` === selectedTarget)}
+                                onClick={() => void reassignPhotoAttachment(attachment)}
+                              >
+                                Reassign
+                              </Button>
+                              <Button size='sm' variant='secondary' onClick={() => exportPhotoAttachment(attachment)}>
+                                Export
+                              </Button>
+                              <Button size='sm' variant='destructive' onClick={() => void deletePhotoAttachment(attachment.id)}>
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className='h-full min-h-56 flex flex-col items-center justify-center text-center'>
+                  <div className='h-12 w-12 rounded-full bg-blush-sand flex items-center justify-center mb-3'>
+                    <Camera className='h-6 w-6 text-clay' />
+                  </div>
+                  <p className='text-sm font-medium text-espresso'>No photos stored yet</p>
+                  <p className='text-xs text-clay mt-1'>Photos added in patient records will appear here.</p>
+                </div>
+              )}
+            </ScrollArea>
+            <div className='flex justify-end'>
+              <Button variant='secondary' onClick={() => setShowPhotoReviewDialog(false)}>Close</Button>
+            </div>
           </DialogContent>
         </Dialog>
 
