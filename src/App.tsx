@@ -302,7 +302,7 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
 }
 
 const isConflictSyncResult = (result: SyncNowResult): result is ConflictResult => {
-  return 'kind' in result && result.kind === 'conflict'
+  return 'kind' in result && (result.kind === 'conflict' || result.kind === 'first-sync')
 }
 
 const ensurePatientLastModified = (patient: Patient): Patient => {
@@ -388,6 +388,7 @@ function App() {
   const [conflictVersions, setConflictVersions] = useState<SyncVersion[]>([])
   const [selectedConflictVersion, setSelectedConflictVersion] = useState('local')
   const [syncConflictOpen, setSyncConflictOpen] = useState(false)
+  const [syncConflictMode, setSyncConflictMode] = useState<'conflict' | 'first-sync'>('conflict')
   const [syncInsight, setSyncInsight] = useState<SyncInsight | null>(null)
   const [isSyncInsightLoading, setIsSyncInsightLoading] = useState(false)
   const touchPatientLastModified = useCallback(async (patientId?: number | null) => {
@@ -490,6 +491,18 @@ function App() {
       ? `${syncInsight.remoteLatestPushedBy} (this device)`
       : syncInsight.remoteLatestPushedBy
   }, [syncConfig?.deviceTag, syncInsight?.remoteLatestPushedBy])
+
+  const syncButtonStatus = useMemo<SyncStatus>(() => {
+    if (syncStatus === 'syncing' || syncStatus === 'error' || syncStatus === 'conflict' || syncStatus === 'not-configured') {
+      return syncStatus
+    }
+
+    if (!syncConfig) return 'not-configured'
+    if (hasLocalChangesSinceLastSync && syncInsight?.remoteHasNewerData) return 'conflict'
+    if (hasLocalChangesSinceLastSync) return 'push-ready'
+    if (syncInsight?.remoteHasNewerData) return 'updates-available'
+    return 'synced'
+  }, [hasLocalChangesSinceLastSync, syncConfig, syncInsight?.remoteHasNewerData, syncStatus])
 
   useEffect(() => {
     void refreshSyncInsight(syncConfig)
@@ -2143,9 +2156,12 @@ function App() {
         setSyncConfig(result.config)
         setConflictVersions(result.versions)
         setSelectedConflictVersion('local')
+        setSyncConflictMode(result.kind)
         setSyncConflictOpen(true)
         setSyncStatus('conflict')
-        setNotice('Sync conflict detected. Pick a version to keep.')
+        setNotice(result.kind === 'first-sync'
+          ? 'First sync: choose upload or download before continuing.'
+          : 'Sync conflict detected. Pick a version to keep.')
         void refreshSyncInsight(result.config)
         return
       }
@@ -2176,9 +2192,12 @@ function App() {
         setSyncConfig(result.config)
         setConflictVersions(result.versions)
         setSelectedConflictVersion('local')
+        setSyncConflictMode(result.kind)
         setSyncConflictOpen(true)
         setSyncStatus('conflict')
-        setNotice('Sync conflict detected. Pick a version to keep.')
+        setNotice(result.kind === 'first-sync'
+          ? 'First sync: choose upload or download before continuing.'
+          : 'Sync conflict detected. Pick a version to keep.')
         void refreshSyncInsight(result.config)
         return
       }
@@ -2207,6 +2226,7 @@ function App() {
 
       setSyncConflictOpen(false)
       setConflictVersions([])
+      setSyncConflictMode('conflict')
       setSelectedConflictVersion('local')
       applySyncResult(result.config, 'Conflict resolved and sync completed.')
     } catch (error) {
@@ -2792,7 +2812,7 @@ function App() {
           </div>
           <div className='hidden sm:flex items-center justify-end gap-2'>
             <SyncButton
-              status={syncStatus}
+              status={syncButtonStatus}
               onClick={() => void runSyncNow()}
               disabled={isSyncBusy}
               lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
@@ -2812,7 +2832,7 @@ function App() {
         {view == 'settings' ? (
           <div className='mb-3 flex sm:hidden justify-end'>
             <SyncButton
-              status={syncStatus}
+              status={syncButtonStatus}
               onClick={() => void runSyncNow()}
               disabled={isSyncBusy}
               lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
@@ -4580,8 +4600,9 @@ function App() {
                     ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop). Keep names distinct to avoid accidental overwrite behavior.'],
                     ['Edit sync identity', 'Open Settings → Edit sync settings any time to change this device\'s room code or device name.'],
                     ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
+                    ['Understand first sync choices', 'If a room already has data and this device has never synced, PUHRR asks you to pick Upload this device or Download room data first. It will not auto-overwrite.'],
                     ['Check sync status', 'Open Settings → Sync Status to confirm latest room upload time, which device uploaded it, and whether this device has local unsynced changes.'],
-                    ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. The status indicator shows syncing, success, conflict, or error.'],
+                    ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. Button states: Synced, ↑ Push ready, ↓ Updates available, ⚠ Conflict, or Syncing.'],
                     ['If conflict appears', 'A version picker opens whenever remote data is newer and this device also changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
                     ['Keep backup safety', 'Sync excludes photos. Continue exporting JSON backup regularly from Settings, especially before device/browser changes.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -4863,6 +4884,7 @@ function App() {
 
         <VersionPickerDialog
           open={syncConflictOpen}
+          mode={syncConflictMode}
           versions={conflictVersions}
           localDeviceTag={syncConfig?.deviceTag ?? 'local-device'}
           selectedVersion={selectedConflictVersion}

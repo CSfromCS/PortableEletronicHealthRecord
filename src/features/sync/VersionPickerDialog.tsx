@@ -5,6 +5,7 @@ import type { SyncVersion } from './syncService'
 
 type VersionPickerDialogProps = {
   open: boolean
+  mode?: 'conflict' | 'first-sync'
   versions: SyncVersion[]
   localDeviceTag: string
   selectedVersion: string
@@ -22,6 +23,7 @@ const formatSize = (sizeBytes: number): string => {
 
 export function VersionPickerDialog({
   open,
+  mode = 'conflict',
   versions,
   localDeviceTag,
   selectedVersion,
@@ -30,13 +32,19 @@ export function VersionPickerDialog({
   onOpenChange,
   isResolving,
 }: VersionPickerDialogProps) {
+  const isFirstSync = mode === 'first-sync'
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-lg'>
         <DialogHeader>
-          <DialogTitle>Resolve sync conflict</DialogTitle>
+          <DialogTitle>{isFirstSync ? 'Choose first sync direction' : 'Resolve sync conflict'}</DialogTitle>
         </DialogHeader>
-        <p className='text-sm text-clay'>Both devices changed since last sync. Pick one version to keep.</p>
+        <p className='text-sm text-clay'>
+          {isFirstSync
+            ? 'A room snapshot already exists. Choose whether to upload this device now or download room data first.'
+            : 'Both devices changed since last sync. Pick one version to keep.'}
+        </p>
         <div className='space-y-2 max-h-[52vh] overflow-y-auto pr-1'>
           <button
             type='button'
@@ -48,8 +56,12 @@ export function VersionPickerDialog({
             )}
             onClick={() => onSelectVersion('local')}
           >
-            <p className='text-sm font-semibold text-espresso'>Keep current ({localDeviceTag})</p>
-            <p className='text-xs text-clay'>Use this device state and overwrite remote.</p>
+            <p className='text-sm font-semibold text-espresso'>
+              {isFirstSync ? `Upload this device (${localDeviceTag})` : `Keep current (${localDeviceTag})`}
+            </p>
+            <p className='text-xs text-clay'>
+              {isFirstSync ? 'Push local data to the room.' : 'Use this device state and overwrite remote.'}
+            </p>
           </button>
 
           {versions.map((version) => (
@@ -81,7 +93,7 @@ export function VersionPickerDialog({
         <div className='flex justify-end gap-2'>
           <Button variant='secondary' onClick={() => onOpenChange(false)} disabled={isResolving}>Cancel</Button>
           <Button onClick={() => void onResolve()} disabled={isResolving}>
-            {isResolving ? 'Applying...' : 'Use selected'}
+            {isResolving ? 'Applying...' : isFirstSync ? 'Continue' : 'Use selected'}
           </Button>
         </div>
       </DialogContent>

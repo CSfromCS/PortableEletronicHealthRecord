@@ -2,7 +2,16 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, Cloud, CloudOff, Loader2, RefreshCw, TriangleAlert, XCircle } from 'lucide-react'
 
-export type SyncStatus = 'not-configured' | 'idle' | 'syncing' | 'success' | 'conflict' | 'error'
+export type SyncStatus =
+  | 'not-configured'
+  | 'idle'
+  | 'syncing'
+  | 'success'
+  | 'conflict'
+  | 'error'
+  | 'synced'
+  | 'push-ready'
+  | 'updates-available'
 
 type SyncButtonProps = {
   status: SyncStatus
@@ -28,11 +37,26 @@ const getStatusMeta = (status: SyncStatus) => {
         badgeClassName: 'bg-action-edit/15 text-action-edit border-action-edit/30',
       }
     case 'success':
+    case 'synced':
       return {
         icon: CheckCircle2,
         label: 'Synced',
-        badgeLabel: 'OK',
-        badgeClassName: 'bg-green-100 text-green-700 border-green-200',
+        badgeLabel: 'Synced',
+        badgeClassName: 'bg-clay/15 text-clay border-clay/30',
+      }
+    case 'push-ready':
+      return {
+        icon: Cloud,
+        label: 'Push ready',
+        badgeLabel: '↑ Push ready',
+        badgeClassName: 'bg-action-edit/15 text-action-edit border-action-edit/30',
+      }
+    case 'updates-available':
+      return {
+        icon: Cloud,
+        label: 'Updates available',
+        badgeLabel: '↓ Updates available',
+        badgeClassName: 'bg-action-edit/15 text-action-edit border-action-edit/30',
       }
     case 'conflict':
       return {
