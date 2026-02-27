@@ -4,7 +4,7 @@ import { decryptBlobToPayload, encryptPayloadToBlob, sha256Hex } from './crypto'
 
 const SYNC_CONFIG_STORAGE_KEY = 'puhrr.sync.config'
 const SYNC_DATA_VERSION = 1
-const DEFAULT_SYNC_ENDPOINT = 'https://roundingsync-api.azurewebsites.net'
+const DEFAULT_SYNC_ENDPOINT = 'https://purh-sync-dfeeeqh8hhdhhfb0.southeastasia-01.azurewebsites.net'
 
 type DeviceName = 'Phone' | 'Laptop'
 

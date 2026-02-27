@@ -56,7 +56,7 @@ Response: `{ "gistId": "abc123..." }` or 404 if not found
 
 ## What the PWA needs to implement
 
-Refer to `RoundingApp-SyncPRD.md` for full requirements. Summary:
+Refer to `SyncPlan.md` for full requirements. Summary:
 
 1. **Crypto module** — AES-256-GCM encrypt/decrypt using Web Crypto API, PBKDF2 key derivation from room code, SHA-256 hash for roomTag
 2. **Sync service** — exports `patients` + `dailyUpdates` as JSON, encrypts, pushes/pulls via the endpoints above

@@ -94,7 +94,9 @@ import {
   resolveConflictWithVersion,
   saveSyncConfig,
   syncNow,
+  type ConflictResult,
   type SyncConfig,
+  type SyncNowResult,
   type SyncVersion,
 } from './features/sync/syncService'
 import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Expand, Minimize2 } from 'lucide-react'
@@ -297,6 +299,17 @@ const isBackupPayload = (value: unknown): value is BackupPayload => {
   return validVitals && validMedications && validLabs && validOrders
 }
 
+const isConflictSyncResult = (result: SyncNowResult): result is ConflictResult => {
+  return 'kind' in result && result.kind === 'conflict'
+}
+
+const ensurePatientLastModified = (patient: Patient): Patient => {
+  return {
+    ...patient,
+    lastModified: patient.lastModified ?? patient.admitDate ?? new Date().toISOString(),
+  }
+}
+
 function App() {
   const backupFileInputRef = useRef<HTMLInputElement | null>(null)
   const cameraPhotoInputRef = useRef<HTMLInputElement | null>(null)
@@ -368,10 +381,15 @@ function App() {
   const [syncConfig, setSyncConfig] = useState<SyncConfig | null>(() => readSyncConfig())
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(() => (readSyncConfig() ? 'idle' : 'not-configured'))
   const [syncSetupOpen, setSyncSetupOpen] = useState(false)
+  const [syncSetupMode, setSyncSetupMode] = useState<'setup' | 'edit'>('setup')
   const [isSyncBusy, setIsSyncBusy] = useState(false)
   const [conflictVersions, setConflictVersions] = useState<SyncVersion[]>([])
   const [selectedConflictVersion, setSelectedConflictVersion] = useState('local')
   const [syncConflictOpen, setSyncConflictOpen] = useState(false)
+  const touchPatientLastModified = useCallback(async (patientId?: number | null) => {
+    if (patientId === undefined || patientId === null) return
+    await db.patients.update(patientId, { lastModified: new Date().toISOString() })
+  }, [])
   const canUseWebShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const isStandaloneDisplayMode = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -1212,6 +1230,7 @@ function App() {
     if (patient.id === undefined) return
     const discharged = patient.status === 'active'
     await db.patients.update(patient.id, {
+      lastModified: new Date().toISOString(),
       status: discharged ? 'discharged' : 'active',
       dischargeDate: discharged ? toLocalISODate() : undefined,
     })
@@ -1328,6 +1347,7 @@ function App() {
       )
 
       await db.photoAttachments.bulkAdd(preparedAttachments)
+      await touchPatientLastModified(selectedPatientId)
 
       setAttachmentTitle(buildDefaultPhotoTitle(attachmentCategory))
       setNotice(files.length === 1 ? 'Photo attached.' : `${files.length} photos attached in one block.`)
@@ -1341,7 +1361,9 @@ function App() {
 
   const deletePhotoAttachment = async (attachmentId?: number) => {
     if (attachmentId === undefined) return
+    const removedAttachment = photoAttachments?.find((attachment) => attachment.id === attachmentId)
     await db.photoAttachments.delete(attachmentId)
+    await touchPatientLastModified(removedAttachment?.patientId)
     if (selectedAttachmentId === attachmentId) {
       setSelectedAttachmentId(null)
     }
@@ -1397,19 +1419,23 @@ function App() {
     }
 
     await db.photoAttachments.update(attachment.id, { patientId: nextPatientId })
+    await touchPatientLastModified(attachment.patientId)
+    await touchPatientLastModified(nextPatientId)
 
     if (selectedAttachmentId === attachment.id && selectedPatientId !== null && selectedPatientId !== nextPatientId) {
       setSelectedAttachmentId(null)
     }
 
     setNotice('Photo reassigned.')
-  }, [patientsById, reassignTargetsByAttachmentId, selectedAttachmentId, selectedPatientId])
+  }, [patientsById, reassignTargetsByAttachmentId, selectedAttachmentId, selectedPatientId, touchPatientLastModified])
 
   const deletePhotoAttachmentGroup = async (group: PhotoAttachmentGroup) => {
     const attachmentIds = group.entries.map((entry) => entry.id)
+    const affectedPatientIds = Array.from(new Set(group.entries.map((entry) => entry.patientId)))
     if (attachmentIds.length === 0) return
 
     await db.photoAttachments.bulkDelete(attachmentIds)
+    await Promise.all(affectedPatientIds.map((patientId) => touchPatientLastModified(patientId)))
     if (selectedAttachmentId !== null && attachmentIds.includes(selectedAttachmentId)) {
       setSelectedAttachmentId(null)
     }
@@ -1437,6 +1463,7 @@ function App() {
           ...dailyUpdateForm,
           lastUpdated: new Date().toISOString(),
         })
+        await touchPatientLastModified(selectedPatientId)
 
         setDailyUpdateId(typeof nextId === 'number' ? nextId : undefined)
         setDailyDirty(false)
@@ -1449,7 +1476,7 @@ function App() {
         setIsSaving(false)
       }
     },
-    [dailyDate, dailyUpdateForm, dailyUpdateId, selectedPatientId],
+    [dailyDate, dailyUpdateForm, dailyUpdateId, selectedPatientId, touchPatientLastModified],
   )
 
   useEffect(() => {
@@ -1554,6 +1581,7 @@ function App() {
   const deleteStructuredVital = async (vitalId?: number) => {
     if (vitalId === undefined) return
     await db.vitals.delete(vitalId)
+    await touchPatientLastModified(selectedPatientId)
     if (editingVitalId === vitalId) {
       setEditingVitalId(null)
       setVitalForm(initialVitalForm())
@@ -1614,6 +1642,7 @@ function App() {
       status: medicationForm.status,
       createdAt: new Date().toISOString(),
     })
+    await touchPatientLastModified(selectedPatientId)
 
     setMedicationForm(initialMedicationForm())
     setNotice('Medication added.')
@@ -1667,6 +1696,7 @@ function App() {
   const deleteOrder = async (orderId?: number) => {
     if (orderId === undefined) return
     await db.orders.delete(orderId)
+    await touchPatientLastModified(selectedPatientId)
     if (editingOrderId === orderId) {
       setEditingOrderId(null)
       setOrderForm(initialOrderForm())
@@ -1717,6 +1747,7 @@ function App() {
           })
           setVitalDraftId(typeof nextId === 'number' ? nextId : null)
         }
+        await touchPatientLastModified(selectedPatientId)
 
         setVitalDirty(false)
         setLastSavedAt(new Date().toISOString())
@@ -1728,7 +1759,7 @@ function App() {
         setIsSaving(false)
       }
     },
-    [editingVitalId, selectedPatientId, vitalDraftId, vitalForm],
+    [editingVitalId, selectedPatientId, touchPatientLastModified, vitalDraftId, vitalForm],
   )
 
   const saveOrderDraft = useCallback(
@@ -1767,6 +1798,7 @@ function App() {
           })
           setOrderDraftId(typeof nextId === 'number' ? nextId : null)
         }
+        await touchPatientLastModified(selectedPatientId)
 
         setOrderDirty(false)
         setLastSavedAt(new Date().toISOString())
@@ -1778,7 +1810,7 @@ function App() {
         setIsSaving(false)
       }
     },
-    [editingOrderId, orderDraftId, orderForm, selectedPatientId],
+    [editingOrderId, orderDraftId, orderForm, selectedPatientId, touchPatientLastModified],
   )
 
   const saveAllChanges = useCallback(async () => {
@@ -1830,6 +1862,7 @@ function App() {
   const deleteStructuredMedication = async (medicationId?: number) => {
     if (medicationId === undefined) return
     await db.medications.delete(medicationId)
+    await touchPatientLastModified(selectedPatientId)
     if (editingMedicationId === medicationId) {
       setEditingMedicationId(null)
       setMedicationForm(initialMedicationForm())
@@ -1861,6 +1894,7 @@ function App() {
       note: medicationForm.note.trim(),
       status: medicationForm.status,
     })
+    await touchPatientLastModified(selectedPatientId)
 
     setEditingMedicationId(null)
     setMedicationForm(initialMedicationForm())
@@ -1896,6 +1930,7 @@ function App() {
       note: labTemplateNote.trim(),
       createdAt: new Date().toISOString(),
     })
+    await touchPatientLastModified(selectedPatientId)
 
     setLabTemplateValues({})
     setLabTemplateNote('')
@@ -1906,6 +1941,7 @@ function App() {
   const deleteStructuredLab = async (labId?: number) => {
     if (labId === undefined) return
     await db.labs.delete(labId)
+    await touchPatientLastModified(selectedPatientId)
     if (editingLabId === labId) {
       setEditingLabId(null)
       setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
@@ -1950,6 +1986,7 @@ function App() {
       results: resultsPayload,
       note: labTemplateNote.trim(),
     })
+    await touchPatientLastModified(selectedPatientId)
 
     setEditingLabId(null)
     setSelectedLabTemplateId(DEFAULT_LAB_TEMPLATE_ID)
@@ -2011,6 +2048,7 @@ function App() {
 
   const runSyncNow = useCallback(async () => {
     if (!syncConfig) {
+      setSyncSetupMode('setup')
       setSyncSetupOpen(true)
       return
     }
@@ -2023,7 +2061,7 @@ function App() {
     try {
       const result = await syncNow(syncConfig)
 
-      if ('kind' in result && result.kind === 'conflict') {
+      if (isConflictSyncResult(result)) {
         setSyncConfig(result.config)
         setConflictVersions(result.versions)
         setSelectedConflictVersion('local')
@@ -2054,7 +2092,7 @@ function App() {
     setSyncStatus('syncing')
     try {
       const result = await syncNow(nextConfig)
-      if ('kind' in result && result.kind === 'conflict') {
+      if (isConflictSyncResult(result)) {
         setSyncConfig(result.config)
         setConflictVersions(result.versions)
         setSelectedConflictVersion('local')
@@ -2142,7 +2180,7 @@ function App() {
         await db.dailyUpdates.clear()
         await db.patients.clear()
         if (parsed.patients.length > 0) {
-          await db.patients.bulkPut(parsed.patients)
+          await db.patients.bulkPut(parsed.patients.map((patient) => ensurePatientLastModified(patient)))
         }
         if (parsed.dailyUpdates.length > 0) {
           await db.dailyUpdates.bulkPut(parsed.dailyUpdates)
@@ -2256,6 +2294,7 @@ function App() {
 
     await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders], async () => {
       samplePatientId = await db.patients.add({
+        lastModified: now,
         roomNumber: '512A',
         lastName: 'Dela Cruz',
         firstName: 'Juan',
@@ -2668,7 +2707,13 @@ function App() {
               <p className='text-xs text-clay/65 mt-0.5 font-medium'>Portable Unofficial Health Record, Really!</p>
             </div>
           </div>
-          <div className='hidden sm:flex justify-end'>
+          <div className='hidden sm:flex items-center justify-end gap-2'>
+            <SyncButton
+              status={syncStatus}
+              onClick={() => void runSyncNow()}
+              disabled={isSyncBusy}
+              lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
+            />
             <div className='flex gap-0.5 bg-blush-sand/60 rounded-xl p-1 border border-clay/15 shadow-sm'>
               <Button variant={view === 'patients' ? 'default' : 'ghost'} size='sm' onClick={() => setView('patients')}>Patients</Button>
               {canShowFocusedPatientNavButton ? (
@@ -2679,6 +2724,15 @@ function App() {
               <Button variant={view === 'settings' ? 'default' : 'ghost'} size='sm' onClick={() => setView('settings')}>Settings</Button>
             </div>
           </div>
+        </div>
+
+        <div className='mb-3 flex sm:hidden justify-end'>
+          <SyncButton
+            status={syncStatus}
+            onClick={() => void runSyncNow()}
+            disabled={isSyncBusy}
+            lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
+          />
         </div>
 
         {view === 'patient' && selectedPatient ? (
@@ -4267,6 +4321,22 @@ function App() {
                       <p className='text-xs text-clay mt-0.5'>Permanently removes all discharged patient records</p>
                     </div>
                   </button>
+                  <button
+                    type='button'
+                    onClick={() => {
+                      setSyncSetupMode('edit')
+                      setSyncSetupOpen(true)
+                    }}
+                    className='flex items-center gap-3 px-3.5 py-3 rounded-xl bg-blush-sand/50 hover:bg-blush-sand border border-clay/20 text-left transition-colors active:scale-[0.98]'
+                  >
+                    <div className='w-9 h-9 rounded-lg bg-action-edit/10 flex items-center justify-center shrink-0'>
+                      <Settings className='h-4 w-4 text-action-edit' />
+                    </div>
+                    <div className='min-w-0'>
+                      <p className='text-sm font-semibold text-espresso'>Edit sync settings</p>
+                      <p className='text-xs text-clay mt-0.5'>Change room code or device name for this device</p>
+                    </div>
+                  </button>
                 </div>
               </div>
               {/* App */}
@@ -4398,6 +4468,7 @@ function App() {
                   {([
                     ['Prepare both devices', 'Open PUHRR on both devices and make sure both are connected to the internet during sync.'],
                     ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop).'],
+                    ['Edit sync identity', 'Open Settings → Edit sync settings any time to change this device\'s room code or device name.'],
                     ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
                     ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. The status indicator shows syncing, success, conflict, or error.'],
                     ['If conflict appears', 'A version picker opens when both devices changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
@@ -4416,7 +4487,7 @@ function App() {
                 <p className='text-[10px] font-extrabold uppercase tracking-widest text-clay/55'>Data & saving</p>
                 <ul className='space-y-2'>
                   {([
-                    'All data is stored locally on this device — no account or internet connection required.',
+                    'All data is stored locally on this device by default. Internet is only needed when you choose to use Sync.',
                     'Profile, daily notes, vitals, and orders auto-save a moment after you stop typing.',
                     'Photos are compressed and stored in the app; they are excluded from JSON backup exports.',
                     'Import backup replaces text tables only and keeps all photos currently stored on this device.',
@@ -4668,6 +4739,27 @@ function App() {
             </div>
           </DialogContent>
         </Dialog>
+
+        <SyncSetupDialog
+          open={syncSetupOpen}
+          title={syncSetupMode === 'edit' ? 'Edit sync settings' : 'Set up sync'}
+          submitLabel={syncSetupMode === 'edit' ? 'Update & Sync' : 'Save & Sync'}
+          initialRoomCode={syncConfig?.roomCode ?? ''}
+          initialDeviceName={syncConfig?.deviceName ?? 'Phone'}
+          onOpenChange={setSyncSetupOpen}
+          onSubmit={handleSyncSetupSubmit}
+        />
+
+        <VersionPickerDialog
+          open={syncConflictOpen}
+          versions={conflictVersions}
+          localDeviceTag={syncConfig?.deviceTag ?? 'local-device'}
+          selectedVersion={selectedConflictVersion}
+          onSelectVersion={setSelectedConflictVersion}
+          onResolve={resolveSyncConflict}
+          onOpenChange={setSyncConflictOpen}
+          isResolving={isSyncBusy}
+        />
 
         <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
           <DialogContent className='max-w-md'>

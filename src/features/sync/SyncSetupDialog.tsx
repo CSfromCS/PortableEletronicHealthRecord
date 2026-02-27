@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -11,12 +11,23 @@ export type SetupDeviceName = 'Phone' | 'Laptop'
 
 type SyncSetupDialogProps = {
   open: boolean
-  endpoint: string
+  title?: string
+  submitLabel?: string
+  initialRoomCode?: string
+  initialDeviceName?: SetupDeviceName
   onOpenChange: (open: boolean) => void
   onSubmit: (params: { roomCode: string; deviceName: SetupDeviceName }) => Promise<void>
 }
 
-export function SyncSetupDialog({ open, endpoint, onOpenChange, onSubmit }: SyncSetupDialogProps) {
+export function SyncSetupDialog({
+  open,
+  title = 'Set up sync',
+  submitLabel = 'Save & Sync',
+  initialRoomCode = '',
+  initialDeviceName = 'Phone',
+  onOpenChange,
+  onSubmit,
+}: SyncSetupDialogProps) {
   const [roomCode, setRoomCode] = useState('')
   const [deviceName, setDeviceName] = useState<SetupDeviceName>('Phone')
   const [roomTagPreview, setRoomTagPreview] = useState('-----')
@@ -36,6 +47,17 @@ export function SyncSetupDialog({ open, endpoint, onOpenChange, onSubmit }: Sync
     setRoomTagPreview(roomHash.slice(0, 5))
   }
 
+  useEffect(() => {
+    if (!open) return
+
+    const prefilledRoomCode = initialRoomCode.trim()
+    setRoomCode(prefilledRoomCode)
+    setDeviceName(initialDeviceName)
+    setShowRoomCode(false)
+
+    void refreshRoomTagPreview(prefilledRoomCode)
+  }, [initialDeviceName, initialRoomCode, open])
+
   const handleSubmit = async () => {
     if (!roomCode.trim()) return
 
@@ -46,9 +68,6 @@ export function SyncSetupDialog({ open, endpoint, onOpenChange, onSubmit }: Sync
         deviceName,
       })
       onOpenChange(false)
-      setRoomCode('')
-      setRoomTagPreview('-----')
-      setDeviceName('Phone')
     } finally {
       setIsSaving(false)
     }
@@ -58,7 +77,7 @@ export function SyncSetupDialog({ open, endpoint, onOpenChange, onSubmit }: Sync
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className='sm:max-w-md'>
         <DialogHeader>
-          <DialogTitle>Set up sync</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className='space-y-3'>
           <div className='space-y-1'>
@@ -100,12 +119,11 @@ export function SyncSetupDialog({ open, endpoint, onOpenChange, onSubmit }: Sync
           <div className='rounded-md border border-clay/25 bg-blush-sand/45 p-2'>
             <p className='text-xs text-clay'>Device tag</p>
             <p className='text-sm font-semibold text-espresso'>{deviceTagPreview}</p>
-            <p className='text-[11px] text-clay mt-1'>Endpoint: {endpoint}</p>
           </div>
           <div className='flex justify-end gap-2 pt-2'>
             <Button variant='secondary' onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
             <Button onClick={() => void handleSubmit()} disabled={isSaving || roomCode.trim().length === 0}>
-              {isSaving ? 'Saving...' : 'Save & Sync'}
+              {isSaving ? 'Saving...' : submitLabel}
             </Button>
           </div>
         </div>

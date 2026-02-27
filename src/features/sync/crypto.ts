@@ -44,6 +44,12 @@ const getCrypto = (): Crypto => {
   return window.crypto
 }
 
+const toCryptoBuffer = (bytes: Uint8Array): ArrayBuffer => {
+  const copiedBuffer = new ArrayBuffer(bytes.byteLength)
+  new Uint8Array(copiedBuffer).set(bytes)
+  return copiedBuffer
+}
+
 const deriveEncryptionKey = async (roomCode: string, salt: Uint8Array): Promise<CryptoKey> => {
   const crypto = getCrypto()
   const roomCodeKeyMaterial = await crypto.subtle.importKey(
@@ -57,7 +63,7 @@ const deriveEncryptionKey = async (roomCode: string, salt: Uint8Array): Promise<
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: toCryptoBuffer(salt),
       iterations: PBKDF2_ITERATIONS,
       hash: 'SHA-256',
     },
@@ -88,7 +94,7 @@ export const encryptPayloadToBlob = async (payload: unknown, roomCode: string): 
   const encryptedBuffer = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv,
+      iv: toCryptoBuffer(iv),
     },
     encryptionKey,
     plaintextBytes,
@@ -141,10 +147,10 @@ export const decryptBlobToPayload = async <T>(blob: string, roomCode: string): P
     decrypted = await getCrypto().subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv,
+        iv: toCryptoBuffer(iv),
       },
       decryptionKey,
-      ciphertext,
+      toCryptoBuffer(ciphertext),
     )
   } catch {
     throw new Error('Unable to decrypt data. Check room code.')
