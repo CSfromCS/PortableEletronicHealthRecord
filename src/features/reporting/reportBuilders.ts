@@ -53,6 +53,10 @@ type DailySummaryInput = {
   other: string
   assessment: string
   plans: string
+  checklist: Array<{
+    text: string
+    completed: boolean
+  }>
 }
 
 const labTemplatesById = new Map(LAB_TEMPLATES.map((template) => [template.id, template] as const))
@@ -410,6 +414,14 @@ export const toDailySummary = (
   dailyDate: string,
 ) => {
   const vitalsLine = buildDailyVitalsRangeLine(vitalsEntries, dailyDate)
+  const pendingChecklist = (update.checklist ?? [])
+    .filter((item) => !item.completed)
+    .map((item) => item.text.trim())
+    .filter(Boolean)
+  const completedChecklist = (update.checklist ?? [])
+    .filter((item) => item.completed)
+    .map((item) => item.text.trim())
+    .filter(Boolean)
 
   const lines = [
     `${formatPatientHeader(patient)} — ${formatDateMMDDYYYY(dailyDate)}`,
@@ -426,6 +438,8 @@ export const toDailySummary = (
     update.other ? `Other: ${update.other}` : '',
     update.assessment ? `Assessment: ${update.assessment}` : '',
     update.plans ? `Plan: ${update.plans}` : '',
+    pendingChecklist.length > 0 ? `Checklist pending: ${pendingChecklist.join('; ')}` : '',
+    completedChecklist.length > 0 ? `Checklist completed: ${completedChecklist.join('; ')}` : '',
   ]
 
   return lines.filter(Boolean).join('\n')

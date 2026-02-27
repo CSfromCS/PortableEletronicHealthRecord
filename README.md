@@ -52,8 +52,8 @@ Each open patient has eight focused tabs:
 
 | Tab | Purpose |
 |---|---|
-| **Profile** | Demographics plus case-review notes (clinical summary, chief complaint, HPI, PMH, PE), diagnosis, and clinical details |
-| **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs) with a Copy latest entry action to carry forward all daily fields |
+| **Profile** | Demographics plus case-review notes (clinical summary, chief complaint, HPI, PMH, PE), diagnosis, and clerk notes |
+| **FRICHMOND** | Daily progress notes (Fluid, Respiratory, Infectious, Cardiovascular, Hema, Metabolic, Output, Neuro, Drugs), assessment, plan, and checklist with Copy latest entry carrying forward pending checklist items only |
 | **Vitals** | Temp, BP, HR, RR, O₂ saturation with history |
 | **Labs** | CBC, urinalysis, Blood Chemistry, ABG (with auto-calculated pO2/FiO2 and conditional Desired FiO2 when FiO2 > 21% or pO2 < 60; target PaO2 = 60), and Others (custom label + freeform result); trend comparison applies to structured templates, while Others stays plain |
 | **Medications** | Active medication list with status tracking |
@@ -64,7 +64,7 @@ Each open patient has eight focused tabs:
 ### Reporting & Export
 
 - **Profile summary** follows room/name header, main/referral service split, `Dx`, and optional `Notes` blocks.
-- **FRICHMOND summary** uses `ROOM - LASTNAME, First — MM-DD-YYYY`, removes orders, and includes daily vitals min–max ranges.
+- **FRICHMOND summary** uses `ROOM - LASTNAME, First — MM-DD-YYYY`, removes orders, includes daily vitals min–max ranges, and outputs checklist pending/completed lines when present.
 - **Vitals summary** supports multi-patient selection and date/time window filtering.
 - **Labs summary** supports arbitrary instance selection per patient; comparison mode runs only when exactly 2 instances of the same non-Others lab template are selected.
 - **Orders summary** supports date/time filtering using order date/time fields and preserves order text exactly as entered.

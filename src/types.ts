@@ -41,7 +41,13 @@ export interface DailyUpdate {
   other: string
   assessment: string
   plans: string
+  checklist: DailyChecklistItem[]
   lastUpdated: string
+}
+
+export interface DailyChecklistItem {
+  text: string
+  completed: boolean
 }
 
 export interface VitalEntry {
