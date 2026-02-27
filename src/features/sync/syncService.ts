@@ -72,7 +72,7 @@ type SyncResult = {
 }
 
 export type ConflictResult = {
-  kind: 'conflict'
+  kind: 'conflict' | 'first-sync'
   config: SyncConfig
   versions: SyncVersion[]
   remoteDeviceTag: string
@@ -267,10 +267,18 @@ const pushSnapshot = async (config: SyncConfig): Promise<SyncResult> => {
     }),
   })
 
-  const nextConfig: SyncConfig = {
+  const nextConfigWithoutSyncTime: SyncConfig = {
     ...config,
     gistId: response.gistId,
-    lastSyncedAt: toIsoNow(),
+  }
+  const remoteCheck = await checkRemote(nextConfigWithoutSyncTime)
+  if (!remoteCheck) {
+    throw new Error('Sync push succeeded, but remote state could not be confirmed via /api/sync/check. Check connectivity and sync again.')
+  }
+
+  const nextConfig: SyncConfig = {
+    ...nextConfigWithoutSyncTime,
+    lastSyncedAt: remoteCheck.updatedAt,
   }
 
   saveSyncConfig(nextConfig)
@@ -316,6 +324,10 @@ const checkRemote = async (config: SyncConfig): Promise<SyncCheckResponse | null
   } catch {
     return null
   }
+}
+
+const prepareVersionShaForPull = (versionSha: string): string | undefined => {
+  return versionSha === 'latest' ? undefined : versionSha
 }
 
 const getRemoteVersions = async (config: SyncConfig, count = 5): Promise<SyncVersion[]> => {
@@ -460,20 +472,28 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
       linkedConfig = { ...linkedConfig, gistId: foundGistId }
       saveSyncConfig(linkedConfig)
 
-      const remotePayload = await pullSnapshot(linkedConfig)
-      await replaceSyncedTables(remotePayload)
-
-      const syncedConfig = {
-        ...linkedConfig,
-        lastSyncedAt: toIsoNow(),
+      const remoteCheck = await checkRemote(linkedConfig)
+      if (remoteCheck) {
+        const remoteDescription = parseDescription(remoteCheck.description)
+        const versionsFromServer = await getRemoteVersions(linkedConfig, 5)
+        const versions = versionsFromServer.length > 0
+          ? versionsFromServer
+          : [{
+            sha: 'latest',
+            pushedAt: remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt,
+            deviceTag: remoteDescription?.lastPushedBy ?? 'remote room version',
+            sizeBytes: remoteDescription?.blobSizeBytes ?? 0,
+          }]
+        return {
+          kind: 'first-sync',
+          config: linkedConfig,
+          versions,
+          remoteDeviceTag: remoteDescription?.lastPushedBy ?? 'remote room version',
+          remotePushedAt: remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt,
+        }
       }
-      saveSyncConfig(syncedConfig)
 
-      return {
-        config: syncedConfig,
-        operation: 'pull',
-        message: 'Pulled latest room data.',
-      }
+      return pushSnapshot(linkedConfig)
     }
 
     return pushSnapshot(linkedConfig)
@@ -487,6 +507,25 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
   const remoteDescription = parseDescription(remoteCheck.description)
   if (remoteDescription && remoteDescription.roomTag !== linkedConfig.roomTag) {
     throw new Error('Remote sync room does not match this room code.')
+  }
+
+  if (!linkedConfig.lastSyncedAt) {
+    const versionsFromServer = await getRemoteVersions(linkedConfig, 5)
+    const versions = versionsFromServer.length > 0
+      ? versionsFromServer
+      : [{
+        sha: 'latest',
+        pushedAt: remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt,
+        deviceTag: remoteDescription?.lastPushedBy ?? 'remote room version',
+        sizeBytes: remoteDescription?.blobSizeBytes ?? 0,
+      }]
+    return {
+      kind: 'first-sync',
+      config: linkedConfig,
+      versions,
+      remoteDeviceTag: remoteDescription?.lastPushedBy ?? 'remote room version',
+      remotePushedAt: remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt,
+    }
   }
 
   const remotePushedAt = remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt
@@ -507,7 +546,15 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
 
   if (remoteIsNewSinceLastSync) {
     if (hasLocalChangesSinceLastSync) {
-      const versions = await getRemoteVersions(linkedConfig, 5)
+      const versionsFromServer = await getRemoteVersions(linkedConfig, 5)
+      const versions = versionsFromServer.length > 0
+        ? versionsFromServer
+        : [{
+          sha: 'latest',
+          pushedAt: remotePushedAt,
+          deviceTag: remoteDeviceTag || 'remote room version',
+          sizeBytes: remoteDescription?.blobSizeBytes ?? 0,
+        }]
       return {
         kind: 'conflict',
         config: linkedConfig,
@@ -522,7 +569,7 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
 
     const syncedConfig = {
       ...linkedConfig,
-      lastSyncedAt: toIsoNow(),
+      lastSyncedAt: remoteCheck.updatedAt,
     }
 
     saveSyncConfig(syncedConfig)
@@ -531,6 +578,14 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
       config: syncedConfig,
       operation: 'pull',
       message: 'Pulled latest room data.',
+    }
+  }
+
+  if (!hasLocalChangesSinceLastSync) {
+    return {
+      config: linkedConfig,
+      operation: 'noop',
+      message: 'Already synced.',
     }
   }
 
@@ -545,16 +600,22 @@ export const resolveConflictWithVersion = async (
   config: SyncConfig,
   versionSha: string,
 ): Promise<SyncResult> => {
-  const payload = await pullSnapshot(config, versionSha)
+  const remoteCheck = await checkRemote(config)
+  const lastSyncedAt = remoteCheck?.updatedAt ?? toIsoNow()
+  const payload = await pullSnapshot(config, prepareVersionShaForPull(versionSha))
   await replaceSyncedTables(payload)
 
   const updatedConfig = {
     ...config,
-    lastSyncedAt: toIsoNow(),
+    lastSyncedAt,
   }
   saveSyncConfig(updatedConfig)
 
-  return pushSnapshot(updatedConfig)
+  return {
+    config: updatedConfig,
+    operation: 'pull',
+    message: 'Pulled selected room version.',
+  }
 }
 
 export const getDefaultSyncEndpoint = (): string => DEFAULT_SYNC_ENDPOINT
