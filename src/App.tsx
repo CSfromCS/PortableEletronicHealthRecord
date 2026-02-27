@@ -4597,7 +4597,7 @@ function App() {
                 <ol className='space-y-2'>
                   {([
                     ['Prepare both devices', 'Open PUHRR on both devices and make sure both are connected to the internet during sync.'],
-                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then give each device a different Device name (example: Phone, Laptop). Keep names distinct to avoid accidental overwrite behavior.'],
+                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then type a Device name (recommended default: Phone). Keep each device name unique (example: Phone, Clerk-Laptop) so you can identify which device pushed each sync.'],
                     ['Edit sync identity', 'Open Settings → Edit sync settings any time to change this device\'s room code or device name.'],
                     ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
                     ['Understand first sync choices', 'If a room already has data and this device has never synced, PUHRR asks you to pick Upload this device or Download room data first. It will not auto-overwrite.'],

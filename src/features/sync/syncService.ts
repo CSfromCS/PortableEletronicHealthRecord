@@ -6,7 +6,7 @@ const SYNC_CONFIG_STORAGE_KEY = 'puhrr.sync.config'
 const SYNC_DATA_VERSION = 1
 const DEFAULT_SYNC_ENDPOINT = 'https://purh-sync-dfeeeqh8hhdhhfb0.southeastasia-01.azurewebsites.net'
 
-type DeviceName = 'Phone' | 'Laptop'
+type DeviceName = string
 
 type SyncPayload = {
   version: number
@@ -105,7 +105,8 @@ const isSyncConfig = (value: unknown): value is SyncConfig => {
     typeof candidate.roomCode === 'string'
     && typeof candidate.roomHash === 'string'
     && typeof candidate.roomTag === 'string'
-    && (candidate.deviceName === 'Phone' || candidate.deviceName === 'Laptop')
+    && typeof candidate.deviceName === 'string'
+    && candidate.deviceName.trim().length > 0
     && typeof candidate.deviceTag === 'string'
     && (candidate.gistId === null || typeof candidate.gistId === 'string')
     && (candidate.lastSyncedAt === null || typeof candidate.lastSyncedAt === 'string')
@@ -441,16 +442,20 @@ export const buildSyncConfig = async (
   if (!normalizedRoomCode) {
     throw new Error('Room code is required.')
   }
+  const normalizedDeviceName = deviceName.trim()
+  if (!normalizedDeviceName) {
+    throw new Error('Device name is required.')
+  }
 
   const roomHash = await sha256Hex(normalizedRoomCode)
   const roomTag = roomHash.slice(0, 5)
-  const deviceTag = `${roomTag}-${deviceName}`
+  const deviceTag = `${roomTag}-${normalizedDeviceName}`
 
   return {
     roomCode: normalizedRoomCode,
     roomHash,
     roomTag,
-    deviceName,
+    deviceName: normalizedDeviceName,
     deviceTag,
     gistId: null,
     lastSyncedAt: null,
