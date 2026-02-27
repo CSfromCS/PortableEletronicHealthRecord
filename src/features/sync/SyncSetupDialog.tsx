@@ -3,11 +3,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Eye, EyeOff } from 'lucide-react'
 import { sha256Hex } from './crypto'
 
-export type SetupDeviceName = 'Phone' | 'Laptop'
+export type SetupDeviceName = string
 
 type SyncSetupDialogProps = {
   open: boolean
@@ -59,13 +58,13 @@ export function SyncSetupDialog({
   }, [initialDeviceName, initialRoomCode, open])
 
   const handleSubmit = async () => {
-    if (!roomCode.trim()) return
+    if (!roomCode.trim() || !deviceName.trim()) return
 
     setIsSaving(true)
     try {
       await onSubmit({
         roomCode: roomCode.trim(),
-        deviceName,
+        deviceName: deviceName.trim(),
       })
       onOpenChange(false)
     } finally {
@@ -107,15 +106,14 @@ export function SyncSetupDialog({
           </div>
           <div className='space-y-1'>
             <Label htmlFor='sync-device-name'>Device name</Label>
-            <Select value={deviceName} onValueChange={(value) => setDeviceName(value as SetupDeviceName)}>
-              <SelectTrigger id='sync-device-name'>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value='Phone'>Phone</SelectItem>
-                <SelectItem value='Laptop'>Laptop</SelectItem>
-              </SelectContent>
-            </Select>
+            <Input
+              id='sync-device-name'
+              value={deviceName}
+              onChange={(event) => setDeviceName(event.target.value)}
+              placeholder='Phone'
+              autoComplete='off'
+            />
+            <p className='text-xs text-clay'>Use a unique name per device (example: Phone, Clerk-Laptop) so you can tell where each sync came from.</p>
           </div>
           <div className='rounded-md border border-clay/25 bg-blush-sand/45 p-2'>
             <p className='text-xs text-clay'>Device tag</p>
@@ -123,7 +121,7 @@ export function SyncSetupDialog({
           </div>
           <div className='flex justify-end gap-2 pt-2'>
             <Button variant='secondary' onClick={() => onOpenChange(false)} disabled={isSaving}>Cancel</Button>
-            <Button onClick={() => void handleSubmit()} disabled={isSaving || roomCode.trim().length === 0}>
+            <Button onClick={() => void handleSubmit()} disabled={isSaving || roomCode.trim().length === 0 || deviceName.trim().length === 0}>
               {isSaving ? 'Saving...' : submitLabel}
             </Button>
           </div>
