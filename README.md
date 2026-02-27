@@ -111,6 +111,18 @@ Each open patient has eight focused tabs:
 
 ## Getting Started
 
+### Setup orientation (what this is, how it works, what to remember)
+
+Before running the app, use this quick mental model:
+
+- **What this is:** a personal, offline-first rounding notebook for one medical clerk. It is not a shared EHR.
+- **How it works:** React + TypeScript renders the UI, Dexie stores data in IndexedDB, and report builders generate copy/paste-ready text from saved records.
+- **Data flow to remember:** UI actions in `App.tsx` write/read Dexie tables via `db.ts`, shared shapes come from `types.ts`, and formatted outputs are produced by feature formatters/builders.
+- **Safety baseline:** preserve existing patient data by default; avoid destructive schema changes unless explicitly requested.
+- **Docs drift rule:** if workflow/labels/output behavior changes, update both this README and the in-app Settings “How to use” content.
+
+If you only remember one thing: **keep the app fast on mobile and offline-first**.
+
 ### Prerequisites
 
 - **Node.js 20 LTS or later** — [nodejs.org](https://nodejs.org)

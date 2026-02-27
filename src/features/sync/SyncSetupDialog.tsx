@@ -81,7 +81,8 @@ export function SyncSetupDialog({
         </DialogHeader>
         <div className='space-y-3'>
           <div className='space-y-1'>
-            <Label htmlFor='sync-room-code'>Room code</Label>
+            <Label htmlFor='sync-room-code'>Room key</Label>
+            <p className='text-xs text-clay'>Use the same Room key on your phone and laptop to join the same encrypted sync room.</p>
             <div className='relative'>
               <Input
                 id='sync-room-code'
@@ -91,7 +92,7 @@ export function SyncSetupDialog({
                   setRoomCode(event.target.value)
                   void refreshRoomTagPreview(event.target.value)
                 }}
-                placeholder='Enter room code'
+                placeholder='Enter room key'
                 autoComplete='off'
               />
               <button
