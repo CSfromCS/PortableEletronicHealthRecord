@@ -386,6 +386,8 @@ function App() {
   const [dailyDirty, setDailyDirty] = useState(false)
   const [copyLatestConfirmOpen, setCopyLatestConfirmOpen] = useState(false)
   const [pendingLatestDailyUpdate, setPendingLatestDailyUpdate] = useState<DailyUpdate | null>(null)
+  const [deleteDailyConfirmOpen, setDeleteDailyConfirmOpen] = useState(false)
+  const [pendingDeleteDailyUpdate, setPendingDeleteDailyUpdate] = useState<DailyUpdate | null>(null)
   const [selectedTab, setSelectedTab] = useState<'profile' | 'frichmond' | 'vitals' | 'labs' | 'medications' | 'orders' | 'photos' | 'reporting'>('profile')
   const [notice, setNotice] = useState('')
   const [noticeIsDecaying, setNoticeIsDecaying] = useState(false)
@@ -1223,9 +1225,18 @@ function App() {
       return
     }
 
-    setPendingLatestDailyUpdate(latestUpdate)
+    const sourceUpdate = latestUpdate.date === dailyDate
+      ? selectLatestDailyUpdate(updates.filter((entry) => entry.date < dailyDate))
+      : latestUpdate
+
+    if (!sourceUpdate) {
+      setNotice('No previous daily entry to copy yet.')
+      return
+    }
+
+    setPendingLatestDailyUpdate(sourceUpdate)
     setCopyLatestConfirmOpen(true)
-  }, [selectedPatientId])
+  }, [dailyDate, selectedPatientId])
 
   const confirmCopyLatestDailyUpdate = useCallback(() => {
     if (!pendingLatestDailyUpdate) return
@@ -1241,11 +1252,42 @@ function App() {
     setPendingLatestDailyUpdate(null)
   }, [])
 
+  const requestDeleteDailyUpdate = useCallback(async () => {
+    if (selectedPatientId === null) return
+    const update = await db.dailyUpdates.where('[patientId+date]').equals([selectedPatientId, dailyDate]).first()
+    if (!update) {
+      setNotice('No saved daily entry for this date.')
+      return
+    }
+
+    setPendingDeleteDailyUpdate(update)
+    setDeleteDailyConfirmOpen(true)
+  }, [dailyDate, selectedPatientId])
+
+  const confirmDeleteDailyUpdate = async () => {
+    if (!pendingDeleteDailyUpdate || selectedPatientId === null) return
+
+    await db.dailyUpdates.delete(pendingDeleteDailyUpdate.id)
+    await touchPatientLastModified(selectedPatientId)
+    setNotice(`Deleted daily entry (${pendingDeleteDailyUpdate.date}).`)
+    setDeleteDailyConfirmOpen(false)
+    setPendingDeleteDailyUpdate(null)
+    await loadDailyUpdate(selectedPatientId, dailyDate)
+  }
+
+  const closeDeleteDailyConfirm = useCallback(() => {
+    setDeleteDailyConfirmOpen(false)
+    setPendingDeleteDailyUpdate(null)
+  }, [])
+
   useEffect(() => {
     if (selectedPatientId === null && copyLatestConfirmOpen) {
       closeCopyLatestConfirm()
     }
-  }, [closeCopyLatestConfirm, copyLatestConfirmOpen, selectedPatientId])
+    if (selectedPatientId === null && deleteDailyConfirmOpen) {
+      closeDeleteDailyConfirm()
+    }
+  }, [closeCopyLatestConfirm, closeDeleteDailyConfirm, copyLatestConfirmOpen, deleteDailyConfirmOpen, selectedPatientId])
 
   const saveProfile = useCallback(
     async () => {
@@ -2927,17 +2969,6 @@ function App() {
           </div>
         </div>
 
-        {view == 'settings' ? (
-          <div className='mb-3 flex sm:hidden justify-end'>
-            <SyncButton
-              status={syncButtonStatus}
-              onClick={() => void runSyncNow()}
-              disabled={isSyncBusy}
-              lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
-            />
-          </div>
-        ) : null}
-
         {view === 'patient' && selectedPatient ? (
           <div className='mb-3 h-px bg-linear-to-r from-transparent via-clay/20 to-transparent sm:hidden' aria-hidden='true' />
         ) : null}
@@ -3288,6 +3319,14 @@ function App() {
                       >
                         Copy latest entry
                       </Button>
+                      <Button
+                        type='button'
+                        variant='destructive'
+                        onClick={() => void requestDeleteDailyUpdate()}
+                        disabled={selectedPatientId === null}
+                      >
+                        Delete day entry
+                      </Button>
                     </div>
                     <div className='space-y-1'>
                       <p className='text-xs text-clay'>Saved entry dates</p>
@@ -3317,7 +3356,34 @@ function App() {
                         <p className='text-xs text-clay'>No saved daily entries yet.</p>
                       )}
                     </div>
-                    <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date.</p>
+                    <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date (or previous date when today is latest).</p>
+                    <div className='space-y-2'>
+                      <Label>Checklist</Label>
+                      <div className='flex flex-wrap gap-2'>
+                        <Input
+                          value={dailyChecklistDraft}
+                          onChange={(event) => setDailyChecklistDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              addDailyChecklistItem()
+                            }
+                          }}
+                          placeholder='Add checklist item'
+                          aria-label='Add checklist item'
+                        />
+                        <Button type='button' variant='secondary' onClick={addDailyChecklistItem}>
+                          Add item
+                        </Button>
+                      </div>
+                      <div className='space-y-2'>
+                        {dailyChecklistSections.pending.map(({ item, index }) => renderDailyChecklistItem(item, index))}
+                        {dailyChecklistSections.completed.map(({ item, index }) => renderDailyChecklistItem(item, index))}
+                        {dailyUpdateForm.checklist.length === 0 && (
+                          <p className='text-xs text-clay'>No checklist items yet.</p>
+                        )}
+                      </div>
+                    </div>
                     <div className='space-y-1'>
                       <Label>Fluid</Label>
                       <PhotoMentionField
@@ -3497,33 +3563,6 @@ function App() {
                         attachmentByTitle={mentionableAttachmentByTitle}
                         onOpenPhotoById={openPhotoById}
                       />
-                    </div>
-                    <div className='space-y-2'>
-                      <Label>Checklist</Label>
-                      <div className='flex flex-wrap gap-2'>
-                        <Input
-                          value={dailyChecklistDraft}
-                          onChange={(event) => setDailyChecklistDraft(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') {
-                              event.preventDefault()
-                              addDailyChecklistItem()
-                            }
-                          }}
-                          placeholder='Add checklist item'
-                          aria-label='Add checklist item'
-                        />
-                        <Button type='button' variant='secondary' onClick={addDailyChecklistItem}>
-                          Add item
-                        </Button>
-                      </div>
-                      <div className='space-y-2'>
-                        {dailyChecklistSections.pending.map(({ item, index }) => renderDailyChecklistItem(item, index))}
-                        {dailyChecklistSections.completed.map(({ item, index }) => renderDailyChecklistItem(item, index))}
-                        {dailyUpdateForm.checklist.length === 0 && (
-                          <p className='text-xs text-clay'>No checklist items yet.</p>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -4479,10 +4518,11 @@ function App() {
 
                   <div className='grid gap-1.5 text-xs text-espresso'>
                     <p><strong>Device:</strong> {syncConfig?.deviceTag ?? 'Not configured'}</p>
-                    <p><strong>Last successful sync:</strong> {formatSyncDateTime(syncConfig?.lastSyncedAt)}</p>
                     <p><strong>Latest local change:</strong> {formatSyncDateTime(latestLocalChangeAt)}</p>
-                    <p><strong>Latest room upload:</strong> {formatSyncDateTime(syncInsight?.remoteLatestPushAt)}</p>
-                    <p><strong>Latest upload by:</strong> {latestUploadOwnerLabel}</p>
+                    <div className='h-px bg-clay/15 my-1' />
+                    <p><strong>Last successful sync:</strong> {formatSyncDateTime(syncConfig?.lastSyncedAt)}</p>
+                    <div className='h-px bg-clay/15 my-1' />
+                    <p><strong>Last room upload:</strong> {formatSyncDateTime(syncInsight?.remoteLatestPushAt)} by {latestUploadOwnerLabel}</p>
                   </div>
                 </div>
               </div>
@@ -4696,12 +4736,12 @@ function App() {
                 <ol className='space-y-2'>
                   {([
                     ['Prepare both devices', 'Open PUHRR on both devices and make sure both are connected to the internet during sync.'],
-                    ['Set up sync once', 'Tap the sync button in the header. Enter the same Room code on both devices, then type a Device name (recommended default: Phone). Keep each device name unique (example: Phone, Clerk-Laptop) so you can identify which device pushed each sync.'],
+                    ['Set up sync once', 'Tap the sync button (bottom-right in the mobile footer, top-right on desktop). Enter the same Room code on both devices, then type a Device name (recommended default: Phone). Keep each device name unique (example: Phone, Clerk-Laptop) so you can identify which device pushed each sync.'],
                     ['Edit sync identity', 'Open Settings → Edit sync settings any time to change this device\'s room code or device name.'],
                     ['Run first sync', 'After setup, PUHRR runs an initial sync. Wait for the success state before closing the dialog.'],
                     ['Understand first sync choices', 'If a room already has data and this device has never synced, PUHRR asks you to pick Upload this device or Download room data first. It will not auto-overwrite.'],
                     ['Check sync status', 'Open Settings → Sync Status to confirm latest room upload time, which device uploaded it, and whether this device has local unsynced changes.'],
-                    ['Sync during rounds', 'Tap Sync whenever you finish key edits or before switching devices. Button states: Synced, ↑ Push ready, ↓ Updates available, ⚠ Conflict, or Syncing.'],
+                    ['Sync during rounds', 'Tap Sync from the footer (phone) or header (desktop) whenever you finish key edits or before switching devices. Button states: Synced, ↑ Push ready, ↓ Updates available, ⚠ Conflict, or Syncing.'],
                     ['If conflict appears', 'A version picker opens whenever remote data is newer and this device also changed since the last sync. Choose one of the latest versions (or keep local) to continue.'],
                     ['Keep backup safety', 'Sync excludes photos. Continue exporting JSON backup regularly from Settings, especially before device/browser changes.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -4972,6 +5012,22 @@ function App() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={deleteDailyConfirmOpen} onOpenChange={(open) => { if (!open) closeDeleteDailyConfirm() }}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>Confirm delete daily entry</DialogTitle>
+            </DialogHeader>
+            <p className='text-sm text-espresso text-center'>
+              Are you sure you want to delete the daily entry for
+              <strong className='block text-center'>{pendingDeleteDailyUpdate?.date ?? dailyDate}?</strong>
+            </p>
+            <div className='flex gap-2 flex-wrap justify-center'>
+              <Button variant='destructive' onClick={() => void confirmDeleteDailyUpdate()}>Yes, delete entry</Button>
+              <Button variant='secondary' onClick={closeDeleteDailyConfirm}>Cancel</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <SyncSetupDialog
           open={syncSetupOpen}
           title={syncSetupMode === 'edit' ? 'Edit sync settings' : 'Set up sync'}
@@ -5147,6 +5203,14 @@ function App() {
                 </Button>
               </>
             ) : null}
+          </div>
+          <div className='sm:hidden'>
+            <SyncButton
+              status={syncButtonStatus}
+              onClick={() => void runSyncNow()}
+              disabled={isSyncBusy}
+              lastSyncedAt={syncConfig?.lastSyncedAt ?? null}
+            />
           </div>
         </div>
       </footer>
