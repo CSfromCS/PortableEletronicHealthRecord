@@ -247,6 +247,27 @@ const toPendingChecklistItems = (items: DailyChecklistItem[] | undefined) =>
     .filter((item) => !item.completed)
     .map((item) => ({ ...item, completed: false }))
 
+const selectLatestDailyUpdate = (updates: DailyUpdate[]) => {
+  if (updates.length === 0) return null
+
+  return updates.reduce((latest, candidate) => {
+    if (candidate.date > latest.date) {
+      return candidate
+    }
+    if (candidate.date < latest.date) {
+      return latest
+    }
+
+    const latestTimestamp = Date.parse(latest.lastUpdated)
+    const candidateTimestamp = Date.parse(candidate.lastUpdated)
+    if (Number.isFinite(candidateTimestamp) && Number.isFinite(latestTimestamp)) {
+      return candidateTimestamp >= latestTimestamp ? candidate : latest
+    }
+
+    return candidate
+  })
+}
+
 const getNormalAaDo2 = (age: number): number => {
   const decadesAboveThirty = age > 30 ? Math.floor((age - 30) / 10) : 0
   return 15 + decadesAboveThirty * 3
@@ -1131,27 +1152,6 @@ function App() {
     setForm(initialForm)
   }
 
-  const selectLatestDailyUpdate = useCallback((updates: DailyUpdate[]) => {
-    if (updates.length === 0) return null
-
-    return updates.reduce((latest, candidate) => {
-      if (candidate.date > latest.date) {
-        return candidate
-      }
-      if (candidate.date < latest.date) {
-        return latest
-      }
-
-      const latestTimestamp = Date.parse(latest.lastUpdated)
-      const candidateTimestamp = Date.parse(candidate.lastUpdated)
-      if (Number.isFinite(candidateTimestamp) && Number.isFinite(latestTimestamp)) {
-        return candidateTimestamp >= latestTimestamp ? candidate : latest
-      }
-
-      return candidate
-    })
-  }, [])
-
   const loadDailyUpdate = async (patientId: number, date: string) => {
     const update = await db.dailyUpdates.where('[patientId+date]').equals([patientId, date]).first()
     if (!update) {
@@ -1225,7 +1225,7 @@ function App() {
 
     setPendingLatestDailyUpdate(latestUpdate)
     setCopyLatestConfirmOpen(true)
-  }, [selectedPatientId, selectLatestDailyUpdate])
+  }, [selectedPatientId])
 
   const confirmCopyLatestDailyUpdate = useCallback(() => {
     if (!pendingLatestDailyUpdate) return
@@ -1417,6 +1417,22 @@ function App() {
     }))
     setDailyDirty(true)
   }, [])
+
+  const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
+    <div key={`checklist-${index}`} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
+      <input
+        type='checkbox'
+        className='mt-1 h-4 w-4 accent-action-primary'
+        checked={item.completed}
+        onChange={(event) => updateDailyChecklistItemCompletion(index, event.target.checked)}
+        aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
+      />
+      <p className={`flex-1 whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
+        Remove
+      </Button>
+    </div>
+  ), [removeDailyChecklistItem, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -2849,6 +2865,16 @@ function App() {
     ? `${selectedPatient.roomNumber} - ${selectedPatient.lastName}`
     : 'Patient'
   const canShowFocusedPatientNavButton = selectedPatient?.status === 'active'
+  const dailyChecklistSections = useMemo(() =>
+    dailyUpdateForm.checklist.reduce<{ pending: Array<{ item: DailyChecklistItem; index: number }>; completed: Array<{ item: DailyChecklistItem; index: number }> }>((accumulator, item, index) => {
+      if (item.completed) {
+        accumulator.completed.push({ item, index })
+      } else {
+        accumulator.pending.push({ item, index })
+      }
+      return accumulator
+    }, { pending: [], completed: [] }),
+  [dailyUpdateForm.checklist])
 
   return (
     <div className='min-h-screen pb-20 sm:pb-0'>
@@ -3492,44 +3518,8 @@ function App() {
                         </Button>
                       </div>
                       <div className='space-y-2'>
-                        {dailyUpdateForm.checklist.map((item, index) => (
-                          item.completed
-                            ? null
-                            : (
-                              <div key={`pending-${index}`} className='flex items-start gap-2 rounded-md border border-clay/30 bg-warm-ivory px-2 py-1.5'>
-                                <input
-                                  type='checkbox'
-                                  className='mt-1 h-4 w-4 accent-action-primary'
-                                  checked={item.completed}
-                                  onChange={(event) => updateDailyChecklistItemCompletion(index, event.target.checked)}
-                                  aria-label='Mark checklist item complete'
-                                />
-                                <p className='flex-1 whitespace-pre-wrap text-sm text-espresso'>{item.text}</p>
-                                <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
-                                  Remove
-                                </Button>
-                              </div>
-                            )
-                        ))}
-                        {dailyUpdateForm.checklist.map((item, index) => (
-                          item.completed
-                            ? (
-                              <div key={`completed-${index}`} className='flex items-start gap-2 rounded-md border border-clay/20 bg-warm-ivory/70 px-2 py-1.5'>
-                                <input
-                                  type='checkbox'
-                                  className='mt-1 h-4 w-4 accent-action-primary'
-                                  checked={item.completed}
-                                  onChange={(event) => updateDailyChecklistItemCompletion(index, event.target.checked)}
-                                  aria-label='Mark checklist item pending'
-                                />
-                                <p className='flex-1 whitespace-pre-wrap text-sm text-clay line-through'>{item.text}</p>
-                                <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
-                                  Remove
-                                </Button>
-                              </div>
-                            )
-                            : null
-                        ))}
+                        {dailyChecklistSections.pending.map(({ item, index }) => renderDailyChecklistItem(item, index))}
+                        {dailyChecklistSections.completed.map(({ item, index }) => renderDailyChecklistItem(item, index))}
                         {dailyUpdateForm.checklist.length === 0 && (
                           <p className='text-xs text-clay'>No checklist items yet.</p>
                         )}
