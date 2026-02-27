@@ -58,6 +58,7 @@
 
 @layer base {
   :root {
+    color-scheme: only light;
     --background: var(--color-warm-ivory);
     --foreground: var(--color-espresso);
     --card: var(--color-peach-cream);
