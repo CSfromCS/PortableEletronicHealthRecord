@@ -19,6 +19,40 @@
 - If a change updates workflow, field labels/order, or copy/share behavior, also update the in-app Settings **How to use** section in the same task.
 - Avoid hard-coding static "current version" statements in docs; they become stale quickly.
 
+## Current Code Map (LLM Quick Index)
+
+Use this as the first-stop map when making changes:
+
+- `src/App.tsx`
+  - App shell + overall workflow orchestration
+  - View switching (`patients` / `patient` / `settings`)
+  - Cross-feature state wiring, autosave triggers, dialogs, and reporting actions
+  - Keep this as a coordinator file; prefer extracting pure logic/components instead of growing this file further
+- `src/features/photos/photoUtils.ts`
+  - Photo category options and labels
+  - Photo title defaults, upload-group key helpers
+  - Image compression + byte-size formatting helpers
+- `src/features/photos/photoMentions.tsx`
+  - Mention-aware long-form input (`PhotoMentionField`)
+  - Mention renderer (`MentionText`) for clickable `@photo-title` links
+  - Photo mention-related helper types (`MentionablePhoto`, grouped/review attachment types)
+- `src/features/labs/labTemplates.ts`
+  - Structured lab template catalog (`LAB_TEMPLATES`)
+  - Lab template constants and field-key builders (ULN/normal-range keys, ABG keys)
+  - Template IDs used across lab entry/reporting flows
+- `src/labFormatters.ts`
+  - Lab report text formatters (single, comparison, urinalysis, blood chemistry)
+- `src/db.ts`
+  - Dexie schema, stores, and migrations (source of truth for persisted shape)
+- `src/types.ts`
+  - Domain model and shared types
+
+Refactor guidance for future work:
+
+- Prefer feature-local extraction under `src/features/<feature>/`.
+- Keep components/hooks/utilities focused and small enough to review in one pass.
+- When adding reusable cross-feature helpers, place them in dedicated modules instead of `App.tsx`.
+
 ---
 
 ## Design Principles
