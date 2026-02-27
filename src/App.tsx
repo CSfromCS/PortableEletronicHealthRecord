@@ -83,7 +83,7 @@ import {
   formatPhotoCategory,
   getPhotoGroupKey,
 } from './features/photos/photoUtils'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2 } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Expand, Minimize2 } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -287,6 +287,7 @@ function App() {
   const backupFileInputRef = useRef<HTMLInputElement | null>(null)
   const cameraPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const galleryPhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const outputPreviewTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [form, setForm] = useState<PatientFormState>(initialForm)
   const [view, setView] = useState<'patients' | 'patient' | 'settings'>('patients')
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
@@ -325,6 +326,8 @@ function App() {
   const [clipboardCopied, setClipboardCopied] = useState(false)
   const [outputPreview, setOutputPreview] = useState('')
   const [outputPreviewTitle, setOutputPreviewTitle] = useState('Generated text')
+  const [isOutputPreviewExpanded, setIsOutputPreviewExpanded] = useState(false)
+  const [showOutputPreviewExpand, setShowOutputPreviewExpand] = useState(false)
   const [attachmentCategory, setAttachmentCategory] = useState<PhotoCategory>('profile')
   const [attachmentFilter, setAttachmentFilter] = useState<PhotoCategory | 'all'>('all')
   const [attachmentTitle, setAttachmentTitle] = useState(() => buildDefaultPhotoTitle('profile'))
@@ -1475,7 +1478,43 @@ function App() {
     setOutputPreview('')
     setOutputPreviewTitle('Generated text')
     setClipboardCopied(false)
+    setIsOutputPreviewExpanded(false)
+    setShowOutputPreviewExpand(false)
   }
+
+  const toggleOutputPreviewExpanded = () => {
+    const textarea = outputPreviewTextareaRef.current
+    if (!textarea) return
+
+    if (isOutputPreviewExpanded) {
+      textarea.style.height = '100px'
+      setIsOutputPreviewExpanded(false)
+      return
+    }
+
+    textarea.style.height = 'auto'
+    requestAnimationFrame(() => {
+      textarea.style.height = `${textarea.scrollHeight}px`
+      setIsOutputPreviewExpanded(true)
+    })
+  }
+
+  useEffect(() => {
+    const textarea = outputPreviewTextareaRef.current
+    if (!textarea) return
+
+    const hasOverflowAtDefaultHeight = textarea.scrollHeight > 101
+
+    if (isOutputPreviewExpanded) {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
+      setShowOutputPreviewExpand(true)
+      return
+    }
+
+    textarea.style.height = '100px'
+    setShowOutputPreviewExpand(hasOverflowAtDefaultHeight)
+  }, [isOutputPreviewExpanded, outputPreview])
 
   const addStructuredVital = async () => {
     if (selectedPatientId === null || !vitalForm.date || !vitalForm.time) return
@@ -2448,7 +2487,7 @@ function App() {
   return (
     <div className='min-h-screen pb-20 sm:pb-0'>
       {/* Brand accent bar */}
-      <div className='fixed inset-x-0 top-0 z-60 h-[3px] bg-linear-to-r from-action-primary/40 via-action-primary to-orange-400/70 pointer-events-none' aria-hidden='true' />
+      <div className='fixed inset-x-0 top-0 z-60 h-0.75 bg-linear-to-r from-action-primary/40 via-action-primary to-orange-400/70 pointer-events-none' aria-hidden='true' />
       {notice ? (
         <div className='fixed top-3 left-1/2 z-50 w-[min(92vw,38rem)] -translate-x-1/2 px-1 pointer-events-none'>
           <Alert
@@ -2601,7 +2640,7 @@ function App() {
             {view === 'patient' ? (
               selectedPatient ? (
               <Card className='border-0 bg-transparent shadow-none sm:bg-white/80 sm:border-clay/25 sm:shadow-md sm:ring-1 sm:ring-clay/10'>
-                <CardHeader className='sticky top-0 z-20 py-2 px-0 pb-2 bg-warm-ivory/97 backdrop-blur-sm border-b border-clay/15 -mx-0 sm:static sm:py-3 sm:px-4 sm:pb-0 sm:bg-transparent sm:backdrop-blur-none sm:border-b-0'>
+                <CardHeader className='sticky top-0 z-20 py-2 px-0 pb-2 bg-warm-ivory/97 backdrop-blur-sm border-b border-clay/15 mx-0 sm:static sm:py-3 sm:px-4 sm:pb-0 sm:bg-transparent sm:backdrop-blur-none sm:border-b-0'>
                   <Select
                     value={selectedPatient.id?.toString() ?? ''}
                     onValueChange={(value) => {
@@ -4184,6 +4223,7 @@ function App() {
                     'ABG: pO2/FiO2 is auto-calculated from pO2 and Actual FiO2. Desired FiO2 only appears when FiO2 > 21% or pO2 < 60 mmHg.',
                     'Report Labs: two entries from the same lab template are auto-compared, except Others entries which are always shown as separate plain results.',
                     'Type @ in any text field to link a photo by title — tap the highlighted @title to open the photo viewer.',
+                    'Large note text boxes include an expand button when content overflows; tap again to collapse back to default height.',
                     'FRICH exports include a daily vitals range line (BP, HR, RR, Temp, SpO2%) for the selected date.',
                     'All patient exports: select and reorder active patients before generating Multiple Census or Multiple Vitals.',
                     'Photos: upload multiple images at once — they are grouped into one block. Tap the block to open a swipeable carousel.',
@@ -4247,10 +4287,23 @@ function App() {
                   'Copy full text'
                 )}
               </Button>
+              {showOutputPreviewExpand ? (
+                <Button variant='secondary' onClick={toggleOutputPreviewExpanded}>
+                  {isOutputPreviewExpanded ? (
+                    <><Minimize2 className='h-4 w-4 mr-1.5' />Collapse</>
+                  ) : (
+                    <><Expand className='h-4 w-4 mr-1.5' />Expand</>
+                  )}
+                </Button>
+              ) : null}
               <Button variant='destructive' onClick={closeCopyModal}>Close</Button>
             </div>
             <textarea
-              className='flex-1 min-h-0 w-full font-mono bg-white/90 resize-none p-3 rounded-lg border border-clay/30 text-sm overflow-auto leading-relaxed'
+              ref={outputPreviewTextareaRef}
+              className={cn(
+                'flex-1 min-h-0 w-full h-25 font-mono bg-white/90 resize-none p-3 rounded-lg border border-clay/30 text-sm overflow-auto leading-relaxed transition-[height] duration-200 ease-in-out',
+                isOutputPreviewExpanded && 'output-preview-expanded',
+              )}
               aria-label='Generated text preview'
               readOnly
               value={outputPreview}

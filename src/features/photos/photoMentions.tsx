@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -6,10 +7,14 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from 'react'
+import { Expand, Minimize2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
 import type { PhotoAttachment, PhotoCategory } from '../../types'
 import { formatPhotoCategory } from './photoUtils'
+
+const DEFAULT_MULTILINE_HEIGHT = 100
 
 export type MentionablePhoto = {
   id: number
@@ -143,6 +148,8 @@ export const PhotoMentionField = ({
   const inputRef = useRef<HTMLInputElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [activeMention, setActiveMention] = useState<ActivePhotoMention | null>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [showExpandToggle, setShowExpandToggle] = useState(false)
 
   const filteredSuggestions = useMemo(() => {
     if (!activeMention) return [] as MentionablePhoto[]
@@ -209,21 +216,82 @@ export const PhotoMentionField = ({
     setActiveMention(findActivePhotoMention(target.value, caretPosition))
   }
 
+  useEffect(() => {
+    if (!multiline) return
+
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    const frame = requestAnimationFrame(() => {
+      const hasOverflowAtDefaultHeight = textarea.scrollHeight > DEFAULT_MULTILINE_HEIGHT + 1
+
+      if (isExpanded) {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${textarea.scrollHeight}px`
+        setShowExpandToggle(true)
+        return
+      }
+
+      textarea.style.height = `${DEFAULT_MULTILINE_HEIGHT}px`
+      setShowExpandToggle(hasOverflowAtDefaultHeight)
+    })
+
+    return () => {
+      cancelAnimationFrame(frame)
+    }
+  }, [isExpanded, multiline, value])
+
+  const toggleExpanded = () => {
+    if (!multiline) return
+
+    const textarea = textareaRef.current
+    if (!textarea) return
+
+    if (isExpanded) {
+      textarea.style.height = `${DEFAULT_MULTILINE_HEIGHT}px`
+      setIsExpanded(false)
+      return
+    }
+
+    textarea.style.height = 'auto'
+    requestAnimationFrame(() => {
+      const expandedHeight = textarea.scrollHeight
+      textarea.style.height = `${expandedHeight}px`
+      setIsExpanded(true)
+    })
+  }
+
   return (
     <div className='space-y-1'>
       <div className='relative'>
         {multiline ? (
-          <Textarea
-            ref={textareaRef}
-            aria-label={ariaLabel}
-            placeholder={placeholder}
-            className={className}
-            value={value}
-            onChange={(event) => applyValueChange(event.target.value, event.target)}
-            onSelect={handleTextareaSelect}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-          />
+          <>
+            {showExpandToggle ? (
+              <button
+                type='button'
+                className='absolute right-0 -top-7 inline-flex h-6 w-6 items-center justify-center rounded border border-clay/30 bg-white/90 text-clay transition-colors hover:bg-blush-sand/60'
+                onClick={toggleExpanded}
+                aria-label={isExpanded ? 'Collapse text area' : 'Expand text area'}
+              >
+                {isExpanded ? <Minimize2 className='h-3.5 w-3.5' /> : <Expand className='h-3.5 w-3.5' />}
+              </button>
+            ) : null}
+            <Textarea
+              ref={textareaRef}
+              aria-label={ariaLabel}
+              placeholder={placeholder}
+              className={cn(
+                className,
+                'h-25 min-h-25 overflow-auto resize-none transition-[height] duration-200 ease-in-out',
+                isExpanded && 'photo-mention-field-expanded',
+              )}
+              value={value}
+              onChange={(event) => applyValueChange(event.target.value, event.target)}
+              onSelect={handleTextareaSelect}
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
+            />
+          </>
         ) : (
           <Input
             ref={inputRef}
