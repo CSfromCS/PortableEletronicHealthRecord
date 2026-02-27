@@ -36,7 +36,6 @@ type ReportWindow = {
 type ProfileSummaryInput = {
   service: string
   diagnosis: string
-  pendings: string
   clerkNotes: string
 }
 
@@ -53,6 +52,7 @@ type DailySummaryInput = {
   other: string
   assessment: string
   plans: string
+  checklist: { text: string; completed: boolean }[]
 }
 
 const labTemplatesById = new Map(LAB_TEMPLATES.map((template) => [template.id, template] as const))
@@ -296,7 +296,6 @@ export const toCensusEntry = (
     `Labs: ${labsCombined || '-'}`,
     `Meds: ${medsCombined || '-'}`,
     `Orders: ${activeOrders || '-'}`,
-    `Pendings: ${patient.pendings || '-'}`,
   ].join('\n')
 }
 
@@ -379,10 +378,6 @@ export const toProfileSummary = (
 ) => {
   const { main, referrals } = parseServiceLines(profile.service || patient.service)
   const diagnosis = profile.diagnosis.trim() || patient.diagnosis.trim() || '-'
-  const pendingItems = (profile.pendings || patient.pendings || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
   const notes = (profile.clerkNotes || patient.clerkNotes || '').trim()
 
   const lines = [
@@ -391,8 +386,6 @@ export const toProfileSummary = (
     `Main: ${main}`,
     `Referrals: ${referrals.length > 0 ? referrals.join(', ') : '-'}`,
     `Dx: ${diagnosis}`,
-    'Pendings:',
-    pendingItems.length > 0 ? pendingItems.join('\n\n') : '-',
   ]
 
   if (notes) {
@@ -410,6 +403,9 @@ export const toDailySummary = (
   dailyDate: string,
 ) => {
   const vitalsLine = buildDailyVitalsRangeLine(vitalsEntries, dailyDate)
+  const checklistItems = (update.checklist ?? []).filter((item) => (item.text ?? '').trim().length > 0)
+  const pendingChecklistItems = checklistItems.filter((item) => !item.completed)
+  const completedChecklistItems = checklistItems.filter((item) => item.completed)
 
   const lines = [
     `${formatPatientHeader(patient)} — ${formatDateMMDDYYYY(dailyDate)}`,
@@ -426,6 +422,9 @@ export const toDailySummary = (
     update.other ? `Other: ${update.other}` : '',
     update.assessment ? `Assessment: ${update.assessment}` : '',
     update.plans ? `Plan: ${update.plans}` : '',
+    checklistItems.length > 0 ? 'Checklist:' : '',
+    ...pendingChecklistItems.map((item) => `- [ ] ${item.text.trim()}`),
+    ...completedChecklistItems.map((item) => `- [x] ${item.text.trim()}`),
   ]
 
   return lines.filter(Boolean).join('\n')

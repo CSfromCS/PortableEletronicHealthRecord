@@ -41,6 +41,7 @@ export interface DailyUpdate {
   other: string
   assessment: string
   plans: string
+  checklist: { text: string; completed: boolean }[]
   lastUpdated: string
 }
 
