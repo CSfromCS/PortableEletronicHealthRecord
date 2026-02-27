@@ -2228,7 +2228,7 @@ function App() {
       setConflictVersions([])
       setSyncConflictMode('conflict')
       setSelectedConflictVersion('local')
-      applySyncResult(result.config, 'Conflict resolved and sync completed.')
+      applySyncResult(result.config, result.message)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to resolve conflict.'
       setSyncStatus('error')

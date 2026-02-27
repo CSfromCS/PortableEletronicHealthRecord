@@ -273,7 +273,7 @@ const pushSnapshot = async (config: SyncConfig): Promise<SyncResult> => {
   }
   const remoteCheck = await checkRemote(nextConfigWithoutSyncTime)
   if (!remoteCheck) {
-    throw new Error('Sync push completed but could not verify server timestamp. Please sync again.')
+    throw new Error('Sync push succeeded, but remote state could not be confirmed via /api/sync/check. Check connectivity and sync again.')
   }
 
   const nextConfig: SyncConfig = {
@@ -324,6 +324,10 @@ const checkRemote = async (config: SyncConfig): Promise<SyncCheckResponse | null
   } catch {
     return null
   }
+}
+
+const prepareVersionShaForPull = (versionSha: string): string | undefined => {
+  return versionSha === 'latest' ? undefined : versionSha
 }
 
 const getRemoteVersions = async (config: SyncConfig, count = 5): Promise<SyncVersion[]> => {
@@ -598,7 +602,7 @@ export const resolveConflictWithVersion = async (
 ): Promise<SyncResult> => {
   const remoteCheck = await checkRemote(config)
   const lastSyncedAt = remoteCheck?.updatedAt ?? toIsoNow()
-  const payload = await pullSnapshot(config, versionSha === 'latest' ? undefined : versionSha)
+  const payload = await pullSnapshot(config, prepareVersionShaForPull(versionSha))
   await replaceSyncedTables(payload)
 
   const updatedConfig = {
