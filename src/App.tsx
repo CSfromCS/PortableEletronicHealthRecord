@@ -2905,9 +2905,8 @@ function App() {
 
       await db.transaction(
         'rw',
-        [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders, db.photoAttachments],
+        [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders],
         async () => {
-        await db.photoAttachments.clear()
         await db.labs.clear()
         await db.medications.clear()
         await db.orders.clear()
@@ -2960,7 +2959,7 @@ function App() {
       setSelectedAttachmentId(null)
       setProfileForm(initialProfileForm)
       setLastSavedAt(null)
-      setNotice('Backup imported. Photos were not included and were cleared.')
+      setNotice('Backup imported. Text data was replaced; existing photos were kept.')
     } catch {
       setNotice('Unable to import backup.')
     } finally {
@@ -4979,7 +4978,7 @@ function App() {
                     </div>
                     <div className='min-w-0'>
                       <p className='text-sm font-semibold text-espresso'>Import backup</p>
-                      <p className='text-xs text-clay mt-0.5'>Restore from a backup JSON file — replaces all current data</p>
+                      <p className='text-xs text-clay mt-0.5'>Restore from backup JSON — replaces text data, keeps current photos</p>
                     </div>
                   </button>
                   <button
@@ -5125,6 +5124,7 @@ function App() {
                     'All data is stored locally on this device — no account or internet connection required.',
                     'Profile, daily notes, vitals, and orders auto-save a moment after you stop typing.',
                     'Photos are compressed and stored in the app; they are excluded from JSON backup exports.',
+                    'Import backup replaces text tables only and keeps all photos currently stored on this device.',
                     'Use the Save now button in the footer to force-save all pending changes immediately.',
                     'Data persists across page refreshes and browser restarts on the same browser profile.',
                     'Export backup JSON regularly when switching devices or browsers to avoid data loss.',

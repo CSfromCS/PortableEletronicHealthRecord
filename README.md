@@ -83,7 +83,7 @@ Each open patient has eight focused tabs:
 
 ### Settings
 
-- **Backup / restore** — export all text data as JSON; import to restore.
+- **Backup / restore** — export all text data as JSON; import replaces text data while keeping current on-device photos.
 - **Clear discharged patients** — bulk-remove patients marked as discharged.
 - **Show onboarding** — reopen the Welcome modal and retry the install prompt at any time.
 
@@ -223,6 +223,7 @@ public/
 - No analytics, no telemetry, no external API calls.
 - Backups are plain JSON files exported manually from Settings.
 - Photo attachments are stored in IndexedDB only — they are **excluded** from the JSON backup.
+- Importing a JSON backup replaces text tables and keeps existing photo attachments already stored on the device.
 
 ---
 
@@ -248,6 +249,7 @@ Then do a quick manual smoke test:
 ## Known Limitations
 
 - JSON backup/restore covers **text data only** — photo attachments are not included.
+- Import keeps currently stored photos; it does not recreate photos from the backup file.
 - No multi-user or sync support by design.
 - Offline support depends on the PWA service worker being registered on first load while online.
 
