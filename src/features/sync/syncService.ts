@@ -387,11 +387,11 @@ export const getSyncInsight = async (currentConfig: SyncConfig): Promise<SyncIns
   const remoteDescription = parseDescription(remoteCheck.description)
   const remoteLatestPushAt = remoteDescription?.lastPushedAt ?? remoteCheck.updatedAt
   const remoteLatestPushedBy = remoteDescription?.lastPushedBy ?? null
-  const remoteLatestMs = Date.parse(remoteLatestPushAt)
+  const remoteUpdatedMs = Date.parse(remoteCheck.updatedAt)
 
   const remoteHasNewerData = Number.isFinite(lastSyncedMs)
-    ? Number.isFinite(remoteLatestMs) && remoteLatestMs > lastSyncedMs
-    : Number.isFinite(remoteLatestMs)
+    ? Number.isFinite(remoteUpdatedMs) && remoteUpdatedMs > lastSyncedMs
+    : Number.isFinite(remoteUpdatedMs)
 
   return {
     localLatestChangeAt,
@@ -537,7 +537,7 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
   const remoteDeviceTag = remoteDescription?.lastPushedBy ?? ''
 
   const lastSyncedMs = linkedConfig.lastSyncedAt ? Date.parse(linkedConfig.lastSyncedAt) : Number.NaN
-  const remotePushedMs = Date.parse(remotePushedAt)
+  const remoteUpdatedMs = Date.parse(remoteCheck.updatedAt)
   const localLatestChange = await getLatestLocalChangeAt()
   const localLatestMs = localLatestChange ? Date.parse(localLatestChange) : Number.NaN
 
@@ -546,8 +546,8 @@ export const syncNow = async (currentConfig: SyncConfig): Promise<SyncNowResult>
     : Number.isFinite(localLatestMs)
 
   const remoteIsNewSinceLastSync = Number.isFinite(lastSyncedMs)
-    ? Number.isFinite(remotePushedMs) && remotePushedMs > lastSyncedMs
-    : Number.isFinite(remotePushedMs)
+    ? Number.isFinite(remoteUpdatedMs) && remoteUpdatedMs > lastSyncedMs
+    : Number.isFinite(remoteUpdatedMs)
 
   if (remoteIsNewSinceLastSync) {
     if (hasLocalChangesSinceLastSync) {
