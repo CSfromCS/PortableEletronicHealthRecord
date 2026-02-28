@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type DragEvent,
   type FormEvent,
 } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -101,7 +102,7 @@ import {
   type SyncNowResult,
   type SyncVersion,
 } from './features/sync/syncService'
-import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Expand, Minimize2 } from 'lucide-react'
+import { Users, UserRound, Settings, HeartPulse, Pill, FlaskConical, ClipboardList, Camera, ChevronLeft, ChevronRight, CheckCircle2, Info, Download, Upload, Trash2, Expand, Minimize2, GripVertical } from 'lucide-react'
 
 type PatientFormState = {
   roomNumber: string
@@ -365,6 +366,7 @@ function App() {
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [dailyChecklistDraft, setDailyChecklistDraft] = useState('')
   const [editingDailyChecklistItem, setEditingDailyChecklistItem] = useState<{ index: number; text: string } | null>(null)
+  const [draggingDailyChecklistItemIndex, setDraggingDailyChecklistItemIndex] = useState<number | null>(null)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
@@ -1488,34 +1490,37 @@ function App() {
     setEditingDailyChecklistItem(null)
   }, [editingDailyChecklistItem, updateDailyChecklistItemText])
 
-  const moveDailyChecklistItem = useCallback((index: number, direction: 'up' | 'down') => {
+  const removeEditedDailyChecklistItem = useCallback(() => {
+    if (!editingDailyChecklistItem) return
+
+    removeDailyChecklistItem(editingDailyChecklistItem.index)
+    setEditingDailyChecklistItem(null)
+  }, [editingDailyChecklistItem, removeDailyChecklistItem])
+
+  const reorderDailyChecklistItem = useCallback((sourceIndex: number, targetIndex: number) => {
     setDailyUpdateForm((previous) => {
-      const currentItem = previous.checklist[index]
-      if (!currentItem) return previous
+      const sourceItem = previous.checklist[sourceIndex]
+      const targetItem = previous.checklist[targetIndex]
+      if (!sourceItem || !targetItem || sourceIndex === targetIndex || sourceItem.completed !== targetItem.completed) return previous
 
-      let swapIndex = -1
-      if (direction === 'up') {
-        for (let candidateIndex = index - 1; candidateIndex >= 0; candidateIndex -= 1) {
-          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
-            swapIndex = candidateIndex
-            break
-          }
+      const matchingIndices = previous.checklist.reduce<number[]>((accumulator, item, index) => {
+        if (item.completed === sourceItem.completed) {
+          accumulator.push(index)
         }
-      } else {
-        for (let candidateIndex = index + 1; candidateIndex < previous.checklist.length; candidateIndex += 1) {
-          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
-            swapIndex = candidateIndex
-            break
-          }
-        }
-      }
+        return accumulator
+      }, [])
+      const sourcePosition = matchingIndices.indexOf(sourceIndex)
+      const targetPosition = matchingIndices.indexOf(targetIndex)
+      if (sourcePosition < 0 || targetPosition < 0) return previous
 
-      if (swapIndex < 0) return previous
+      const matchingItems = matchingIndices.map((index) => previous.checklist[index])
+      const [movedItem] = matchingItems.splice(sourcePosition, 1)
+      matchingItems.splice(targetPosition, 0, movedItem)
 
       const nextChecklist = [...previous.checklist]
-      const currentValue = nextChecklist[index]
-      nextChecklist[index] = nextChecklist[swapIndex]
-      nextChecklist[swapIndex] = currentValue
+      matchingIndices.forEach((index, itemPosition) => {
+        nextChecklist[index] = matchingItems[itemPosition]
+      })
 
       return {
         ...previous,
@@ -1525,8 +1530,57 @@ function App() {
     setDailyDirty(true)
   }, [])
 
+  const startDailyChecklistDrag = useCallback((event: DragEvent<HTMLButtonElement>, index: number) => {
+    event.dataTransfer.effectAllowed = 'move'
+    setDraggingDailyChecklistItemIndex(index)
+  }, [])
+
+  const endDailyChecklistDrag = useCallback(() => {
+    setDraggingDailyChecklistItemIndex(null)
+  }, [])
+
+  const allowDailyChecklistDrop = useCallback((event: DragEvent<HTMLDivElement>, targetIndex: number) => {
+    if (draggingDailyChecklistItemIndex === null || draggingDailyChecklistItemIndex === targetIndex) return
+
+    const sourceItem = dailyUpdateForm.checklist[draggingDailyChecklistItemIndex]
+    const targetItem = dailyUpdateForm.checklist[targetIndex]
+    if (!sourceItem || !targetItem || sourceItem.completed !== targetItem.completed) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }, [dailyUpdateForm.checklist, draggingDailyChecklistItemIndex])
+
+  const dropDailyChecklistItem = useCallback((event: DragEvent<HTMLDivElement>, targetIndex: number) => {
+    event.preventDefault()
+    if (draggingDailyChecklistItemIndex === null || draggingDailyChecklistItemIndex === targetIndex) {
+      setDraggingDailyChecklistItemIndex(null)
+      return
+    }
+
+    reorderDailyChecklistItem(draggingDailyChecklistItemIndex, targetIndex)
+    setDraggingDailyChecklistItemIndex(null)
+  }, [draggingDailyChecklistItemIndex, reorderDailyChecklistItem])
+
+  const moveDailyChecklistItemByDirection = useCallback((index: number, direction: 'up' | 'down') => {
+    const currentItem = dailyUpdateForm.checklist[index]
+    if (!currentItem) return
+
+    const step = direction === 'up' ? -1 : 1
+    for (let candidateIndex = index + step; candidateIndex >= 0 && candidateIndex < dailyUpdateForm.checklist.length; candidateIndex += step) {
+      if (dailyUpdateForm.checklist[candidateIndex]?.completed === currentItem.completed) {
+        reorderDailyChecklistItem(index, candidateIndex)
+        return
+      }
+    }
+  }, [dailyUpdateForm.checklist, reorderDailyChecklistItem])
+
   const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
-    <div key={`checklist-${index}`} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
+    <div
+      key={`checklist-${index}`}
+      className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'} ${draggingDailyChecklistItemIndex === index ? 'opacity-60' : ''}`}
+      onDragOver={(event) => allowDailyChecklistDrop(event, index)}
+      onDrop={(event) => dropDailyChecklistItem(event, index)}
+    >
       <input
         type='checkbox'
         className='mt-1 h-4 w-4 accent-action-primary'
@@ -1535,20 +1589,27 @@ function App() {
         aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
       />
       <p className={`flex-1 whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
-      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'up')} aria-label='Move checklist item up'>
-        <span aria-hidden='true'>↑</span>
-      </Button>
-      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'down')} aria-label='Move checklist item down'>
-        <span aria-hidden='true'>↓</span>
+      <Button
+        type='button'
+        variant='ghost'
+        className='h-6 w-6 shrink-0 p-0 text-clay cursor-grab active:cursor-grabbing'
+        aria-label='Drag checklist item to reorder'
+        draggable
+        onDragStart={(event) => startDailyChecklistDrag(event, index)}
+        onDragEnd={endDailyChecklistDrag}
+        onKeyDown={(event) => {
+          if (!(event.ctrlKey || event.metaKey) || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+          event.preventDefault()
+          moveDailyChecklistItemByDirection(index, event.key === 'ArrowUp' ? 'up' : 'down')
+        }}
+      >
+        <GripVertical className='h-3.5 w-3.5' aria-hidden='true' />
       </Button>
       <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => requestEditDailyChecklistItem(index)}>
         Edit
       </Button>
-      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
-        Remove
-      </Button>
     </div>
-  ), [moveDailyChecklistItem, removeDailyChecklistItem, requestEditDailyChecklistItem, updateDailyChecklistItemCompletion])
+  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, moveDailyChecklistItemByDirection, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -3433,6 +3494,7 @@ function App() {
                     <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date (or previous date when today is latest).</p>
                     <div className='space-y-2'>
                       <Label>Checklist</Label>
+                      <p className='text-xs text-clay'>Drag the handle to reorder items within pending or completed sections. Keyboard: focus handle then press Ctrl/⌘ + ↑/↓.</p>
                       <div className='flex flex-wrap gap-2'>
                         <Input
                           value={dailyChecklistDraft}
@@ -4744,7 +4806,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit and ↑/↓ on checklist items to revise details and reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit to revise or remove checklist items, and use the drag handle to reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -5115,6 +5177,7 @@ function App() {
                 placeholder='Checklist item'
               />
               <div className='flex gap-2 justify-end'>
+                <Button variant='destructive' className='mr-auto' onClick={removeEditedDailyChecklistItem}>Remove</Button>
                 <Button variant='secondary' onClick={() => setEditingDailyChecklistItem(null)}>Cancel</Button>
                 <Button onClick={saveEditedDailyChecklistItem}>Save</Button>
               </div>
