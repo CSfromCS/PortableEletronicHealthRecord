@@ -1490,6 +1490,13 @@ function App() {
     setEditingDailyChecklistItem(null)
   }, [editingDailyChecklistItem, updateDailyChecklistItemText])
 
+  const removeEditedDailyChecklistItem = useCallback(() => {
+    if (!editingDailyChecklistItem) return
+
+    removeDailyChecklistItem(editingDailyChecklistItem.index)
+    setEditingDailyChecklistItem(null)
+  }, [editingDailyChecklistItem, removeDailyChecklistItem])
+
   const reorderDailyChecklistItem = useCallback((sourceIndex: number, targetIndex: number) => {
     setDailyUpdateForm((previous) => {
       const sourceItem = previous.checklist[sourceIndex]
@@ -1601,11 +1608,8 @@ function App() {
       <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => requestEditDailyChecklistItem(index)}>
         Edit
       </Button>
-      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
-        Remove
-      </Button>
     </div>
-  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, moveDailyChecklistItemByDirection, removeDailyChecklistItem, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
+  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, moveDailyChecklistItemByDirection, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -4802,7 +4806,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit and the drag handle on checklist items to revise details and reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit to revise or remove checklist items, and use the drag handle to reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -5173,6 +5177,7 @@ function App() {
                 placeholder='Checklist item'
               />
               <div className='flex gap-2 justify-end'>
+                <Button variant='destructive' className='mr-auto' onClick={removeEditedDailyChecklistItem}>Remove</Button>
                 <Button variant='secondary' onClick={() => setEditingDailyChecklistItem(null)}>Cancel</Button>
                 <Button onClick={saveEditedDailyChecklistItem}>Save</Button>
               </div>
