@@ -163,6 +163,16 @@ const initialProfileForm: ProfileFormState = {
 
 type DailyUpdateFormState = Omit<DailyUpdate, 'id' | 'patientId' | 'date' | 'lastUpdated'>
 type DailyChecklistItem = DailyUpdateFormState['checklist'][number]
+type MasterChecklistItem = {
+  patientId: number
+  patientIdentifier: string
+  viewDate: string
+  index: number
+  text: string
+  completed: boolean
+  createdDate: string | null
+  completedDate: string | null
+}
 
 type VitalFormState = {
   date: string
@@ -354,17 +364,19 @@ function App() {
   const galleryPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const outputPreviewTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const [form, setForm] = useState<PatientFormState>(initialForm)
-  const [view, setView] = useState<'patients' | 'patient' | 'settings'>('patients')
+  const [view, setView] = useState<'patients' | 'patient' | 'checklist' | 'settings'>('patients')
   const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'active' | 'discharged' | 'all'>('active')
   const [sortBy, setSortBy] = useState<'room' | 'name' | 'admitDate'>('room')
   const [profileForm, setProfileForm] = useState<ProfileFormState>(initialProfileForm)
   const [dailyDate, setDailyDate] = useState(() => toLocalISODate())
+  const [masterChecklistDate, setMasterChecklistDate] = useState(() => toLocalISODate())
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [dailyChecklistDraft, setDailyChecklistDraft] = useState('')
   const [editingDailyChecklistItem, setEditingDailyChecklistItem] = useState<{ index: number; text: string } | null>(null)
+  const [editingMasterChecklistItem, setEditingMasterChecklistItem] = useState<{ patientId: number; index: number; text: string } | null>(null)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
@@ -935,6 +947,86 @@ function App() {
     return map
   }, [patients])
 
+  const dailyUpdatesByPatient = useMemo(() => {
+    const grouped = new Map<number, DailyUpdate[]>()
+    ;(allDailyUpdates ?? []).forEach((entry) => {
+      const list = grouped.get(entry.patientId) ?? []
+      list.push(entry)
+      grouped.set(entry.patientId, list)
+    })
+
+    grouped.forEach((list) => {
+      list.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date)
+        return a.lastUpdated.localeCompare(b.lastUpdated)
+      })
+    })
+
+    return grouped
+  }, [allDailyUpdates])
+
+  const masterChecklistItems = useMemo<MasterChecklistItem[]>(() => {
+    const sortedPatients = [...(patients ?? [])].sort((a, b) => {
+      const byRoom = a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true, sensitivity: 'base' })
+      if (byRoom !== 0) return byRoom
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`)
+    })
+
+    const items: MasterChecklistItem[] = []
+    sortedPatients.forEach((patient) => {
+      if (patient.id === undefined) return
+      const patientId = patient.id
+
+      const updates = dailyUpdatesByPatient.get(patientId) ?? []
+      const priorOrCurrent = updates.filter((entry) => entry.date <= masterChecklistDate)
+      if (priorOrCurrent.length === 0) return
+
+      const dateMatchedUpdate = priorOrCurrent.find((entry) => entry.date === masterChecklistDate)
+      const sourceUpdate = dateMatchedUpdate ?? selectLatestDailyUpdate(priorOrCurrent)
+      if (!sourceUpdate) return
+
+      const scopedChecklist = dateMatchedUpdate
+        ? normalizeChecklistItems(sourceUpdate.checklist)
+        : toPendingChecklistItems(sourceUpdate.checklist)
+      if (scopedChecklist.length === 0) return
+
+      const patientIdentifier = `${patient.roomNumber} - ${patient.lastName}, ${patient.firstName}`
+      const normalizedHistory = priorOrCurrent.map((entry) => ({
+        date: entry.date,
+        checklist: normalizeChecklistItems(entry.checklist),
+      }))
+
+      scopedChecklist.forEach((item, index) => {
+        let createdDate: string | null = null
+        let completedDate: string | null = null
+
+        normalizedHistory.forEach((historyEntry) => {
+          const matchedHistoryItem = historyEntry.checklist.find((historyItem) => historyItem.text === item.text)
+          if (!matchedHistoryItem) return
+          if (createdDate === null) {
+            createdDate = historyEntry.date
+          }
+          if (completedDate === null && matchedHistoryItem.completed) {
+            completedDate = historyEntry.date
+          }
+        })
+
+        items.push({
+          patientId,
+          patientIdentifier,
+          viewDate: masterChecklistDate,
+          index,
+          text: item.text,
+          completed: item.completed,
+          createdDate,
+          completedDate,
+        })
+      })
+    })
+
+    return items
+  }, [dailyUpdatesByPatient, masterChecklistDate, patients])
+
   const reviewablePhotoAttachments = useMemo(() => {
     return (photoAttachments ?? [])
       .filter((entry): entry is ReviewablePhotoAttachment => entry.id !== undefined)
@@ -1155,7 +1247,7 @@ function App() {
     setForm(initialForm)
   }
 
-  const loadDailyUpdate = async (patientId: number, date: string) => {
+  const loadDailyUpdate = useCallback(async (patientId: number, date: string) => {
     const update = await db.dailyUpdates.where('[patientId+date]').equals([patientId, date]).first()
     if (!update) {
       const priorUpdates = (await db.dailyUpdates.where('patientId').equals(patientId).toArray())
@@ -1189,7 +1281,7 @@ function App() {
     })
     setDailyChecklistDraft('')
     setDailyDirty(false)
-  }
+  }, [])
 
   const applyDailyUpdateToForm = useCallback((update: DailyUpdate) => {
     setDailyUpdateForm({
@@ -1396,6 +1488,11 @@ function App() {
     setSelectedTab('profile')
   }
 
+  useEffect(() => {
+    if (view !== 'patient' || selectedPatientId === null || dailyDirty) return
+    void loadDailyUpdate(selectedPatientId, dailyDate)
+  }, [dailyDate, dailyDirty, loadDailyUpdate, selectedPatientId, view])
+
   const toggleDischarge = async (patient: Patient) => {
     if (patient.id === undefined) return
     const discharged = patient.status === 'active'
@@ -1430,6 +1527,37 @@ function App() {
     setOrderForm((previous) => ({ ...previous, [field]: value }))
     setOrderDirty(true)
   }, [])
+
+  const updateMasterChecklist = useCallback(async (
+    patientId: number,
+    updater: (checklist: DailyChecklistItem[]) => DailyChecklistItem[],
+  ) => {
+    const existingEntry = await db.dailyUpdates.where('[patientId+date]').equals([patientId, masterChecklistDate]).first()
+    const entryForDate = existingEntry ?? (() => {
+      const updates = (dailyUpdatesByPatient.get(patientId) ?? []).filter((entry) => entry.date < masterChecklistDate)
+      const latestPriorUpdate = selectLatestDailyUpdate(updates)
+      return {
+        patientId,
+        date: masterChecklistDate,
+        ...initialDailyUpdateForm,
+        checklist: toPendingChecklistItems(latestPriorUpdate?.checklist),
+        lastUpdated: new Date().toISOString(),
+      } satisfies Omit<DailyUpdate, 'id'>
+    })()
+
+    const currentChecklist = normalizeChecklistItems(entryForDate.checklist)
+    const nextChecklist = normalizeChecklistItems(updater(currentChecklist))
+
+    const savedId = await db.dailyUpdates.put({
+      ...entryForDate,
+      id: existingEntry?.id,
+      checklist: nextChecklist,
+      lastUpdated: new Date().toISOString(),
+    })
+    await touchPatientLastModified(patientId)
+
+    return typeof savedId === 'number' ? savedId : existingEntry?.id
+  }, [dailyUpdatesByPatient, masterChecklistDate, touchPatientLastModified])
 
   const addDailyChecklistItem = useCallback(() => {
     const nextText = dailyChecklistDraft.trim()
@@ -1549,6 +1677,106 @@ function App() {
       </Button>
     </div>
   ), [moveDailyChecklistItem, removeDailyChecklistItem, requestEditDailyChecklistItem, updateDailyChecklistItemCompletion])
+
+  const updateMasterChecklistItemCompletion = useCallback((patientId: number, index: number, completed: boolean) => {
+    void updateMasterChecklist(patientId, (previous) => previous.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, completed } : item
+    )))
+  }, [updateMasterChecklist])
+
+  const removeMasterChecklistItem = useCallback((patientId: number, index: number) => {
+    void updateMasterChecklist(patientId, (previous) => previous.filter((_, itemIndex) => itemIndex !== index))
+  }, [updateMasterChecklist])
+
+  const updateMasterChecklistItemText = useCallback((patientId: number, index: number, text: string) => {
+    const nextText = text.trim()
+    if (!nextText) return
+
+    void updateMasterChecklist(patientId, (previous) => previous.map((item, itemIndex) => (
+      itemIndex === index ? { ...item, text: nextText } : item
+    )))
+  }, [updateMasterChecklist])
+
+  const moveMasterChecklistItem = useCallback((patientId: number, index: number, direction: 'up' | 'down') => {
+    void updateMasterChecklist(patientId, (previous) => {
+      const currentItem = previous[index]
+      if (!currentItem) return previous
+
+      let swapIndex = -1
+      if (direction === 'up') {
+        for (let candidateIndex = index - 1; candidateIndex >= 0; candidateIndex -= 1) {
+          if (previous[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      } else {
+        for (let candidateIndex = index + 1; candidateIndex < previous.length; candidateIndex += 1) {
+          if (previous[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      }
+
+      if (swapIndex < 0) return previous
+
+      const nextChecklist = [...previous]
+      const currentValue = nextChecklist[index]
+      nextChecklist[index] = nextChecklist[swapIndex]
+      nextChecklist[swapIndex] = currentValue
+      return nextChecklist
+    })
+  }, [updateMasterChecklist])
+
+  const requestEditMasterChecklistItem = useCallback((item: MasterChecklistItem) => {
+    setEditingMasterChecklistItem({ patientId: item.patientId, index: item.index, text: item.text })
+  }, [])
+
+  const saveEditedMasterChecklistItem = useCallback(() => {
+    if (!editingMasterChecklistItem) return
+
+    updateMasterChecklistItemText(
+      editingMasterChecklistItem.patientId,
+      editingMasterChecklistItem.index,
+      editingMasterChecklistItem.text,
+    )
+    setEditingMasterChecklistItem(null)
+  }, [editingMasterChecklistItem, updateMasterChecklistItemText])
+
+  const renderMasterChecklistItem = useCallback((item: MasterChecklistItem, key: string) => (
+    <div key={key} className={`space-y-1 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
+      <div className='flex items-start gap-2'>
+        <input
+          type='checkbox'
+          className='mt-1 h-4 w-4 accent-action-primary'
+          checked={item.completed}
+          onChange={(event) => updateMasterChecklistItemCompletion(item.patientId, item.index, event.target.checked)}
+          aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
+        />
+        <div className='flex-1'>
+          <p className={`whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
+          <p className='text-[11px] text-clay'>
+            {item.patientIdentifier} • Date: {item.viewDate}
+            {item.createdDate ? ` • Created: ${item.createdDate}` : ''}
+            {item.completedDate ? ` • Completed: ${item.completedDate}` : ''}
+          </p>
+        </div>
+        <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveMasterChecklistItem(item.patientId, item.index, 'up')} aria-label='Move checklist item up'>
+          <span aria-hidden='true'>↑</span>
+        </Button>
+        <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveMasterChecklistItem(item.patientId, item.index, 'down')} aria-label='Move checklist item down'>
+          <span aria-hidden='true'>↓</span>
+        </Button>
+        <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => requestEditMasterChecklistItem(item)}>
+          Edit
+        </Button>
+        <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeMasterChecklistItem(item.patientId, item.index)}>
+          Remove
+        </Button>
+      </div>
+    </div>
+  ), [moveMasterChecklistItem, removeMasterChecklistItem, requestEditMasterChecklistItem, updateMasterChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -2991,6 +3219,16 @@ function App() {
       return accumulator
     }, { pending: [], completed: [] }),
   [dailyUpdateForm.checklist])
+  const masterChecklistSections = useMemo(() =>
+    masterChecklistItems.reduce<{ pending: MasterChecklistItem[]; completed: MasterChecklistItem[] }>((accumulator, item) => {
+      if (item.completed) {
+        accumulator.completed.push(item)
+      } else {
+        accumulator.pending.push(item)
+      }
+      return accumulator
+    }, { pending: [], completed: [] }),
+  [masterChecklistItems])
 
   return (
     <div className='min-h-screen pb-20 sm:pb-0'>
@@ -3038,6 +3276,7 @@ function App() {
                   {focusedPatientNavLabel}
                 </Button>
               ) : null}
+              <Button variant={view === 'checklist' ? 'default' : 'ghost'} size='sm' onClick={() => setView('checklist')}>Checklist</Button>
               <Button variant={view === 'settings' ? 'default' : 'ghost'} size='sm' onClick={() => setView('settings')}>Settings</Button>
             </div>
           </div>
@@ -3149,6 +3388,35 @@ function App() {
               ))}
             </div>
               </>
+            ) : null}
+
+            {view === 'checklist' ? (
+              <Card className='bg-warm-ivory border-clay shadow-sm'>
+                <CardHeader className='pb-2'>
+                  <CardTitle className='text-base text-espresso'>Master Checklist (All Patients)</CardTitle>
+                </CardHeader>
+                <CardContent className='space-y-3'>
+                  <div className='space-y-1 max-w-60'>
+                    <Label htmlFor='master-checklist-date'>Date</Label>
+                    <Input
+                      id='master-checklist-date'
+                      type='date'
+                      value={masterChecklistDate}
+                      onChange={(event) => setMasterChecklistDate(event.target.value)}
+                    />
+                  </div>
+                  <p className='text-xs text-clay'>
+                    Viewing checklist state for {masterChecklistDate}. Pending items carry forward to future dates; completed items stay on their original completion date.
+                  </p>
+                  <div className='space-y-2'>
+                    {masterChecklistSections.pending.map((item) => renderMasterChecklistItem(item, `master-pending-${item.patientId}-${item.index}-${item.text}`))}
+                    {masterChecklistSections.completed.map((item) => renderMasterChecklistItem(item, `master-completed-${item.patientId}-${item.index}-${item.text}`))}
+                    {masterChecklistItems.length === 0 ? (
+                      <p className='text-xs text-clay'>No checklist items for this date.</p>
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
             ) : null}
 
             {view === 'patient' ? (
@@ -4745,6 +5013,7 @@ function App() {
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
                     ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit and ↑/↓ on checklist items to revise details and reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Review all checklist items', 'Open Checklist from the main navigation to see all patient checklist items for one date, including pending and completed entries with created/completed dates. Edit, reorder, and update status there when needed.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -5122,6 +5391,26 @@ function App() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={editingMasterChecklistItem !== null} onOpenChange={(open) => { if (!open) setEditingMasterChecklistItem(null) }}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>Edit checklist item</DialogTitle>
+            </DialogHeader>
+            <div className='space-y-3'>
+              <Input
+                value={editingMasterChecklistItem?.text ?? ''}
+                onChange={(event) => setEditingMasterChecklistItem((previous) => (previous ? { ...previous, text: event.target.value } : previous))}
+                aria-label='Edit master checklist item text'
+                placeholder='Checklist item'
+              />
+              <div className='flex gap-2 justify-end'>
+                <Button variant='secondary' onClick={() => setEditingMasterChecklistItem(null)}>Cancel</Button>
+                <Button onClick={saveEditedMasterChecklistItem}>Save</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <SyncSetupDialog
           open={syncSetupOpen}
           title={syncSetupMode === 'edit' ? 'Edit sync settings' : 'Set up sync'}
@@ -5261,6 +5550,18 @@ function App() {
                 <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
               </button>
             ) : null}
+            <button
+              className={cn(
+                'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',
+                view === 'checklist'
+                  ? 'text-action-primary bg-action-primary/10'
+                  : 'text-clay/70 hover:text-espresso hover:bg-clay/5',
+              )}
+              onClick={() => setView('checklist')}
+            >
+              <CheckCircle2 className='h-5 w-5' />
+              <span>Checklist</span>
+            </button>
             <button
               className={cn(
                 'flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200',

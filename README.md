@@ -41,7 +41,7 @@ It is **not** a shared EHR, team tool, or full EMR — just a fast personal note
 
 ### Navigation
 
-- **Bottom nav on mobile** — Patients / Patient / Settings sticky bar.
+- **Bottom nav on mobile** — Patients / Patient / Checklist / Settings sticky bar.
 - **Top nav on desktop** — same sections, with focused patient shown as *Room – Last name*.
 - Tap **Open** on any patient card to jump directly into the focused patient view.
 - On mobile, the tab row stays fixed just above the bottom nav when a patient is open.
@@ -276,3 +276,9 @@ Then do a quick manual smoke test:
 ## License
 
 [MIT](LICENSE)
+### Master Checklist (All Patients)
+
+- Date picker shows checklist state for the chosen date across all patients.
+- Incomplete items carry forward to future dates; completed items stay on their original completion date.
+- Each row shows patient identifier, date, created date, and completed date (if completed).
+- Checklist entries can be marked done/pending, edited, removed, and reordered from either FRICHMOND or Master Checklist view.
