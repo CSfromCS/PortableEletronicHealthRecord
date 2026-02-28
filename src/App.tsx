@@ -1460,6 +1460,70 @@ function App() {
     setDailyDirty(true)
   }, [])
 
+  const updateDailyChecklistItemText = useCallback((index: number, text: string) => {
+    const nextText = text.trim()
+    if (!nextText) return
+
+    setDailyUpdateForm((previous) => ({
+      ...previous,
+      checklist: previous.checklist.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, text: nextText } : item
+      )),
+    }))
+    setDailyDirty(true)
+  }, [])
+
+  const editDailyChecklistItem = useCallback((index: number) => {
+    const currentItem = dailyUpdateForm.checklist[index]
+    if (!currentItem) return
+
+    const nextText = window.prompt('Edit checklist item', currentItem.text)
+    if (nextText === null) return
+
+    updateDailyChecklistItemText(index, nextText)
+  }, [dailyUpdateForm.checklist, updateDailyChecklistItemText])
+
+  const moveDailyChecklistItem = useCallback((index: number, direction: 'up' | 'down') => {
+    let didMove = false
+
+    setDailyUpdateForm((previous) => {
+      const currentItem = previous.checklist[index]
+      if (!currentItem) return previous
+
+      let swapIndex = -1
+      if (direction === 'up') {
+        for (let candidateIndex = index - 1; candidateIndex >= 0; candidateIndex -= 1) {
+          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      } else {
+        for (let candidateIndex = index + 1; candidateIndex < previous.checklist.length; candidateIndex += 1) {
+          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      }
+
+      if (swapIndex < 0) return previous
+
+      const nextChecklist = [...previous.checklist]
+      ;[nextChecklist[index], nextChecklist[swapIndex]] = [nextChecklist[swapIndex], nextChecklist[index]]
+      didMove = true
+
+      return {
+        ...previous,
+        checklist: nextChecklist,
+      }
+    })
+
+    if (didMove) {
+      setDailyDirty(true)
+    }
+  }, [])
+
   const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
     <div key={`checklist-${index}`} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
       <input
@@ -1470,11 +1534,20 @@ function App() {
         aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
       />
       <p className={`flex-1 whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'up')} aria-label='Move checklist item up'>
+        ↑
+      </Button>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'down')} aria-label='Move checklist item down'>
+        ↓
+      </Button>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => editDailyChecklistItem(index)}>
+        Edit
+      </Button>
       <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
         Remove
       </Button>
     </div>
-  ), [removeDailyChecklistItem, updateDailyChecklistItemCompletion])
+  ), [editDailyChecklistItem, moveDailyChecklistItem, removeDailyChecklistItem, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -4670,7 +4743,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit and ↑/↓ on checklist items to revise details and reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
