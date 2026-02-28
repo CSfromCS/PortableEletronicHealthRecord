@@ -61,6 +61,13 @@ Each open patient has eight focused tabs:
 | **Photos** | Camera capture or gallery pick, organized by section category |
 | **Reporting** | Profile/FRICHMOND/vitals/labs/orders/census exports with lab instance selection and comparison support |
 
+### Master Checklist (All Patients)
+
+- Date picker shows checklist state for the chosen date across all patients.
+- Incomplete items carry forward to future dates; completed items stay on their original completion date.
+- Each row shows patient identifier, date, created date, and completed date (if completed).
+- Checklist entries can be marked done/pending, edited, removed, and reordered from either FRICHMOND or Master Checklist view.
+
 ### Reporting & Export
 
 - **Profile summary** follows room/name header, main/referral service split, `Dx`, and optional `Notes` blocks.
@@ -276,9 +283,3 @@ Then do a quick manual smoke test:
 ## License
 
 [MIT](LICENSE)
-### Master Checklist (All Patients)
-
-- Date picker shows checklist state for the chosen date across all patients.
-- Incomplete items carry forward to future dates; completed items stay on their original completion date.
-- Each row shows patient identifier, date, created date, and completed date (if completed).
-- Checklist entries can be marked done/pending, edited, removed, and reordered from either FRICHMOND or Master Checklist view.

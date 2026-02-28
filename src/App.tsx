@@ -1488,11 +1488,6 @@ function App() {
     setSelectedTab('profile')
   }
 
-  useEffect(() => {
-    if (view !== 'patient' || selectedPatientId === null || dailyDirty) return
-    void loadDailyUpdate(selectedPatientId, dailyDate)
-  }, [dailyDate, dailyDirty, loadDailyUpdate, selectedPatientId, view])
-
   const toggleDischarge = async (patient: Patient) => {
     if (patient.id === undefined) return
     const discharged = patient.status === 'active'
@@ -1722,9 +1717,7 @@ function App() {
       if (swapIndex < 0) return previous
 
       const nextChecklist = [...previous]
-      const currentValue = nextChecklist[index]
-      nextChecklist[index] = nextChecklist[swapIndex]
-      nextChecklist[swapIndex] = currentValue
+      ;[nextChecklist[index], nextChecklist[swapIndex]] = [nextChecklist[swapIndex], nextChecklist[index]]
       return nextChecklist
     })
   }, [updateMasterChecklist])
@@ -3272,7 +3265,16 @@ function App() {
             <div className='flex gap-0.5 bg-blush-sand/60 rounded-xl p-1 border border-clay/15 shadow-sm'>
               <Button variant={view === 'patients' ? 'default' : 'ghost'} size='sm' onClick={() => setView('patients')}>Patients</Button>
               {canShowFocusedPatientNavButton ? (
-                <Button variant={view === 'patient' ? 'default' : 'ghost'} size='sm' onClick={() => setView('patient')}>
+                <Button
+                  variant={view === 'patient' ? 'default' : 'ghost'}
+                  size='sm'
+                  onClick={() => {
+                    if (view !== 'patient' && selectedPatientId !== null) {
+                      void loadDailyUpdate(selectedPatientId, dailyDate)
+                    }
+                    setView('patient')
+                  }}
+                >
                   {focusedPatientNavLabel}
                 </Button>
               ) : null}
@@ -3409,8 +3411,8 @@ function App() {
                     Viewing checklist state for {masterChecklistDate}. Pending items carry forward to future dates; completed items stay on their original completion date.
                   </p>
                   <div className='space-y-2'>
-                    {masterChecklistSections.pending.map((item) => renderMasterChecklistItem(item, `master-pending-${item.patientId}-${item.index}-${item.text}`))}
-                    {masterChecklistSections.completed.map((item) => renderMasterChecklistItem(item, `master-completed-${item.patientId}-${item.index}-${item.text}`))}
+                    {masterChecklistSections.pending.map((item) => renderMasterChecklistItem(item, `master-pending-${item.patientId}-${item.viewDate}-${item.index}`))}
+                    {masterChecklistSections.completed.map((item) => renderMasterChecklistItem(item, `master-completed-${item.patientId}-${item.viewDate}-${item.index}`))}
                     {masterChecklistItems.length === 0 ? (
                       <p className='text-xs text-clay'>No checklist items for this date.</p>
                     ) : null}
@@ -5544,7 +5546,12 @@ function App() {
             {canShowFocusedPatientNavButton ? (
               <button
                 className='flex flex-1 flex-col items-center gap-0.5 px-2 py-1.5 text-xs font-semibold rounded-xl transition-all duration-200 min-w-0 max-w-[42%] text-clay/70 hover:text-espresso hover:bg-clay/5'
-                onClick={() => setView('patient')}
+                onClick={() => {
+                  if (view !== 'patient' && selectedPatientId !== null) {
+                    void loadDailyUpdate(selectedPatientId, dailyDate)
+                  }
+                  setView('patient')
+                }}
               >
                 <UserRound className='h-5 w-5' />
                 <span className='truncate w-full text-center'>{focusedPatientNavLabel}</span>
