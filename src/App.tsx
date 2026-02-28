@@ -1496,9 +1496,24 @@ function App() {
       const targetItem = previous.checklist[targetIndex]
       if (!sourceItem || !targetItem || sourceIndex === targetIndex || sourceItem.completed !== targetItem.completed) return previous
 
+      const matchingIndices = previous.checklist.reduce<number[]>((accumulator, item, index) => {
+        if (item.completed === sourceItem.completed) {
+          accumulator.push(index)
+        }
+        return accumulator
+      }, [])
+      const sourcePosition = matchingIndices.indexOf(sourceIndex)
+      const targetPosition = matchingIndices.indexOf(targetIndex)
+      if (sourcePosition < 0 || targetPosition < 0) return previous
+
+      const matchingItems = matchingIndices.map((index) => previous.checklist[index])
+      const [movedItem] = matchingItems.splice(sourcePosition, 1)
+      matchingItems.splice(targetPosition, 0, movedItem)
+
       const nextChecklist = [...previous.checklist]
-      nextChecklist[sourceIndex] = targetItem
-      nextChecklist[targetIndex] = sourceItem
+      matchingIndices.forEach((index, itemPosition) => {
+        nextChecklist[index] = matchingItems[itemPosition]
+      })
 
       return {
         ...previous,
@@ -1539,6 +1554,19 @@ function App() {
     setDraggingDailyChecklistItemIndex(null)
   }, [draggingDailyChecklistItemIndex, reorderDailyChecklistItem])
 
+  const moveDailyChecklistItemByDirection = useCallback((index: number, direction: 'up' | 'down') => {
+    const currentItem = dailyUpdateForm.checklist[index]
+    if (!currentItem) return
+
+    const step = direction === 'up' ? -1 : 1
+    for (let candidateIndex = index + step; candidateIndex >= 0 && candidateIndex < dailyUpdateForm.checklist.length; candidateIndex += step) {
+      if (dailyUpdateForm.checklist[candidateIndex]?.completed === currentItem.completed) {
+        reorderDailyChecklistItem(index, candidateIndex)
+        return
+      }
+    }
+  }, [dailyUpdateForm.checklist, reorderDailyChecklistItem])
+
   const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
     <div
       key={`checklist-${index}`}
@@ -1562,6 +1590,11 @@ function App() {
         draggable
         onDragStart={(event) => startDailyChecklistDrag(event, index)}
         onDragEnd={endDailyChecklistDrag}
+        onKeyDown={(event) => {
+          if (!(event.ctrlKey || event.metaKey) || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+          event.preventDefault()
+          moveDailyChecklistItemByDirection(index, event.key === 'ArrowUp' ? 'up' : 'down')
+        }}
       >
         <GripVertical className='h-3.5 w-3.5' aria-hidden='true' />
       </Button>
@@ -1572,7 +1605,7 @@ function App() {
         Remove
       </Button>
     </div>
-  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, removeDailyChecklistItem, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
+  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, moveDailyChecklistItemByDirection, removeDailyChecklistItem, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -3457,7 +3490,7 @@ function App() {
                     <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date (or previous date when today is latest).</p>
                     <div className='space-y-2'>
                       <Label>Checklist</Label>
-                      <p className='text-xs text-clay'>Drag the handle to reorder items within pending or completed sections.</p>
+                      <p className='text-xs text-clay'>Drag the handle to reorder items within pending or completed sections. Keyboard: focus handle then press Ctrl/⌘ + ↑/↓.</p>
                       <div className='flex flex-wrap gap-2'>
                         <Input
                           value={dailyChecklistDraft}
