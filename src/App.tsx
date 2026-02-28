@@ -364,6 +364,7 @@ function App() {
   const [dailyUpdateForm, setDailyUpdateForm] = useState<DailyUpdateFormState>(initialDailyUpdateForm)
   const [dailyUpdateId, setDailyUpdateId] = useState<number | undefined>(undefined)
   const [dailyChecklistDraft, setDailyChecklistDraft] = useState('')
+  const [editingDailyChecklistItem, setEditingDailyChecklistItem] = useState<{ index: number; text: string } | null>(null)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
@@ -1460,6 +1461,70 @@ function App() {
     setDailyDirty(true)
   }, [])
 
+  const updateDailyChecklistItemText = useCallback((index: number, text: string) => {
+    const nextText = text.trim()
+    if (!nextText) return
+
+    setDailyUpdateForm((previous) => ({
+      ...previous,
+      checklist: previous.checklist.map((item, itemIndex) => (
+        itemIndex === index ? { ...item, text: nextText } : item
+      )),
+    }))
+    setDailyDirty(true)
+  }, [])
+
+  const requestEditDailyChecklistItem = useCallback((index: number) => {
+    const currentItem = dailyUpdateForm.checklist[index]
+    if (!currentItem) return
+
+    setEditingDailyChecklistItem({ index, text: currentItem.text })
+  }, [dailyUpdateForm.checklist])
+
+  const saveEditedDailyChecklistItem = useCallback(() => {
+    if (!editingDailyChecklistItem) return
+
+    updateDailyChecklistItemText(editingDailyChecklistItem.index, editingDailyChecklistItem.text)
+    setEditingDailyChecklistItem(null)
+  }, [editingDailyChecklistItem, updateDailyChecklistItemText])
+
+  const moveDailyChecklistItem = useCallback((index: number, direction: 'up' | 'down') => {
+    setDailyUpdateForm((previous) => {
+      const currentItem = previous.checklist[index]
+      if (!currentItem) return previous
+
+      let swapIndex = -1
+      if (direction === 'up') {
+        for (let candidateIndex = index - 1; candidateIndex >= 0; candidateIndex -= 1) {
+          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      } else {
+        for (let candidateIndex = index + 1; candidateIndex < previous.checklist.length; candidateIndex += 1) {
+          if (previous.checklist[candidateIndex]?.completed === currentItem.completed) {
+            swapIndex = candidateIndex
+            break
+          }
+        }
+      }
+
+      if (swapIndex < 0) return previous
+
+      const nextChecklist = [...previous.checklist]
+      const currentValue = nextChecklist[index]
+      nextChecklist[index] = nextChecklist[swapIndex]
+      nextChecklist[swapIndex] = currentValue
+
+      return {
+        ...previous,
+        checklist: nextChecklist,
+      }
+    })
+    setDailyDirty(true)
+  }, [])
+
   const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
     <div key={`checklist-${index}`} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'}`}>
       <input
@@ -1470,11 +1535,20 @@ function App() {
         aria-label={item.completed ? 'Mark checklist item pending' : 'Mark checklist item complete'}
       />
       <p className={`flex-1 whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'up')} aria-label='Move checklist item up'>
+        <span aria-hidden='true'>↑</span>
+      </Button>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveDailyChecklistItem(index, 'down')} aria-label='Move checklist item down'>
+        <span aria-hidden='true'>↓</span>
+      </Button>
+      <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => requestEditDailyChecklistItem(index)}>
+        Edit
+      </Button>
       <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => removeDailyChecklistItem(index)}>
         Remove
       </Button>
     </div>
-  ), [removeDailyChecklistItem, updateDailyChecklistItemCompletion])
+  ), [moveDailyChecklistItem, removeDailyChecklistItem, requestEditDailyChecklistItem, updateDailyChecklistItemCompletion])
 
   const updateLabTemplateValue = useCallback((testKey: string, value: string) => {
     setLabTemplateValues((previous) => ({ ...previous, [testKey]: value }))
@@ -4670,7 +4744,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit and ↑/↓ on checklist items to revise details and reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (
@@ -5024,6 +5098,26 @@ function App() {
             <div className='flex gap-2 flex-wrap justify-center'>
               <Button variant='destructive' onClick={() => void confirmDeleteDailyUpdate()}>Yes, delete entry</Button>
               <Button variant='secondary' onClick={closeDeleteDailyConfirm}>Cancel</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editingDailyChecklistItem !== null} onOpenChange={(open) => { if (!open) setEditingDailyChecklistItem(null) }}>
+          <DialogContent className='max-w-md'>
+            <DialogHeader>
+              <DialogTitle>Edit checklist item</DialogTitle>
+            </DialogHeader>
+            <div className='space-y-3'>
+              <Input
+                value={editingDailyChecklistItem?.text ?? ''}
+                onChange={(event) => setEditingDailyChecklistItem((previous) => (previous ? { ...previous, text: event.target.value } : previous))}
+                aria-label='Edit checklist item text'
+                placeholder='Checklist item'
+              />
+              <div className='flex gap-2 justify-end'>
+                <Button variant='secondary' onClick={() => setEditingDailyChecklistItem(null)}>Cancel</Button>
+                <Button onClick={saveEditedDailyChecklistItem}>Save</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
