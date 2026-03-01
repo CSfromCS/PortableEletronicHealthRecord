@@ -249,10 +249,10 @@ const isSyncPayload = (value: unknown): value is SyncPayload => {
     && typeof candidate.deviceTag === 'string'
     && Array.isArray(candidate.patients)
     && Array.isArray(candidate.dailyUpdates)
-    && Array.isArray(candidate.vitals ?? [])
-    && Array.isArray(candidate.medications ?? [])
-    && Array.isArray(candidate.labs ?? [])
-    && Array.isArray(candidate.orders ?? [])
+    && (candidate.vitals === undefined || Array.isArray(candidate.vitals))
+    && (candidate.medications === undefined || Array.isArray(candidate.medications))
+    && (candidate.labs === undefined || Array.isArray(candidate.labs))
+    && (candidate.orders === undefined || Array.isArray(candidate.orders))
   )
 }
 
@@ -264,12 +264,12 @@ const replaceSyncedTables = async (payload: SyncPayload): Promise<void> => {
   const ordersToStore = payload.orders ?? []
 
   await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders], async () => {
-    await db.orders.clear()
-    await db.labs.clear()
-    await db.medications.clear()
-    await db.vitals.clear()
-    await db.dailyUpdates.clear()
     await db.patients.clear()
+    await db.dailyUpdates.clear()
+    await db.vitals.clear()
+    await db.medications.clear()
+    await db.labs.clear()
+    await db.orders.clear()
 
     if (patientsToStore.length > 0) {
       await db.patients.bulkPut(patientsToStore)
