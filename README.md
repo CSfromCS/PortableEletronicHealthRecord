@@ -41,7 +41,7 @@ It is **not** a shared EHR, team tool, or full EMR — just a fast personal note
 
 ### Navigation
 
-- **Bottom nav on mobile** — Patients / Patient / Settings sticky bar.
+- **Bottom nav on mobile** — Patients / Patient / Checklist / Settings sticky bar.
 - **Top nav on desktop** — same sections, with focused patient shown as *Room – Last name*.
 - Tap **Open** on any patient card to jump directly into the focused patient view.
 - On mobile, the tab row stays fixed just above the bottom nav when a patient is open.
@@ -60,6 +60,13 @@ Each open patient has eight focused tabs:
 | **Orders** | Doctor's orders — add, edit status, remove in one place |
 | **Photos** | Camera capture or gallery pick, organized by section category |
 | **Reporting** | Profile/FRICHMOND/vitals/labs/orders/census exports with lab instance selection and comparison support |
+
+### Master Checklist (All Patients)
+
+- Date picker shows checklist state for the chosen date across all patients.
+- Incomplete items carry forward to future dates; completed items stay on their original completion date.
+- Each row shows patient identifier, date, created date, and completed date (if completed).
+- Checklist entries can be marked done/pending, edited, removed, and reordered from either FRICHMOND or Master Checklist view.
 
 ### Reporting & Export
 
