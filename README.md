@@ -65,7 +65,7 @@ Each open patient has eight focused tabs:
 
 - Date picker shows checklist state for the chosen date across all patients.
 - Incomplete items carry forward to future dates; completed items stay on their original completion date.
-- Each row shows patient identifier, date, created date, and completed date (if completed).
+- Each row shows patient identifier plus created/completed dates (if present), displayed in short format (e.g., `Feb 10`).
 - Checklist entries can be marked done/pending, edited, removed, and reordered from either FRICHMOND or Master Checklist view.
 
 ### Reporting & Export

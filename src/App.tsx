@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils'
 import {
   formatClock,
   formatDateMMDD,
+  formatDateShortMonthDay,
   formatCalculatedNumber,
   parseNumericInput,
   toLocalISODate,
@@ -1875,9 +1876,9 @@ function App() {
         <div className='flex-1'>
           <p className={`whitespace-pre-wrap text-sm ${item.completed ? 'text-clay line-through' : 'text-espresso'}`}>{item.text}</p>
           <p className='text-[11px] text-clay'>
-            {item.patientIdentifier} • Date: {item.viewDate}
-            {item.createdDate ? ` • Created: ${item.createdDate}` : ''}
-            {item.completedDate ? ` • Completed: ${item.completedDate}` : ''}
+            {item.patientIdentifier}
+            {item.createdDate ? ` • Created: ${formatDateShortMonthDay(item.createdDate)}` : ''}
+            {item.completedDate ? ` • Completed: ${formatDateShortMonthDay(item.completedDate)}` : ''}
           </p>
         </div>
         <Button type='button' variant='ghost' className='h-6 px-2 text-xs' onClick={() => moveMasterChecklistItem(item.patientId, item.index, 'up')} aria-label='Move checklist item up'>
@@ -3533,7 +3534,7 @@ function App() {
                     />
                   </div>
                   <p className='text-xs text-clay'>
-                    Viewing checklist state for {masterChecklistDate}. Pending items carry forward to future dates; completed items stay on their original completion date.
+                    Viewing checklist state for {formatDateShortMonthDay(masterChecklistDate)}. Pending items carry forward to future dates; completed items stay on their original completion date.
                   </p>
                   <div className='space-y-2'>
                     {masterChecklistSections.pending.map((item) => renderMasterChecklistItem(item, `master-pending-${item.patientId}-${item.viewDate}-${item.index}`))}
@@ -5141,7 +5142,7 @@ function App() {
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
                     ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit to revise or remove checklist items, and use the drag handle to reorder priorities (on mobile, press and hold the handle then drag). Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
-                    ['Review all checklist items', 'Open Checklist from the main navigation to see all patient checklist items for one date, including pending and completed entries with created/completed dates. Edit, reorder, and update status there when needed.'],
+                    ['Review all checklist items', 'Open Checklist from the main navigation to see all patient checklist items for one date, including pending and completed entries with Created/Completed dates shown in short format (e.g., Feb 10). Edit, reorder, and update status there when needed.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
                   ] as [string, string][]).map(([title, detail], i) => (

@@ -35,6 +35,19 @@ export const formatDateMMDD = (isoDate: string) => {
   return `${month}-${day}`
 }
 
+export const formatDateShortMonthDay = (isoDate: string) => {
+  const [yearText, monthText, dayText] = isoDate.split('-')
+  const year = Number.parseInt(yearText ?? '', 10)
+  const month = Number.parseInt(monthText ?? '', 10)
+  const day = Number.parseInt(dayText ?? '', 10)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return isoDate
+
+  const date = new Date(year, month - 1, day)
+  if (Number.isNaN(date.getTime())) return isoDate
+
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date)
+}
+
 export const formatClock = (time: string) => {
   const [hourText, minuteText = '00'] = time.split(':')
   const hour = Number.parseInt(hourText, 10)
