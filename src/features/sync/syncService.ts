@@ -1,5 +1,12 @@
 import { db } from '@/db'
-import type { DailyUpdate, Patient } from '@/types'
+import type {
+  DailyUpdate,
+  LabEntry,
+  MedicationEntry,
+  OrderEntry,
+  Patient,
+  VitalEntry,
+} from '@/types'
 import { decryptBlobToPayload, encryptPayloadToBlob, sha256Hex } from './crypto'
 
 const SYNC_CONFIG_STORAGE_KEY = 'puhrr.sync.config'
@@ -14,6 +21,10 @@ type SyncPayload = {
   deviceTag: string
   patients: Patient[]
   dailyUpdates: DailyUpdate[]
+  vitals: VitalEntry[]
+  medications: MedicationEntry[]
+  labs: LabEntry[]
+  orders: OrderEntry[]
 }
 
 type RemoteDescription = {
@@ -142,9 +153,13 @@ const parseDescription = (descriptionRaw: string): RemoteDescription | null => {
 const toIsoNow = (): string => new Date().toISOString()
 
 const getLatestLocalChangeAt = async (): Promise<string | null> => {
-  const [patients, dailyUpdates] = await Promise.all([
+  const [patients, dailyUpdates, vitals, medications, labs, orders] = await Promise.all([
     db.patients.toArray(),
     db.dailyUpdates.toArray(),
+    db.vitals.toArray(),
+    db.medications.toArray(),
+    db.labs.toArray(),
+    db.orders.toArray(),
   ])
 
   let latestTimestamp = 0
@@ -163,13 +178,45 @@ const getLatestLocalChangeAt = async (): Promise<string | null> => {
     }
   }
 
+  for (const vital of vitals) {
+    const parsed = Date.parse(vital.createdAt ?? vital.date)
+    if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+      latestTimestamp = parsed
+    }
+  }
+
+  for (const medication of medications) {
+    const parsed = Date.parse(medication.createdAt)
+    if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+      latestTimestamp = parsed
+    }
+  }
+
+  for (const lab of labs) {
+    const parsed = Date.parse(lab.createdAt ?? lab.date)
+    if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+      latestTimestamp = parsed
+    }
+  }
+
+  for (const order of orders) {
+    const parsed = Date.parse(order.createdAt ?? order.orderDate)
+    if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+      latestTimestamp = parsed
+    }
+  }
+
   return latestTimestamp > 0 ? new Date(latestTimestamp).toISOString() : null
 }
 
 const exportSyncPayload = async (deviceTag: string): Promise<SyncPayload> => {
-  const [patients, dailyUpdates] = await Promise.all([
+  const [patients, dailyUpdates, vitals, medications, labs, orders] = await Promise.all([
     db.patients.toArray(),
     db.dailyUpdates.toArray(),
+    db.vitals.toArray(),
+    db.medications.toArray(),
+    db.labs.toArray(),
+    db.orders.toArray(),
   ])
 
   return {
@@ -178,6 +225,10 @@ const exportSyncPayload = async (deviceTag: string): Promise<SyncPayload> => {
     deviceTag,
     patients,
     dailyUpdates,
+    vitals,
+    medications,
+    labs,
+    orders,
   }
 }
 
@@ -198,15 +249,27 @@ const isSyncPayload = (value: unknown): value is SyncPayload => {
     && typeof candidate.deviceTag === 'string'
     && Array.isArray(candidate.patients)
     && Array.isArray(candidate.dailyUpdates)
+    && (candidate.vitals === undefined || Array.isArray(candidate.vitals))
+    && (candidate.medications === undefined || Array.isArray(candidate.medications))
+    && (candidate.labs === undefined || Array.isArray(candidate.labs))
+    && (candidate.orders === undefined || Array.isArray(candidate.orders))
   )
 }
 
 const replaceSyncedTables = async (payload: SyncPayload): Promise<void> => {
   const patientsToStore = payload.patients.map((patient) => sanitizeImportedPatient(patient))
+  const vitalsToStore = payload.vitals ?? []
+  const medicationsToStore = payload.medications ?? []
+  const labsToStore = payload.labs ?? []
+  const ordersToStore = payload.orders ?? []
 
-  await db.transaction('rw', [db.patients, db.dailyUpdates], async () => {
-    await db.dailyUpdates.clear()
+  await db.transaction('rw', [db.patients, db.dailyUpdates, db.vitals, db.medications, db.labs, db.orders], async () => {
     await db.patients.clear()
+    await db.dailyUpdates.clear()
+    await db.vitals.clear()
+    await db.medications.clear()
+    await db.labs.clear()
+    await db.orders.clear()
 
     if (patientsToStore.length > 0) {
       await db.patients.bulkPut(patientsToStore)
@@ -214,6 +277,22 @@ const replaceSyncedTables = async (payload: SyncPayload): Promise<void> => {
 
     if (payload.dailyUpdates.length > 0) {
       await db.dailyUpdates.bulkPut(payload.dailyUpdates)
+    }
+
+    if (vitalsToStore.length > 0) {
+      await db.vitals.bulkPut(vitalsToStore)
+    }
+
+    if (medicationsToStore.length > 0) {
+      await db.medications.bulkPut(medicationsToStore)
+    }
+
+    if (labsToStore.length > 0) {
+      await db.labs.bulkPut(labsToStore)
+    }
+
+    if (ordersToStore.length > 0) {
+      await db.orders.bulkPut(ordersToStore)
     }
   })
 }
