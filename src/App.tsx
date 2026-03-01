@@ -7,6 +7,7 @@ import {
   type ChangeEvent,
   type DragEvent,
   type FormEvent,
+  type TouchEvent,
 } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db'
@@ -379,6 +380,7 @@ function App() {
   const [editingDailyChecklistItem, setEditingDailyChecklistItem] = useState<{ index: number; text: string } | null>(null)
   const [editingMasterChecklistItem, setEditingMasterChecklistItem] = useState<{ patientId: number; index: number; text: string } | null>(null)
   const [draggingDailyChecklistItemIndex, setDraggingDailyChecklistItemIndex] = useState<number | null>(null)
+  const [touchDailyChecklistTargetIndex, setTouchDailyChecklistTargetIndex] = useState<number | null>(null)
   const [vitalForm, setVitalForm] = useState<VitalFormState>(() => initialVitalForm())
   const [editingVitalId, setEditingVitalId] = useState<number | null>(null)
   const [vitalDraftId, setVitalDraftId] = useState<number | null>(null)
@@ -1658,9 +1660,66 @@ function App() {
     setDraggingDailyChecklistItemIndex(index)
   }, [])
 
-  const endDailyChecklistDrag = useCallback(() => {
+  const resetDailyChecklistDragState = useCallback(() => {
     setDraggingDailyChecklistItemIndex(null)
+    setTouchDailyChecklistTargetIndex(null)
   }, [])
+
+  const endDailyChecklistDrag = useCallback(() => {
+    resetDailyChecklistDragState()
+  }, [resetDailyChecklistDragState])
+
+  const startDailyChecklistTouchDrag = useCallback((event: TouchEvent<HTMLButtonElement>, index: number) => {
+    event.preventDefault()
+    setDraggingDailyChecklistItemIndex(index)
+    setTouchDailyChecklistTargetIndex(index)
+  }, [])
+
+  const updateDailyChecklistTouchTarget = useCallback((event: TouchEvent<HTMLButtonElement>) => {
+    if (draggingDailyChecklistItemIndex === null) return
+
+    const touchPoint = event.touches[0]
+    if (!touchPoint) return
+
+    const targetElement = document.elementFromPoint(touchPoint.clientX, touchPoint.clientY)
+    const checklistItemContainer = targetElement?.closest('[data-daily-checklist-index]')
+    if (!(checklistItemContainer instanceof HTMLElement)) {
+      setTouchDailyChecklistTargetIndex(null)
+      return
+    }
+
+    const parsedTargetIndex = Number.parseInt(checklistItemContainer.dataset.dailyChecklistIndex ?? '', 10)
+    if (!Number.isInteger(parsedTargetIndex)) {
+      setTouchDailyChecklistTargetIndex(null)
+      return
+    }
+
+    const sourceItem = dailyUpdateForm.checklist[draggingDailyChecklistItemIndex]
+    const targetItem = dailyUpdateForm.checklist[parsedTargetIndex]
+    if (!sourceItem || !targetItem || sourceItem.completed !== targetItem.completed) {
+      setTouchDailyChecklistTargetIndex(null)
+      return
+    }
+
+    event.preventDefault()
+    setTouchDailyChecklistTargetIndex(parsedTargetIndex)
+  }, [dailyUpdateForm.checklist, draggingDailyChecklistItemIndex])
+
+  const endDailyChecklistTouchDrag = useCallback(() => {
+    if (
+      draggingDailyChecklistItemIndex !== null
+      && touchDailyChecklistTargetIndex !== null
+      && draggingDailyChecklistItemIndex !== touchDailyChecklistTargetIndex
+    ) {
+      reorderDailyChecklistItem(draggingDailyChecklistItemIndex, touchDailyChecklistTargetIndex)
+    }
+
+    resetDailyChecklistDragState()
+  }, [draggingDailyChecklistItemIndex, reorderDailyChecklistItem, resetDailyChecklistDragState, touchDailyChecklistTargetIndex])
+
+  const cancelDailyChecklistTouchDrag = useCallback(() => {
+    resetDailyChecklistDragState()
+  }, [resetDailyChecklistDragState])
 
   const allowDailyChecklistDrop = useCallback((event: DragEvent<HTMLDivElement>, targetIndex: number) => {
     if (draggingDailyChecklistItemIndex === null || draggingDailyChecklistItemIndex === targetIndex) return
@@ -1676,13 +1735,13 @@ function App() {
   const dropDailyChecklistItem = useCallback((event: DragEvent<HTMLDivElement>, targetIndex: number) => {
     event.preventDefault()
     if (draggingDailyChecklistItemIndex === null || draggingDailyChecklistItemIndex === targetIndex) {
-      setDraggingDailyChecklistItemIndex(null)
+      resetDailyChecklistDragState()
       return
     }
 
     reorderDailyChecklistItem(draggingDailyChecklistItemIndex, targetIndex)
-    setDraggingDailyChecklistItemIndex(null)
-  }, [draggingDailyChecklistItemIndex, reorderDailyChecklistItem])
+    resetDailyChecklistDragState()
+  }, [draggingDailyChecklistItemIndex, reorderDailyChecklistItem, resetDailyChecklistDragState])
 
   const moveDailyChecklistItemByDirection = useCallback((index: number, direction: 'up' | 'down') => {
     const currentItem = dailyUpdateForm.checklist[index]
@@ -1700,7 +1759,8 @@ function App() {
   const renderDailyChecklistItem = useCallback((item: DailyChecklistItem, index: number) => (
     <div
       key={`checklist-${index}`}
-      className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'} ${draggingDailyChecklistItemIndex === index ? 'opacity-60' : ''}`}
+      data-daily-checklist-index={index}
+      className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${item.completed ? 'border border-clay/20 bg-warm-ivory/70' : 'border border-clay/30 bg-warm-ivory'} ${draggingDailyChecklistItemIndex === index ? 'opacity-60' : ''} ${touchDailyChecklistTargetIndex === index && draggingDailyChecklistItemIndex !== null ? 'ring-2 ring-action-primary/40 ring-offset-1 ring-offset-transparent' : ''}`}
       onDragOver={(event) => allowDailyChecklistDrop(event, index)}
       onDrop={(event) => dropDailyChecklistItem(event, index)}
     >
@@ -1715,11 +1775,15 @@ function App() {
       <Button
         type='button'
         variant='ghost'
-        className='h-6 w-6 shrink-0 p-0 text-clay cursor-grab active:cursor-grabbing'
+        className='h-6 w-6 shrink-0 p-0 text-clay cursor-grab active:cursor-grabbing touch-none'
         aria-label='Drag checklist item to reorder'
         draggable
         onDragStart={(event) => startDailyChecklistDrag(event, index)}
         onDragEnd={endDailyChecklistDrag}
+        onTouchStart={(event) => startDailyChecklistTouchDrag(event, index)}
+        onTouchMove={updateDailyChecklistTouchTarget}
+        onTouchEnd={endDailyChecklistTouchDrag}
+        onTouchCancel={cancelDailyChecklistTouchDrag}
         onKeyDown={(event) => {
           if (!(event.ctrlKey || event.metaKey) || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
           event.preventDefault()
@@ -1732,7 +1796,7 @@ function App() {
         Edit
       </Button>
     </div>
-  ), [allowDailyChecklistDrop, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, moveDailyChecklistItemByDirection, requestEditDailyChecklistItem, startDailyChecklistDrag, updateDailyChecklistItemCompletion])
+  ), [allowDailyChecklistDrop, cancelDailyChecklistTouchDrag, draggingDailyChecklistItemIndex, dropDailyChecklistItem, endDailyChecklistDrag, endDailyChecklistTouchDrag, moveDailyChecklistItemByDirection, requestEditDailyChecklistItem, startDailyChecklistDrag, startDailyChecklistTouchDrag, touchDailyChecklistTargetIndex, updateDailyChecklistItemCompletion, updateDailyChecklistTouchTarget])
 
   const updateMasterChecklistItemCompletion = useCallback((patientId: number, index: number, completed: boolean) => {
     void updateMasterChecklist(patientId, (previous) => previous.map((item, itemIndex) => (
@@ -3764,7 +3828,7 @@ function App() {
                     <p className='text-xs text-clay'>Copies all daily fields (FRICHMOND, assessment, plan) and carries over only pending checklist items from the latest saved date (or previous date when today is latest).</p>
                     <div className='space-y-2'>
                       <Label>Checklist</Label>
-                      <p className='text-xs text-clay'>Drag the handle to reorder items within pending or completed sections. Keyboard: focus handle then press Ctrl/⌘ + ↑/↓.</p>
+                      <p className='text-xs text-clay'>Drag the handle to reorder items within pending or completed sections. On mobile, press and hold the handle then drag. Keyboard: focus handle then press Ctrl/⌘ + ↑/↓.</p>
                       <div className='flex flex-wrap gap-2'>
                         <Input
                           value={dailyChecklistDraft}
@@ -5076,7 +5140,7 @@ function App() {
                     ['Open a patient', 'Tap Open on any patient card to enter the patient view with all clinical tabs.'],
                     ['Navigate on mobile', 'The bottom bar shows all 8 patient sections in a 2-row grid — tap any to switch. Use ← Back to return to the patient list.'],
                     ['Switch patients', 'Tap the patient name at the top of any tab to jump to a different patient while staying on the same section.'],
-                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit to revise or remove checklist items, and use the drag handle to reorder priorities. Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
+                    ['Write daily notes', 'Open FRICH, pick today\'s date, fill F-R-I-C-H-M-O-N-D fields, plan, and checklist. Use Edit to revise or remove checklist items, and use the drag handle to reorder priorities (on mobile, press and hold the handle then drag). Tap Copy latest entry to carry forward yesterday\'s note with pending checklist items only.'],
                     ['Review all checklist items', 'Open Checklist from the main navigation to see all patient checklist items for one date, including pending and completed entries with created/completed dates. Edit, reorder, and update status there when needed.'],
                     ['Generate reports', 'Open Report, configure filters, tap any export button to preview, then Copy full text to paste into a handoff or chart.'],
                     ['Back up your data', 'Go to Settings → Export backup regularly, especially before switching devices or browsers.'],
